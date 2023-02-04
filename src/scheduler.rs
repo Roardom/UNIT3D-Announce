@@ -4,11 +4,13 @@ mod history_update;
 mod peer_deletion;
 mod peer_update;
 mod torrent_update;
+mod user_update;
 
 pub use history_update::HistoryUpdateBuffer;
 pub use peer_deletion::PeerDeletionBuffer;
 pub use peer_update::PeerUpdateBuffer;
 pub use torrent_update::TorrentUpdateBuffer;
+pub use user_update::UserUpdateBuffer;
 
 use crate::tracker::Tracker;
 use chrono::{Duration, Utc};
@@ -32,6 +34,7 @@ pub async fn handle(tracker: &Arc<Tracker>) {
             tracker.peer_updates.flush_to_db(&tracker.pool).await;
             tracker.peer_deletions.flush_to_db(&tracker.pool).await;
             tracker.torrent_updates.flush_to_db(&tracker.pool).await;
+            tracker.user_updates.flush_to_db(&tracker.pool).await;
         }
 
         if counter % tracker.config.peer_expiry_interval == 0 {

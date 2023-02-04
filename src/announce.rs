@@ -417,14 +417,17 @@ pub async fn announce(
         std::cmp::max(user.upload_factor, torrent.upload_factor),
     );
 
+    let credited_uploaded_delta = upload_factor as u64 * uploaded_delta / 100;
+    let credited_downloaded_delta = download_factor as u64 * downloaded_delta / 100;
+
     tracker.history_updates.upsert(
         user.id,
         torrent.id,
         UserAgent::from_str(user_agent).unwrap(),
-        upload_factor as u64 * uploaded_delta / 100,
+        credited_uploaded_delta,
         uploaded_delta,
         queries.uploaded,
-        download_factor as u64 * downloaded_delta / 100,
+        credited_downloaded_delta,
         downloaded_delta,
         queries.downloaded,
         queries.left != 0,
@@ -432,7 +435,9 @@ pub async fn announce(
         user.is_immune,
     );
 
-    // TODO: Need to add a user update to increase the uploaded and downloaded columns
+    tracker
+        .user_updates
+        .upsert(user.id, credited_uploaded_delta, credited_downloaded_delta);
 
     let mut peer_list: Vec<_> = Vec::new();
 

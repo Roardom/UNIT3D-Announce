@@ -16,6 +16,7 @@ use crate::config;
 use crate::error::Error;
 use crate::scheduler::{
     HistoryUpdateBuffer, PeerDeletionBuffer, PeerUpdateBuffer, TorrentUpdateBuffer,
+    UserUpdateBuffer,
 };
 use crate::stats::Stats;
 use crate::tracker::personal_freeleech::PersonalFreeleechSet;
@@ -44,6 +45,7 @@ pub struct Tracker {
     pub torrents: Arc<TorrentMap>,
     pub torrent_updates: TorrentUpdateBuffer,
     pub users: UserMap,
+    pub user_updates: UserUpdateBuffer,
 }
 
 impl Tracker {
@@ -113,7 +115,7 @@ impl Tracker {
             torrents,
             torrent_updates: TorrentUpdateBuffer::new(),
             users,
-            // user_updates: DashMap::new(),
+            user_updates: UserUpdateBuffer::new(),
         }))
     }
 }
