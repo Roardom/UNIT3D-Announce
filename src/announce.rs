@@ -327,7 +327,9 @@ pub async fn announce(
             tracker::Peer {
                 ip_address: addr.ip(),
                 user_id: user.id,
+                torrent_id: torrent.id,
                 port: queries.port,
+                peer_id: queries.peer_id,
                 is_seeder: queries.left == 0,
                 is_active: true,
                 updated_at: Utc::now(),

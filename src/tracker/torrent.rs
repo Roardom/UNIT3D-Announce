@@ -21,6 +21,7 @@ impl Map {
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Map, Error> {
+        let peers = peer::Map::from_db(db).await?;
         // TODO: deleted_at column still needs added to unit3d. Until then, no
         // torrents are considered deleted.
         let torrents: Vec<Torrent> = sqlx::query!(
@@ -43,22 +44,40 @@ impl Map {
                     torrents.id = featured_torrents.torrent_id
             "#
         )
-        // If https://github.com/launchbadge/sqlx/issues/1106 is ever solved,
-        // then `map` would not be necessary as we could just add
-        // "SELECT NULL as `peers: PeerMap`" to the query and use sqlx's
-        // query_as! macro
-        .map(|row| Torrent {
-            id: row.id,
-            info_hash: row.info_hash,
-            status: row.status,
-            seeders: row.seeders,
-            leechers: row.leechers,
-            times_completed: row.times_completed,
-            download_factor: row.download_factor,
-            upload_factor: row.upload_factor,
-            is_deleted: row.is_deleted,
-            peers: Arc::new(peer::Map::default()),
-        })
+        .map(|row| {
+            let torrent = Torrent {
+                id: row.id,
+                info_hash: row.info_hash,
+                status: row.status,
+                seeders: row.seeders,
+                leechers: row.leechers,
+                times_completed: row.times_completed,
+                download_factor: row.download_factor,
+                upload_factor: row.upload_factor,
+                is_deleted: row.is_deleted,
+                peers: Arc::new(peer::Map::default()),
+            };
+
+            let peers = peers.iter().filter_map(|peer| {
+                if peer.torrent_id == row.id {
+                    Some(peer)
+                } else {
+                    None
+                }
+            });
+
+            for peer in peers {
+                torrent.peers.insert(
+                    peer::Index {
+                        user_id: peer.user_id,
+                        peer_id: peer.peer_id,
+                    },
+                    *peer.value()
+                );
+            }
+
+            torrent
+    })
         .fetch_all(db)
         .await
         .map_err(|_| Error("Failed loading torrents."))?;

@@ -54,25 +54,32 @@ pub async fn reap(tracker: &Arc<Tracker>) {
     let ttl = Duration::seconds(tracker.config.inactive_peer_ttl.try_into().unwrap());
     let inactive_cutoff = Utc::now().checked_sub_signed(ttl).unwrap();
 
-    tracker.torrents.iter().for_each(|torrent| {
+    tracker.torrents.iter_mut().for_each(|mut torrent| {
+        let mut num_reaped_seeders: u32 = 0;
+        let mut num_reaped_leechers: u32 = 0;
+
         torrent.peers.iter_mut().for_each(|mut peer| {
-            // TODO: Decrease leechers/seeders. Only delete from mysql once. Verify mysql doesn't error if trying to delete non-existing peer tuple.
             match peer.updated_at {
-                x if x < inactive_cutoff => {
+                updated_at if updated_at < inactive_cutoff => {
                     if let Some((index, _)) = torrent.peers.remove(peer.key()) {
                         tracker
                             .peer_deletions
                             .upsert(torrent.id, index.user_id, index.peer_id);
+
+                        match peer.is_seeder {
+                            true => num_reaped_seeders += 1,
+                            false => num_reaped_leechers += 1,
+                        }
                     }
                 }
-                x if x < active_cutoff => {
+                updated_at if updated_at < active_cutoff => {
                     peer.is_active = false;
-                    tracker
-                        .peer_deletions
-                        .upsert(torrent.id, peer.user_id, peer.key().peer_id);
                 }
                 _ => (),
             };
         });
+
+        torrent.seeders += num_reaped_seeders;
+        torrent.leechers += num_reaped_leechers;
     });
 }
