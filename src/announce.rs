@@ -218,7 +218,7 @@ pub async fn announce(
         return Err(Error("Browser, crawler or cheater is not allowed."));
     }
 
-    let passkey: Passkey = Passkey::from_str(&passkey).map_err(|_| Error("Invalid infohash."))?;
+    let passkey: Passkey = Passkey::from_str(&passkey).map_err(|_| Error("Invalid passkey."))?;
 
     // Validate passkey
     let mut user = tracker.users.get_mut(&passkey).ok_or(Error(
