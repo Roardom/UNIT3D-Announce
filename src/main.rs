@@ -43,8 +43,15 @@ async fn main() -> Result<(), Error> {
         .await
         .unwrap();
 
-    // Flush updates one last time before shutting down.
-    scheduler::handle(&tracker_clone2.clone()).await;
+    // Flush all remaining updates before shutting down.
+    while tracker_clone2.history_updates.len() > 0
+        || tracker_clone2.peer_updates.len() > 0
+        || tracker_clone2.peer_deletions.len() > 0
+        || tracker_clone2.torrent_updates.len() > 0
+        || tracker_clone2.user_updates.len() > 0
+    {
+        scheduler::flush(&tracker_clone2.clone()).await;
+    }
 
     Ok(())
 }
