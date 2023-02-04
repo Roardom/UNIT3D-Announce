@@ -5,14 +5,14 @@ use sqlx::MySqlPool;
 
 use crate::Error;
 
-pub struct FreeleechTokenSet(DashSet<FreeleechToken>);
+pub struct Set(DashSet<FreeleechToken>);
 
-impl FreeleechTokenSet {
-    pub fn new() -> FreeleechTokenSet {
-        FreeleechTokenSet(DashSet::new())
+impl Set {
+    pub fn new() -> Set {
+        Set(DashSet::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<FreeleechTokenSet, Error> {
+    pub async fn from_db(db: &MySqlPool) -> Result<Set, Error> {
         let freeleech_tokens = sqlx::query_as!(
             FreeleechToken,
             r#"
@@ -27,7 +27,7 @@ impl FreeleechTokenSet {
         .await
         .map_err(|_| Error("Failed loading freeleech tokens."))?;
 
-        let freeleech_token_set = FreeleechTokenSet::new();
+        let freeleech_token_set = Set::new();
 
         for freeleech_token in freeleech_tokens {
             freeleech_token_set.insert(freeleech_token);
@@ -37,7 +37,7 @@ impl FreeleechTokenSet {
     }
 }
 
-impl Deref for FreeleechTokenSet {
+impl Deref for Set {
     type Target = DashSet<FreeleechToken>;
 
     fn deref(&self) -> &Self::Target {

@@ -8,7 +8,7 @@ pub use peer_id::PeerId;
 pub mod user_agent;
 pub use user_agent::UserAgent;
 
-pub struct PeerMap(DashMap<Index, Peer>);
+pub struct Map(DashMap<Index, Peer>);
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Index {
@@ -28,13 +28,13 @@ pub struct Peer {
     pub downloaded: u64,
 }
 
-impl PeerMap {
-    pub fn new() -> PeerMap {
-        PeerMap(DashMap::new())
+impl Map {
+    pub fn new() -> Map {
+        Map(DashMap::new())
     }
 }
 
-impl Deref for PeerMap {
+impl Deref for Map {
     type Target = DashMap<Index, Peer>;
 
     fn deref(&self) -> &Self::Target {
@@ -42,8 +42,8 @@ impl Deref for PeerMap {
     }
 }
 
-impl Default for PeerMap {
+impl Default for Map {
     fn default() -> Self {
-        PeerMap::new()
+        Map::new()
     }
 }

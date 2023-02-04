@@ -2,11 +2,11 @@ use std::ops::Deref;
 
 use dashmap::DashSet;
 
-pub struct PortSet(DashSet<u16>);
+pub struct Set(DashSet<u16>);
 
-impl Default for PortSet {
-    fn default() -> PortSet {
-        let ports = PortSet(DashSet::with_capacity(16));
+impl Default for Set {
+    fn default() -> Set {
+        let ports = Set(DashSet::with_capacity(16));
         // SSH Port
         ports.insert(22);
         // DNS queries
@@ -38,7 +38,7 @@ impl Default for PortSet {
     }
 }
 
-impl Deref for PortSet {
+impl Deref for Set {
     type Target = DashSet<u16>;
 
     fn deref(&self) -> &Self::Target {

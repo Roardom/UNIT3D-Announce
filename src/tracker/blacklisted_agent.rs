@@ -5,14 +5,14 @@ use sqlx::MySqlPool;
 
 use crate::Error;
 
-pub struct AgentSet(pub DashSet<Agent>);
+pub struct Set(pub DashSet<Agent>);
 
-impl AgentSet {
-    pub fn new() -> AgentSet {
-        AgentSet(DashSet::new())
+impl Set {
+    pub fn new() -> Set {
+        Set(DashSet::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<AgentSet, Error> {
+    pub async fn from_db(db: &MySqlPool) -> Result<Set, Error> {
         let agents = sqlx::query_as!(
             Agent,
             r#"
@@ -26,7 +26,7 @@ impl AgentSet {
         .await
         .map_err(|_| Error("Failed loading blacklisted clients."))?;
 
-        let agent_set = AgentSet::new();
+        let agent_set = Set::new();
 
         for agent in agents {
             agent_set.insert(agent);
@@ -36,7 +36,7 @@ impl AgentSet {
     }
 }
 
-impl Deref for AgentSet {
+impl Deref for Set {
     type Target = DashSet<Agent>;
 
     fn deref(&self) -> &Self::Target {

@@ -19,11 +19,6 @@ use crate::scheduler::{
     UserUpdateBuffer,
 };
 use crate::stats::Stats;
-use crate::tracker::personal_freeleech::PersonalFreeleechSet;
-use crate::tracker::{
-    blacklisted_agent::AgentSet, blacklisted_port::PortSet, freeleech_token::FreeleechTokenSet,
-    torrent::TorrentMap, user::UserMap,
-};
 
 use dotenvy::dotenv;
 use regex::Regex;
@@ -31,20 +26,20 @@ use sqlx::mysql::MySqlPoolOptions;
 use std::{env, sync::Arc, time::Duration};
 
 pub struct Tracker {
-    pub agent_blacklist: AgentSet,
+    pub agent_blacklist: blacklisted_agent::Set,
     pub agent_blacklist_regex: Regex,
     pub config: config::Config,
-    pub freeleech_tokens: FreeleechTokenSet,
+    pub freeleech_tokens: freeleech_token::Set,
     pub history_updates: HistoryUpdateBuffer,
     pub peer_deletions: PeerDeletionBuffer,
     pub peer_updates: PeerUpdateBuffer,
-    pub personal_freeleeches: PersonalFreeleechSet,
+    pub personal_freeleeches: personal_freeleech::Set,
     pub pool: MySqlPool,
-    pub port_blacklist: PortSet,
+    pub port_blacklist: blacklisted_port::Set,
     pub stats: Stats,
-    pub torrents: Arc<TorrentMap>,
+    pub torrents: Arc<torrent::Map>,
     pub torrent_updates: TorrentUpdateBuffer,
-    pub users: UserMap,
+    pub users: user::Map,
     pub user_updates: UserUpdateBuffer,
 }
 
@@ -73,25 +68,25 @@ impl Tracker {
             })?;
 
         println!("Loading from database into memory: blacklisted ports...");
-        let port_blacklist = PortSet::default();
+        let port_blacklist = blacklisted_port::Set::default();
 
         println!("Loading from database into memory: blacklisted user agents...");
-        let agent_blacklist = AgentSet::from_db(&pool).await?;
+        let agent_blacklist = blacklisted_agent::Set::from_db(&pool).await?;
 
         println!("Loading from database into memory: config...");
         let config = config::Config::default();
 
         println!("Loading from database into memory: torrents...");
-        let torrents = Arc::new(TorrentMap::from_db(&pool).await?);
+        let torrents = Arc::new(torrent::Map::from_db(&pool).await?);
 
         println!("Loading from database into memory: users...");
-        let users = UserMap::from_db(&pool).await?;
+        let users = user::Map::from_db(&pool).await?;
 
         println!("Loading from database into memory: freeleech tokens...");
-        let freeleech_tokens = FreeleechTokenSet::from_db(&pool).await?;
+        let freeleech_tokens = freeleech_token::Set::from_db(&pool).await?;
 
         println!("Loading from database into memory: personal freeleeches...");
-        let personal_freeleeches = PersonalFreeleechSet::from_db(&pool).await?;
+        let personal_freeleeches = personal_freeleech::Set::from_db(&pool).await?;
 
         println!("Compiling user agent blacklist regex...");
         let agent_blacklist_regex =

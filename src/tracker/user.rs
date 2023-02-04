@@ -5,14 +5,14 @@ use sqlx::{database::HasValueRef, Database, Decode, MySqlPool};
 
 use crate::Error;
 
-pub struct UserMap(DashMap<Passkey, User>);
+pub struct Map(DashMap<Passkey, User>);
 
-impl UserMap {
-    pub fn new() -> UserMap {
-        UserMap(DashMap::new())
+impl Map {
+    pub fn new() -> Map {
+        Map(DashMap::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<UserMap, Error> {
+    pub async fn from_db(db: &MySqlPool) -> Result<Map, Error> {
         let users = sqlx::query_as!(
             User,
             r#"
@@ -40,7 +40,7 @@ impl UserMap {
         .await
         .map_err(|_| Error("Failed loading personal freeleeches."))?;
 
-        let user_map = UserMap::new();
+        let user_map = Map::new();
 
         for user in users {
             user_map.insert(user.passkey, user);
@@ -49,7 +49,7 @@ impl UserMap {
     }
 }
 
-impl Deref for UserMap {
+impl Deref for Map {
     type Target = DashMap<Passkey, User>;
 
     fn deref(&self) -> &Self::Target {

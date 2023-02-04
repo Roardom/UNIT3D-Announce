@@ -4,7 +4,7 @@ use std::sync::Arc;
 use dashmap::DashMap;
 use sqlx::MySqlPool;
 
-use crate::tracker::peer::PeerMap;
+use crate::tracker::peer;
 use crate::Error;
 
 pub mod infohash;
@@ -13,14 +13,14 @@ pub use infohash::InfoHash;
 pub mod status;
 pub use status::Status;
 
-pub struct TorrentMap(DashMap<InfoHash, Torrent>);
+pub struct Map(DashMap<InfoHash, Torrent>);
 
-impl TorrentMap {
-    pub fn new() -> TorrentMap {
-        TorrentMap(DashMap::new())
+impl Map {
+    pub fn new() -> Map {
+        Map(DashMap::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<TorrentMap, Error> {
+    pub async fn from_db(db: &MySqlPool) -> Result<Map, Error> {
         // TODO: deleted_at column still needs added to unit3d. Until then, no
         // torrents are considered deleted.
         let torrents: Vec<Torrent> = sqlx::query!(
@@ -57,13 +57,13 @@ impl TorrentMap {
             download_factor: row.download_factor,
             upload_factor: row.upload_factor,
             is_deleted: row.is_deleted,
-            peers: Arc::new(PeerMap::default()),
+            peers: Arc::new(peer::Map::default()),
         })
         .fetch_all(db)
         .await
         .map_err(|_| Error("Failed loading torrents."))?;
 
-        let torrent_map = TorrentMap::new();
+        let torrent_map = Map::new();
 
         for torrent in torrents {
             torrent_map.insert(torrent.info_hash, torrent);
@@ -73,7 +73,7 @@ impl TorrentMap {
     }
 }
 
-impl Deref for TorrentMap {
+impl Deref for Map {
     type Target = DashMap<InfoHash, Torrent>;
 
     fn deref(&self) -> &Self::Target {
@@ -87,7 +87,7 @@ pub struct Torrent {
     pub info_hash: InfoHash,
     pub status: Status,
     pub is_deleted: bool,
-    pub peers: Arc<PeerMap>,
+    pub peers: Arc<peer::Map>,
     pub seeders: u32,
     pub leechers: u32,
     pub times_completed: u32,

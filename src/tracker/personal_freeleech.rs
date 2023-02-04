@@ -5,14 +5,14 @@ use sqlx::MySqlPool;
 
 use crate::Error;
 
-pub struct PersonalFreeleechSet(DashSet<PersonalFreeleech>);
+pub struct Set(DashSet<PersonalFreeleech>);
 
-impl PersonalFreeleechSet {
-    pub fn new() -> PersonalFreeleechSet {
-        PersonalFreeleechSet(DashSet::new())
+impl Set {
+    pub fn new() -> Set {
+        Set(DashSet::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<PersonalFreeleechSet, Error> {
+    pub async fn from_db(db: &MySqlPool) -> Result<Set, Error> {
         let personal_freeleeches = sqlx::query_as!(
             PersonalFreeleech,
             r#"
@@ -26,7 +26,7 @@ impl PersonalFreeleechSet {
         .await
         .map_err(|_| Error("Failed loading personal freeleeches."))?;
 
-        let personal_freeleech_set = PersonalFreeleechSet::new();
+        let personal_freeleech_set = Set::new();
 
         for personal_freeleech in personal_freeleeches {
             personal_freeleech_set.insert(personal_freeleech);
@@ -36,7 +36,7 @@ impl PersonalFreeleechSet {
     }
 }
 
-impl Deref for PersonalFreeleechSet {
+impl Deref for Set {
     type Target = DashSet<PersonalFreeleech>;
 
     fn deref(&self) -> &Self::Target {
