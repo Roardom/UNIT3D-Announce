@@ -307,7 +307,6 @@ pub async fn announce(
         // Schedule a peer update in the mysql db
         tracker.peer_updates.upsert(
             queries.peer_id,
-            queries.info_hash,
             addr.ip(),
             queries.port,
             UserAgent::from_str(user_agent).unwrap(),
@@ -421,7 +420,6 @@ pub async fn announce(
     tracker.history_updates.upsert(
         user.id,
         torrent.id,
-        queries.info_hash,
         UserAgent::from_str(user_agent).unwrap(),
         upload_factor as u64 * uploaded_delta / 100,
         uploaded_delta,

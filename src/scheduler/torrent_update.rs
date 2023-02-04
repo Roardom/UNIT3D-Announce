@@ -14,7 +14,6 @@ pub struct TorrentUpdateIndex {
 #[derive(Clone, Copy)]
 pub struct TorrentUpdate {
     pub torrent_id: u32,
-    // pub info_hash: InfoHash,
     pub seeders: u32,
     pub leechers: u32,
     pub times_completed: u32,
@@ -67,7 +66,6 @@ impl TorrentUpdateBuffer {
                     torrents(
                         id,
                         name,
-                        slug,
                         description,
                         info_hash,
                         file_name,
@@ -90,7 +88,6 @@ impl TorrentUpdateBuffer {
         query_builder
             .push_values(torrent_updates.clone(), |mut bind, torrent_update| {
                 bind.push_bind(torrent_update.torrent_id)
-                    .push_bind("")
                     .push_bind("")
                     .push_bind("")
                     .push_bind("")

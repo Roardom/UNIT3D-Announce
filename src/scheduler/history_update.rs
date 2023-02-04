@@ -4,7 +4,7 @@ use chrono::Utc;
 use dashmap::DashMap;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
-use crate::tracker::{peer::UserAgent, torrent::InfoHash};
+use crate::tracker::peer::UserAgent;
 
 pub struct HistoryUpdateBuffer(pub DashMap<HistoryUpdateIndex, HistoryUpdate>);
 
@@ -19,7 +19,6 @@ pub struct HistoryUpdate {
     pub user_id: u32,
     pub torrent_id: u32,
     pub user_agent: UserAgent,
-    pub info_hash: InfoHash,
     pub is_active: bool,
     pub is_seeder: bool,
     pub is_immune: bool,
@@ -40,7 +39,6 @@ impl HistoryUpdateBuffer {
         &self,
         user_id: u32,
         torrent_id: u32,
-        info_hash: InfoHash,
         user_agent: UserAgent,
         credited_uploaded_delta: u64,
         uploaded_delta: u64,
@@ -71,7 +69,6 @@ impl HistoryUpdateBuffer {
             user_id,
             torrent_id,
             user_agent,
-            info_hash,
             is_active,
             is_seeder,
             is_immune,
@@ -113,7 +110,6 @@ impl HistoryUpdateBuffer {
                     user_id,
                     torrent_id,
                     agent,
-                    info_hash,
                     uploaded,
                     actual_uploaded,
                     client_uploaded,
@@ -136,7 +132,6 @@ impl HistoryUpdateBuffer {
                 bind.push_bind(history_update.user_id)
                     .push_bind(history_update.torrent_id)
                     .push_bind(history_update.user_agent.to_vec())
-                    .push_bind(history_update.info_hash.to_string())
                     .push_bind(history_update.credited_uploaded_delta)
                     .push_bind(history_update.uploaded_delta)
                     .push_bind(history_update.uploaded)
@@ -192,7 +187,6 @@ impl HistoryUpdateBuffer {
                     self.upsert(
                         history_update.user_id,
                         history_update.torrent_id,
-                        history_update.info_hash,
                         history_update.user_agent,
                         history_update.credited_uploaded_delta,
                         history_update.uploaded_delta,

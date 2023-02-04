@@ -1,9 +1,6 @@
 use std::{net::IpAddr, ops::Deref};
 
-use crate::tracker::{
-    peer::{PeerId, UserAgent},
-    torrent::InfoHash,
-};
+use crate::tracker::peer::{PeerId, UserAgent};
 use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
@@ -20,7 +17,6 @@ pub struct PeerUpdateIndex {
 #[derive(Clone, Copy)]
 pub struct PeerUpdate {
     pub peer_id: PeerId,
-    pub info_hash: InfoHash,
     pub ip: std::net::IpAddr,
     pub port: u16,
     pub agent: UserAgent,
@@ -41,7 +37,6 @@ impl PeerUpdateBuffer {
     pub fn upsert(
         &self,
         peer_id: PeerId,
-        info_hash: InfoHash,
         ip: IpAddr,
         port: u16,
         agent: UserAgent,
@@ -60,7 +55,6 @@ impl PeerUpdateBuffer {
             },
             PeerUpdate {
                 peer_id,
-                info_hash,
                 ip,
                 port,
                 agent,
@@ -102,7 +96,6 @@ impl PeerUpdateBuffer {
                 INSERT INTO
                     peers(
                         peer_id,
-                        info_hash,
                         ip,
                         port,
                         agent,
@@ -121,7 +114,6 @@ impl PeerUpdateBuffer {
         query_builder
             .push_values(peer_updates.clone(), |mut bind, peer_update| {
                 bind.push_bind(peer_update.peer_id.to_vec())
-                    .push_bind(peer_update.info_hash.to_string())
                     .push_bind(peer_update.ip.to_string())
                     .push_bind(peer_update.port)
                     .push_bind(peer_update.agent.to_vec())
@@ -137,7 +129,6 @@ impl PeerUpdateBuffer {
             .push(
                 r#"
                 ON DUPLICATE KEY UPDATE
-                    info_hash = VALUES(info_hash),
                     ip = VALUES(ip),
                     port = VALUES(port),
                     agent = VALUES(agent),
@@ -163,7 +154,6 @@ impl PeerUpdateBuffer {
                 peer_updates.into_iter().for_each(|peer_update| {
                     self.upsert(
                         peer_update.peer_id,
-                        peer_update.info_hash,
                         peer_update.ip,
                         peer_update.port,
                         peer_update.agent,
