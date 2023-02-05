@@ -18,21 +18,19 @@ pub struct Config {
     /// A random amount of seconds between announce_min and announce_max will
     /// be returned to the peer for the next time they should announce.
     pub announce_max: u32,
-    /// The upload_factor is multiplied by 0.01 before being
-    /// multiplied with the announced uploaded parameter
-    /// and saved in the "credited" upload column.
-    /// A upload_factor of 200 means global double upload.
+    /// The upload_factor is multiplied by 0.01 before being multiplied with
+    /// the announced uploaded parameter and saved in the "credited" upload
+    /// column. An upload_factor of 200 means global double upload.
     pub upload_factor: u8,
-    /// The download factor is multiplied by 0.01 before being
-    /// multiplied with the announced downloaded parameter
-    /// and saved in the "credited" download column.
-    /// A download_factor of 0 means global freeleech.
+    /// The download factor is multiplied by 0.01 before being multiplied
+    /// with the announced downloaded parameter and saved in the "credited"
+    /// download column. A download_factor of 0 means global freeleech.
     pub download_factor: u8,
     /// Amount of seconds between scheduled batches where peers are marked as
     /// inactive or erased from memory.
     pub peer_expiry_interval: u64,
     /// Amount of seconds since the last announce before a peer is considered
-    /// inactive
+    /// inactive.
     pub active_peer_ttl: u64,
     /// Amount of seconds since the last announce before a peer is erased from
     /// memory. This value should be long enough that users can suffer
@@ -41,6 +39,7 @@ pub struct Config {
     /// will be recorded incorrectly.
     pub inactive_peer_ttl: u64,
     /// Site password used by UNIT3D to send api requests to the tracker.
+    /// Must be at least 32 characters long and should be properly randomized.
     pub apikey: String,
 }
 
