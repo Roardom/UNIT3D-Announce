@@ -213,7 +213,19 @@ pub async fn announce(
     }
 
     // Block user agent strings on the regex blacklist
-    if tracker.agent_blacklist_regex.is_match(user_agent) {
+    let user_agent_lower = user_agent.to_ascii_lowercase();
+
+    if user_agent_lower.contains("mozilla")
+        || user_agent_lower.contains("browser")
+        || user_agent_lower.contains("chrome")
+        || user_agent_lower.contains("safari")
+        || user_agent_lower.contains("applewebkit")
+        || user_agent_lower.contains("opera")
+        || user_agent_lower.contains("links")
+        || user_agent_lower.contains("lynx")
+        || user_agent_lower.contains("bot")
+        || user_agent_lower.contains("unknown")
+    {
         return Err(Error("Browser, crawler or cheater is not allowed."));
     }
 

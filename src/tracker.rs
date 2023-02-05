@@ -18,13 +18,11 @@ use crate::scheduler::{history_update, peer_deletion, peer_update, torrent_updat
 use crate::stats::Stats;
 
 use dotenvy::dotenv;
-use regex::Regex;
 use sqlx::mysql::MySqlPoolOptions;
 use std::{env, sync::Arc, time::Duration};
 
 pub struct Tracker {
     pub agent_blacklist: blacklisted_agent::Set,
-    pub agent_blacklist_regex: Regex,
     pub config: config::Config,
     pub freeleech_tokens: freeleech_token::Set,
     pub history_updates: history_update::Queue,
@@ -85,16 +83,10 @@ impl Tracker {
         println!("Loading from database into memory: personal freeleeches...");
         let personal_freeleeches = personal_freeleech::Set::from_db(&pool).await?;
 
-        println!("Compiling user agent blacklist regex...");
-        let agent_blacklist_regex =
-            Regex::new(r"Mozilla|Browser|Chrome|Safari|AppleWebKit|Opera|Links|Lynx|Bot|Unknown")
-                .expect("Invalid regex expression.");
-
         let stats = Stats::default();
 
         Ok(Arc::new(Tracker {
             agent_blacklist,
-            agent_blacklist_regex,
             config,
             freeleech_tokens,
             history_updates: history_update::Queue::new(),
