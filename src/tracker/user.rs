@@ -1,9 +1,13 @@
-use std::{ops::Deref, str::FromStr};
+use std::{ops::Deref, str::FromStr, sync::Arc};
 
+use axum::extract::{Query, State};
 use dashmap::DashMap;
+use serde::Deserialize;
 use sqlx::{database::HasValueRef, Database, Decode, MySqlPool};
 
 use crate::Error;
+
+use crate::tracker::Tracker;
 
 pub struct Map(DashMap<Passkey, User>);
 
@@ -47,6 +51,14 @@ impl Map {
         }
         Ok(user_map)
     }
+
+    pub async fn upsert(State(tracker): State<Arc<Tracker>>, Query(user): Query<User>) {
+        tracker.users.insert(user.passkey, user);
+    }
+
+    pub async fn destroy(State(tracker): State<Arc<Tracker>>, Query(user): Query<User>) {
+        tracker.users.remove(&user.passkey);
+    }
 }
 
 impl Deref for Map {
@@ -57,7 +69,7 @@ impl Deref for Map {
     }
 }
 
-#[derive(Clone, Hash)]
+#[derive(Clone, Deserialize, Hash)]
 pub struct User {
     pub id: u32,
     pub passkey: Passkey,
@@ -70,7 +82,7 @@ pub struct User {
     pub upload_factor: u8,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq)]
 pub struct Passkey(pub [u8; 32]);
 
 impl FromStr for Passkey {

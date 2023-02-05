@@ -1,10 +1,11 @@
 use std::{fmt, ops::Deref, str::FromStr};
 
+use serde::Deserialize;
 use sqlx::{database::HasValueRef, Database, Decode};
 
 use crate::error::Error;
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Deserialize, Debug, Eq, Hash, PartialEq)]
 pub struct InfoHash(pub [u8; 20]);
 
 impl FromStr for InfoHash {

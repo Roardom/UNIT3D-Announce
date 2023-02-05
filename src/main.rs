@@ -1,4 +1,7 @@
-use axum::{routing::get, Router};
+use axum::{
+    routing::{get, put},
+    Router,
+};
 use std::net::SocketAddr;
 use tokio::signal;
 
@@ -28,8 +31,41 @@ async fn main() -> Result<(), Error> {
     });
 
     // Create router.
-    let app =
-        Router::with_state(tracker.clone()).route("/announce/:passkey", get(announce::announce));
+    let app = Router::new()
+        .nest(
+            "/announce",
+            Router::new()
+                .route("/:passkey", get(announce::announce))
+                .nest(
+                    &("/".to_string() + &tracker.config.apikey),
+                    Router::new()
+                        .route(
+                            "/announce/torrents",
+                            put(tracker::torrent::Map::upsert)
+                                .delete(tracker::torrent::Map::destroy),
+                        )
+                        .route(
+                            "/announce/users",
+                            put(tracker::user::Map::upsert).delete(tracker::user::Map::destroy),
+                        )
+                        .route(
+                            "/announce/blacklisted-agents",
+                            put(tracker::blacklisted_agent::Set::upsert)
+                                .delete(tracker::blacklisted_agent::Set::destroy),
+                        )
+                        .route(
+                            "/announce/freeleech-tokens",
+                            put(tracker::freeleech_token::Set::upsert)
+                                .delete(tracker::freeleech_token::Set::destroy),
+                        )
+                        .route(
+                            "/announce/personal-freeleech",
+                            put(tracker::personal_freeleech::Set::upsert)
+                                .delete(tracker::personal_freeleech::Set::destroy),
+                        ),
+                ),
+        )
+        .with_state(tracker.clone());
 
     // Listening socket address.
     let addr = SocketAddr::from(([0, 0, 0, 0], 3001));

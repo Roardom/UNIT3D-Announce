@@ -40,6 +40,8 @@ pub struct Config {
     /// comes back online and the peer has been erased, then their new stats
     /// will be recorded incorrectly.
     pub inactive_peer_ttl: u64,
+    /// Site password used by UNIT3D to send api requests to the tracker.
+    pub apikey: String,
 }
 
 impl Config {
@@ -94,6 +96,15 @@ impl Config {
             .parse()
             .map_err(|_| Error("INACTIVE_PEER_TTL must be a number between 0 and 2^64 - 1"))?;
 
+        let apikey =
+            env::var("APIKEY").map_err(|_| Error("APIKEY not found in .env file. Aborting."))?;
+
+        if apikey.len() < 32 {
+            return Err(Error(
+                "APIKEY must be at least 32 characters long. Aborting.",
+            ));
+        }
+
         Ok(Config {
             flush_interval,
             numwant_default,
@@ -105,6 +116,7 @@ impl Config {
             peer_expiry_interval,
             active_peer_ttl,
             inactive_peer_ttl,
+            apikey,
         })
     }
 }

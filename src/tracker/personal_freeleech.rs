@@ -1,9 +1,13 @@
-use std::ops::Deref;
+use std::{ops::Deref, sync::Arc};
 
+use axum::extract::{Query, State};
 use dashmap::DashSet;
+use serde::Deserialize;
 use sqlx::MySqlPool;
 
 use crate::Error;
+
+use crate::tracker::Tracker;
 
 pub struct Set(DashSet<PersonalFreeleech>);
 
@@ -34,6 +38,20 @@ impl Set {
 
         Ok(personal_freeleech_set)
     }
+
+    pub async fn upsert(
+        State(tracker): State<Arc<Tracker>>,
+        Query(personal_freeleech): Query<PersonalFreeleech>,
+    ) {
+        tracker.personal_freeleeches.insert(personal_freeleech);
+    }
+
+    pub async fn destroy(
+        State(tracker): State<Arc<Tracker>>,
+        Query(personal_freeleech): Query<PersonalFreeleech>,
+    ) {
+        tracker.personal_freeleeches.remove(&personal_freeleech);
+    }
 }
 
 impl Deref for Set {
@@ -44,7 +62,7 @@ impl Deref for Set {
     }
 }
 
-#[derive(Eq, Hash, PartialEq)]
+#[derive(Eq, Deserialize, Hash, PartialEq)]
 pub struct PersonalFreeleech {
     pub user_id: u32,
 }

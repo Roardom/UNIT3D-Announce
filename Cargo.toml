@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = { version = "0.6.0-rc.4", features = ["headers", "query", "macros", "http2"] }
+axum = { version = "0.6.0", features = ["headers", "query", "macros", "http2"] }
 chrono = { version = "0.4.22", features = ["std"]}
 dashmap = "5.4.0"
 dotenvy = "0.15"

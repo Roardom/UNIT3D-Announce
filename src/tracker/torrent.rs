@@ -1,7 +1,9 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
+use axum::extract::{Query, State};
 use dashmap::DashMap;
+use serde::Deserialize;
 use sqlx::MySqlPool;
 
 use crate::tracker::peer;
@@ -12,6 +14,8 @@ pub use infohash::InfoHash;
 
 pub mod status;
 pub use status::Status;
+
+use crate::tracker::Tracker;
 
 pub struct Map(DashMap<InfoHash, Torrent>);
 
@@ -90,6 +94,14 @@ impl Map {
 
         Ok(torrent_map)
     }
+
+    pub async fn upsert(State(tracker): State<Arc<Tracker>>, Query(torrent): Query<Torrent>) {
+        tracker.torrents.insert(torrent.info_hash, torrent);
+    }
+
+    pub async fn destroy(State(tracker): State<Arc<Tracker>>, Query(torrent): Query<Torrent>) {
+        tracker.torrents.remove(&torrent.info_hash);
+    }
 }
 
 impl Deref for Map {
@@ -100,12 +112,13 @@ impl Deref for Map {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 pub struct Torrent {
     pub id: u32,
     pub info_hash: InfoHash,
     pub status: Status,
     pub is_deleted: bool,
+    #[serde(skip)]
     pub peers: Arc<peer::Map>,
     pub seeders: u32,
     pub leechers: u32,
