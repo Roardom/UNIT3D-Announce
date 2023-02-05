@@ -4,10 +4,10 @@ use chrono::Utc;
 use dashmap::DashMap;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
-pub struct TorrentUpdateBuffer(pub DashMap<TorrentUpdateIndex, TorrentUpdate>);
+pub struct Queue(pub DashMap<Index, TorrentUpdate>);
 
 #[derive(Eq, Hash, PartialEq)]
-pub struct TorrentUpdateIndex {
+pub struct Index {
     pub torrent_id: u32,
 }
 
@@ -19,14 +19,14 @@ pub struct TorrentUpdate {
     pub times_completed: u32,
 }
 
-impl TorrentUpdateBuffer {
-    pub fn new() -> TorrentUpdateBuffer {
-        TorrentUpdateBuffer(DashMap::new())
+impl Queue {
+    pub fn new() -> Queue {
+        Queue(DashMap::new())
     }
 
     pub fn upsert(&self, torrent_id: u32, seeders: u32, leechers: u32, times_completed: u32) {
         self.insert(
-            TorrentUpdateIndex { torrent_id },
+            Index { torrent_id },
             TorrentUpdate {
                 torrent_id,
                 seeders,
@@ -50,7 +50,7 @@ impl TorrentUpdateBuffer {
 
         for _ in 0..std::cmp::min(TORRENT_LIMIT, self.len()) {
             let torrent_update = *self.iter().next().unwrap();
-            self.remove(&TorrentUpdateIndex {
+            self.remove(&Index {
                 torrent_id: torrent_update.torrent_id,
             });
             torrent_updates.push(torrent_update);
@@ -139,8 +139,8 @@ impl TorrentUpdateBuffer {
     }
 }
 
-impl Deref for TorrentUpdateBuffer {
-    type Target = DashMap<TorrentUpdateIndex, TorrentUpdate>;
+impl Deref for Queue {
+    type Target = DashMap<Index, TorrentUpdate>;
 
     fn deref(&self) -> &Self::Target {
         &self.0

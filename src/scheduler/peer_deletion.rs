@@ -5,7 +5,7 @@ use sqlx::{MySql, MySqlPool, QueryBuilder};
 
 use crate::tracker::peer::PeerId;
 
-pub struct PeerDeletionBuffer(pub DashSet<PeerDeletion>);
+pub struct Queue(pub DashSet<PeerDeletion>);
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct PeerDeletion {
@@ -14,9 +14,9 @@ pub struct PeerDeletion {
     pub peer_id: crate::tracker::peer::PeerId,
 }
 
-impl PeerDeletionBuffer {
-    pub fn new() -> PeerDeletionBuffer {
-        PeerDeletionBuffer(DashSet::new())
+impl Queue {
+    pub fn new() -> Queue {
+        Queue(DashSet::new())
     }
 
     pub fn upsert(&self, torrent_id: u32, user_id: u32, peer_id: PeerId) {
@@ -89,7 +89,7 @@ impl PeerDeletionBuffer {
     }
 }
 
-impl Deref for PeerDeletionBuffer {
+impl Deref for Queue {
     type Target = DashSet<PeerDeletion>;
 
     fn deref(&self) -> &Self::Target {

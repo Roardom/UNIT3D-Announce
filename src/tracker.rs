@@ -14,10 +14,7 @@ use sqlx::MySqlPool;
 
 use crate::config;
 use crate::error::Error;
-use crate::scheduler::{
-    HistoryUpdateBuffer, PeerDeletionBuffer, PeerUpdateBuffer, TorrentUpdateBuffer,
-    UserUpdateBuffer,
-};
+use crate::scheduler::{history_update, peer_deletion, peer_update, torrent_update, user_update};
 use crate::stats::Stats;
 
 use dotenvy::dotenv;
@@ -30,17 +27,17 @@ pub struct Tracker {
     pub agent_blacklist_regex: Regex,
     pub config: config::Config,
     pub freeleech_tokens: freeleech_token::Set,
-    pub history_updates: HistoryUpdateBuffer,
-    pub peer_deletions: PeerDeletionBuffer,
-    pub peer_updates: PeerUpdateBuffer,
+    pub history_updates: history_update::Queue,
+    pub peer_deletions: peer_deletion::Queue,
+    pub peer_updates: peer_update::Queue,
     pub personal_freeleeches: personal_freeleech::Set,
     pub pool: MySqlPool,
     pub port_blacklist: blacklisted_port::Set,
     pub stats: Stats,
     pub torrents: Arc<torrent::Map>,
-    pub torrent_updates: TorrentUpdateBuffer,
+    pub torrent_updates: torrent_update::Queue,
     pub users: user::Map,
-    pub user_updates: UserUpdateBuffer,
+    pub user_updates: user_update::Queue,
 }
 
 impl Tracker {
@@ -100,17 +97,17 @@ impl Tracker {
             agent_blacklist_regex,
             config,
             freeleech_tokens,
-            history_updates: HistoryUpdateBuffer::new(),
-            peer_deletions: PeerDeletionBuffer::new(),
-            peer_updates: PeerUpdateBuffer::new(),
+            history_updates: history_update::Queue::new(),
+            peer_deletions: peer_deletion::Queue::new(),
+            peer_updates: peer_update::Queue::new(),
             personal_freeleeches,
             pool,
             port_blacklist,
             stats,
             torrents,
-            torrent_updates: TorrentUpdateBuffer::new(),
+            torrent_updates: torrent_update::Queue::new(),
             users,
-            user_updates: UserUpdateBuffer::new(),
+            user_updates: user_update::Queue::new(),
         }))
     }
 }

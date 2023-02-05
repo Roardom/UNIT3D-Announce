@@ -1,16 +1,10 @@
 use std::sync::Arc;
 
-mod history_update;
-mod peer_deletion;
-mod peer_update;
-mod torrent_update;
-mod user_update;
-
-pub use history_update::HistoryUpdateBuffer;
-pub use peer_deletion::PeerDeletionBuffer;
-pub use peer_update::PeerUpdateBuffer;
-pub use torrent_update::TorrentUpdateBuffer;
-pub use user_update::UserUpdateBuffer;
+pub mod history_update;
+pub mod peer_deletion;
+pub mod peer_update;
+pub mod torrent_update;
+pub mod user_update;
 
 use crate::tracker::Tracker;
 use chrono::{Duration, Utc};

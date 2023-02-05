@@ -3,10 +3,10 @@ use std::ops::Deref;
 use dashmap::DashMap;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
-pub struct UserUpdateBuffer(pub DashMap<UserUpdateIndex, UserUpdate>);
+pub struct Queue(pub DashMap<Index, UserUpdate>);
 
 #[derive(Eq, Hash, PartialEq)]
-pub struct UserUpdateIndex {
+pub struct Index {
     pub user_id: u32,
 }
 
@@ -17,14 +17,14 @@ pub struct UserUpdate {
     pub downloaded_delta: u64,
 }
 
-impl UserUpdateBuffer {
-    pub fn new() -> UserUpdateBuffer {
-        UserUpdateBuffer(DashMap::new())
+impl Queue {
+    pub fn new() -> Queue {
+        Queue(DashMap::new())
     }
 
     pub fn upsert(&self, user_id: u32, uploaded_delta: u64, downloaded_delta: u64) {
         self.insert(
-            UserUpdateIndex { user_id },
+            Index { user_id },
             UserUpdate {
                 user_id,
                 uploaded_delta,
@@ -47,7 +47,7 @@ impl UserUpdateBuffer {
 
         for _ in 0..std::cmp::min(USER_LIMIT, self.len()) {
             let user_update = *self.iter().next().unwrap();
-            self.remove(&UserUpdateIndex {
+            self.remove(&Index {
                 user_id: user_update.user_id,
             });
             user_updates.push(user_update);
@@ -115,8 +115,8 @@ impl UserUpdateBuffer {
     }
 }
 
-impl Deref for UserUpdateBuffer {
-    type Target = DashMap<UserUpdateIndex, UserUpdate>;
+impl Deref for Queue {
+    type Target = DashMap<Index, UserUpdate>;
 
     fn deref(&self) -> &Self::Target {
         &self.0

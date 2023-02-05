@@ -5,10 +5,10 @@ use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
-pub struct PeerUpdateBuffer(pub DashMap<PeerUpdateIndex, PeerUpdate>);
+pub struct Queue(pub DashMap<Index, PeerUpdate>);
 
 #[derive(Eq, Hash, PartialEq)]
-pub struct PeerUpdateIndex {
+pub struct Index {
     pub torrent_id: u32,
     pub user_id: u32,
     pub peer_id: PeerId,
@@ -29,9 +29,9 @@ pub struct PeerUpdate {
     pub updated_at: DateTime<Utc>,
 }
 
-impl PeerUpdateBuffer {
-    pub fn new() -> PeerUpdateBuffer {
-        PeerUpdateBuffer(DashMap::new())
+impl Queue {
+    pub fn new() -> Queue {
+        Queue(DashMap::new())
     }
 
     pub fn upsert(
@@ -48,7 +48,7 @@ impl PeerUpdateBuffer {
         user_id: u32,
     ) {
         self.insert(
-            PeerUpdateIndex {
+            Index {
                 torrent_id,
                 user_id,
                 peer_id,
@@ -83,7 +83,7 @@ impl PeerUpdateBuffer {
 
         for _ in 0..std::cmp::min(PEER_LIMIT, self.len()) {
             let peer_update = *self.iter().next().unwrap();
-            self.remove(&PeerUpdateIndex {
+            self.remove(&Index {
                 torrent_id: peer_update.torrent_id,
                 user_id: peer_update.user_id,
                 peer_id: peer_update.peer_id,
@@ -172,8 +172,8 @@ impl PeerUpdateBuffer {
     }
 }
 
-impl Deref for PeerUpdateBuffer {
-    type Target = DashMap<PeerUpdateIndex, PeerUpdate>;
+impl Deref for Queue {
+    type Target = DashMap<Index, PeerUpdate>;
 
     fn deref(&self) -> &Self::Target {
         &self.0

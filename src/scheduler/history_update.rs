@@ -6,10 +6,10 @@ use sqlx::{MySql, MySqlPool, QueryBuilder};
 
 use crate::tracker::peer::UserAgent;
 
-pub struct HistoryUpdateBuffer(pub DashMap<HistoryUpdateIndex, HistoryUpdate>);
+pub struct Queue(pub DashMap<Index, HistoryUpdate>);
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub struct HistoryUpdateIndex {
+pub struct Index {
     pub torrent_id: u32,
     pub user_id: u32,
 }
@@ -30,9 +30,9 @@ pub struct HistoryUpdate {
     pub credited_downloaded_delta: u64,
 }
 
-impl HistoryUpdateBuffer {
-    pub fn new() -> HistoryUpdateBuffer {
-        HistoryUpdateBuffer(DashMap::new())
+impl Queue {
+    pub fn new() -> Queue {
+        Queue(DashMap::new())
     }
 
     pub fn upsert(
@@ -50,7 +50,7 @@ impl HistoryUpdateBuffer {
         is_active: bool,
         is_immune: bool,
     ) {
-        self.entry(HistoryUpdateIndex {
+        self.entry(Index {
             torrent_id,
             user_id,
         })
@@ -97,7 +97,7 @@ impl HistoryUpdateBuffer {
 
         for _ in 0..std::cmp::min(HISTORY_LIMIT, self.len()) {
             let history_update = *self.iter().next().unwrap();
-            self.remove(&HistoryUpdateIndex {
+            self.remove(&Index {
                 torrent_id: history_update.torrent_id,
                 user_id: history_update.user_id,
             });
@@ -204,8 +204,8 @@ impl HistoryUpdateBuffer {
     }
 }
 
-impl Deref for HistoryUpdateBuffer {
-    type Target = DashMap<HistoryUpdateIndex, HistoryUpdate>;
+impl Deref for Queue {
+    type Target = DashMap<Index, HistoryUpdate>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
