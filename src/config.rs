@@ -1,3 +1,6 @@
+use crate::error::Error;
+use std::env;
+
 #[derive(Clone)]
 pub struct Config {
     /// The interval (in seconds) between when history, peers, torrents and
@@ -39,19 +42,69 @@ pub struct Config {
     pub inactive_peer_ttl: u64,
 }
 
-impl Default for Config {
-    fn default() -> Config {
-        Config {
-            flush_interval: 3,            // 3 seconds
-            numwant_default: 25,          // 25 peers
-            numwant_max: 50,              // 50 peers
-            announce_min: 3_600,          // 60 minutes
-            announce_max: 5_400,          // 90 minutes
-            upload_factor: 100,           // 1x factor
-            download_factor: 100,         // 1x factor
-            peer_expiry_interval: 1800,   // 30 minutes
-            active_peer_ttl: 7200,        // 2 hours
-            inactive_peer_ttl: 1_814_400, // 3 weeks
-        }
+impl Config {
+    pub fn from_env() -> Result<Config, Error> {
+        let flush_interval: u64 = env::var("FLUSH_INTERVAL")
+            .map_err(|_| Error("FLUSH_INTERVAL not found in .env file. Aborting."))?
+            .parse()
+            .map_err(|_| Error("FLUSH_INTERVAL must be a number between 0 and 2^64 - 1"))?;
+
+        let numwant_default = env::var("NUMWANT_DEFAULT")
+            .map_err(|_| Error("NUMWANT_DEFAULT not found in .env file. Aborting."))?
+            .parse()
+            .map_err(|_| Error("NUMWANT_DEFAULT must be a number between 0 and 2^64 - 1"))?;
+
+        let numwant_max = env::var("NUMWANT_MAX")
+            .map_err(|_| Error("NUMWANT_MAX not found in .env file. Aborting."))?
+            .parse()
+            .map_err(|_| Error("NUMWANT_MAX must be a number between 0 and 2^64 - 1"))?;
+
+        let announce_min = env::var("ANNOUNCE_MIN")
+            .map_err(|_| Error("ANNOUNCE_MIN not found in .env file. Aborting."))?
+            .parse()
+            .map_err(|_| Error("ANNOUNCE_MIN must be a number between 0 and 2^32 - 1"))?;
+
+        let announce_max = env::var("ANNOUNCE_MAX")
+            .map_err(|_| Error("ANNOUNCE_MAX not found in .env file. Aborting."))?
+            .parse()
+            .map_err(|_| Error("ANNOUNCE_MAX must be a number between 0 and 2^32 - 1"))?;
+
+        let upload_factor = env::var("UPLOAD_FACTOR")
+            .map_err(|_| Error("UPLOAD_FACTOR not found in .env file. Aborting."))?
+            .parse()
+            .map_err(|_| Error("UPLOAD_FACTOR must be a number between 0 and 255"))?;
+
+        let download_factor = env::var("DOWNLOAD_FACTOR")
+            .map_err(|_| Error("DOWNLOAD_FACTOR not found in .env file. Aborting."))?
+            .parse()
+            .map_err(|_| Error("DOWNLOAD_FACTOR must be a number between 0 and 255"))?;
+
+        let peer_expiry_interval = env::var("PEER_EXPIRY_INTERVAL")
+            .map_err(|_| Error("PEER_EXPIRY_INTERVAL not found in .env file. Aborting."))?
+            .parse()
+            .map_err(|_| Error("PEER_EXPIRY_INTERVAL must be a number between 0 and 2^64 - 1"))?;
+
+        let active_peer_ttl = env::var("ACTIVE_PEER_TTL")
+            .map_err(|_| Error("ACTIVE_PEER_TTL not found in .env file. Aborting."))?
+            .parse()
+            .map_err(|_| Error("ACTIVE_PEER_TTL must be a number between 0 and 2^64 - 1"))?;
+
+        let inactive_peer_ttl = env::var("INACTIVE_PEER_TTL")
+            .map_err(|_| Error("INACTIVE_PEER_TTL not found in .env file. Aborting."))?
+            .parse()
+            .map_err(|_| Error("INACTIVE_PEER_TTL must be a number between 0 and 2^64 - 1"))?;
+
+        Ok(Config {
+            flush_interval,
+            numwant_default,
+            numwant_max,
+            announce_min,
+            announce_max,
+            upload_factor,
+            download_factor,
+            peer_expiry_interval,
+            active_peer_ttl,
+            inactive_peer_ttl,
+        })
     }
 }

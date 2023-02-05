@@ -74,7 +74,7 @@ impl Tracker {
         let agent_blacklist = blacklisted_agent::Set::from_db(&pool).await?;
 
         println!("Loading from database into memory: config...");
-        let config = config::Config::default();
+        let config = config::Config::from_env()?;
 
         println!("Loading from database into memory: torrents...");
         let torrents = Arc::new(torrent::Map::from_db(&pool).await?);
