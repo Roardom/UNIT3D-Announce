@@ -114,7 +114,7 @@ impl PeerUpdateBuffer {
         query_builder
             .push_values(peer_updates.clone(), |mut bind, peer_update| {
                 bind.push_bind(peer_update.peer_id.to_vec())
-                    .push("INET_ATON(")
+                    .push("INET6_ATON(")
                     .push_bind_unseparated(peer_update.ip.to_string())
                     .push_unseparated(")")
                     .push_bind(peer_update.port)
@@ -131,7 +131,7 @@ impl PeerUpdateBuffer {
             .push(
                 r#"
                 ON DUPLICATE KEY UPDATE
-                    ip = INET_ATON(VALUES(ip)),
+                    ip = VALUES(ip),
                     port = VALUES(port),
                     agent = VALUES(agent),
                     uploaded = VALUES(uploaded),
