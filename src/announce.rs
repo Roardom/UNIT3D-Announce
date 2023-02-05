@@ -197,7 +197,6 @@ pub async fn announce(
         .ok_or(Error("Invalid user agent."))?
         .to_str()
         .map_err(|_| Error("Invalid user agent."))?;
-    // .to_string();
 
     // Block user agent strings that are too long. (For Database reasons)
     if user_agent.len() > 64 {

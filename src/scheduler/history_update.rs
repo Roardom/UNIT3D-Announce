@@ -131,7 +131,9 @@ impl Queue {
             .push_values(history_updates.clone(), |mut bind, history_update| {
                 bind.push_bind(history_update.user_id)
                     .push_bind(history_update.torrent_id)
-                    .push_bind(history_update.user_agent.to_vec())
+                    .push("TRIM(")
+                    .push_bind_unseparated(history_update.user_agent.to_vec())
+                    .push_unseparated(")")
                     .push_bind(history_update.credited_uploaded_delta)
                     .push_bind(history_update.uploaded_delta)
                     .push_bind(history_update.uploaded)
