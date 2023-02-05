@@ -81,5 +81,14 @@ pub async fn reap(tracker: &Arc<Tracker>) {
 
         torrent.seeders += num_reaped_seeders;
         torrent.leechers += num_reaped_leechers;
+
+        if num_reaped_seeders > 0 || num_reaped_leechers > 0 {
+            tracker.torrent_updates.upsert(
+                torrent.id,
+                torrent.seeders,
+                torrent.leechers,
+                torrent.times_completed,
+            );
+        }
     });
 }
