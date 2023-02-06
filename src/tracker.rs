@@ -26,6 +26,8 @@ pub struct Tracker {
     pub config: config::Config,
     pub freeleech_tokens: freeleech_token::Set,
     pub history_updates: history_update::Queue,
+    pub infohash2id: torrent::infohash2id::Map,
+    pub passkey2id: user::passkey2id::Map,
     pub peer_deletions: peer_deletion::Queue,
     pub peer_updates: peer_update::Queue,
     pub personal_freeleeches: personal_freeleech::Set,
@@ -74,8 +76,14 @@ impl Tracker {
         println!("Loading from database into memory: torrents...");
         let torrents = Arc::new(torrent::Map::from_db(&pool).await?);
 
+        println!("Loading from database into memory: infohash to torrent id mapping...");
+        let infohash2id = torrent::infohash2id::Map::from_db(&pool).await?;
+
         println!("Loading from database into memory: users...");
         let users = user::Map::from_db(&pool).await?;
+
+        println!("Loading from database into memory: passkey to user id mapping...");
+        let passkey2id = user::passkey2id::Map::from_db(&pool).await?;
 
         println!("Loading from database into memory: freeleech tokens...");
         let freeleech_tokens = freeleech_token::Set::from_db(&pool).await?;
@@ -90,6 +98,8 @@ impl Tracker {
             config,
             freeleech_tokens,
             history_updates: history_update::Queue::new(),
+            infohash2id,
+            passkey2id,
             peer_deletions: peer_deletion::Queue::new(),
             peer_updates: peer_update::Queue::new(),
             personal_freeleeches,

@@ -232,7 +232,10 @@ pub async fn announce(
     let passkey: Passkey = Passkey::from_str(&passkey).map_err(|_| Error("Invalid passkey."))?;
 
     // Validate passkey
-    let mut user = tracker.users.get_mut(&passkey).ok_or(Error(
+    let user_id = tracker.passkey2id.get(&passkey).ok_or(Error(
+        "Passkey does not exist. Please re-download the .torrent file.",
+    ))?;
+    let mut user = tracker.users.get_mut(&user_id).ok_or(Error(
         "Passkey does not exist. Please re-download the .torrent file.",
     ))?;
 
@@ -248,9 +251,13 @@ pub async fn announce(
     }
 
     // Validate torrent
+    let torrent_id = tracker
+        .infohash2id
+        .get(&queries.info_hash)
+        .ok_or(Error("torrent not found"))?;
     let mut torrent = tracker
         .torrents
-        .get_mut(&queries.info_hash)
+        .get_mut(&torrent_id)
         .ok_or(Error("Torrent not found."))?;
 
     if torrent.is_deleted {
@@ -339,7 +346,6 @@ pub async fn announce(
                 user_id: user.id,
                 torrent_id: torrent.id,
                 port: queries.port,
-                peer_id: queries.peer_id,
                 is_seeder: queries.left == 0,
                 is_active: true,
                 updated_at: Utc::now(),

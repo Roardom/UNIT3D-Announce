@@ -1,15 +1,21 @@
-use std::{ops::Deref, str::FromStr, sync::Arc};
+use std::{ops::Deref, sync::Arc};
 
 use axum::extract::{Query, State};
 use dashmap::DashMap;
 use serde::Deserialize;
-use sqlx::{database::HasValueRef, Database, Decode, MySqlPool};
+use sqlx::MySqlPool;
 
 use crate::Error;
 
 use crate::tracker::Tracker;
 
-pub struct Map(DashMap<Passkey, User>);
+pub mod passkey;
+pub use passkey::Passkey;
+
+pub mod passkey2id;
+pub use passkey2id::Passkey2Id;
+
+pub struct Map(DashMap<u32, User>);
 
 impl Map {
     pub fn new() -> Map {
@@ -53,22 +59,22 @@ impl Map {
         let user_map = Map::new();
 
         for user in users {
-            user_map.insert(user.passkey, user);
+            user_map.insert(user.id, user);
         }
         Ok(user_map)
     }
 
     pub async fn upsert(State(tracker): State<Arc<Tracker>>, Query(user): Query<User>) {
-        tracker.users.insert(user.passkey, user);
+        tracker.users.insert(user.id, user);
     }
 
     pub async fn destroy(State(tracker): State<Arc<Tracker>>, Query(user): Query<User>) {
-        tracker.users.remove(&user.passkey);
+        tracker.users.remove(&user.id);
     }
 }
 
 impl Deref for Map {
-    type Target = DashMap<Passkey, User>;
+    type Target = DashMap<u32, User>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -86,39 +92,4 @@ pub struct User {
     pub num_leeching: u32,
     pub download_factor: u8,
     pub upload_factor: u8,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq)]
-pub struct Passkey(pub [u8; 32]);
-
-impl FromStr for Passkey {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut bytes = s.bytes();
-
-        if bytes.len() != 32 {
-            return Err(Error("Invalid passkey length."));
-        }
-
-        let array = [(); 32].map(|_| bytes.next().unwrap());
-
-        Ok(Passkey(array))
-    }
-}
-
-impl<'r, DB: Database> Decode<'r, DB> for Passkey
-where
-    &'r str: Decode<'r, DB>,
-{
-    fn decode(
-        value: <DB as HasValueRef<'r>>::ValueRef,
-    ) -> Result<Passkey, Box<dyn std::error::Error + 'static + Send + Sync>> {
-        let value = <&str as Decode<DB>>::decode(value)?;
-        let mut bytes = value.bytes();
-
-        let array = [(); 32].map(|_| bytes.next().expect("Invalid passkey length."));
-
-        Ok(Passkey(array))
-    }
 }

@@ -6,18 +6,21 @@ use dashmap::DashMap;
 use serde::Deserialize;
 use sqlx::MySqlPool;
 
-use crate::tracker::peer;
+use crate::tracker::peer::{self, Peer};
 use crate::Error;
 
 pub mod infohash;
 pub use infohash::InfoHash;
+
+pub mod infohash2id;
+pub use infohash2id::InfoHash2Id;
 
 pub mod status;
 pub use status::Status;
 
 use crate::tracker::Tracker;
 
-pub struct Map(DashMap<InfoHash, Torrent>);
+pub struct Map(DashMap<u32, Torrent>);
 
 impl Map {
     pub fn new() -> Map {
@@ -32,7 +35,6 @@ impl Map {
             r#"
                 SELECT
                     torrents.id as `id: u32`,
-                    torrents.info_hash as `info_hash: InfoHash`,
                     torrents.status as `status: Status`,
                     torrents.seeders as `seeders: u32`,
                     torrents.leechers as `leechers: u32`,
@@ -51,7 +53,6 @@ impl Map {
         .map(|row| {
             let torrent = Torrent {
                 id: row.id,
-                info_hash: row.info_hash,
                 status: row.status,
                 seeders: row.seeders,
                 leechers: row.leechers,
@@ -62,22 +63,33 @@ impl Map {
                 peers: Arc::new(peer::Map::default()),
             };
 
+            // TODO: use drain_filter once stabilized.
             let peers = peers.iter().filter_map(|peer| {
                 if peer.torrent_id == row.id {
-                    Some(peer)
+                    Some((
+                        peer::Index {
+                            user_id: peer.user_id,
+                            peer_id: peer.key().peer_id
+                        },
+                        Peer {
+                            ip_address: peer.ip_address,
+                            user_id: peer.user_id,
+                            torrent_id: peer.torrent_id,
+                            port: peer.port,
+                            is_seeder: peer.is_seeder,
+                            is_active: peer.is_active,
+                            updated_at: peer.updated_at,
+                            uploaded: peer.uploaded,
+                            downloaded: peer.downloaded,
+                        }
+                    ))
                 } else {
                     None
                 }
             });
 
-            for peer in peers {
-                torrent.peers.insert(
-                    peer::Index {
-                        user_id: peer.user_id,
-                        peer_id: peer.peer_id,
-                    },
-                    *peer.value()
-                );
+            for (index, peer) in peers {
+                torrent.peers.insert(index, peer);
             }
 
             torrent
@@ -89,23 +101,23 @@ impl Map {
         let torrent_map = Map::new();
 
         for torrent in torrents {
-            torrent_map.insert(torrent.info_hash, torrent);
+            torrent_map.insert(torrent.id, torrent);
         }
 
         Ok(torrent_map)
     }
 
     pub async fn upsert(State(tracker): State<Arc<Tracker>>, Query(torrent): Query<Torrent>) {
-        tracker.torrents.insert(torrent.info_hash, torrent);
+        tracker.torrents.insert(torrent.id, torrent);
     }
 
     pub async fn destroy(State(tracker): State<Arc<Tracker>>, Query(torrent): Query<Torrent>) {
-        tracker.torrents.remove(&torrent.info_hash);
+        tracker.torrents.remove(&torrent.id);
     }
 }
 
 impl Deref for Map {
-    type Target = DashMap<InfoHash, Torrent>;
+    type Target = DashMap<u32, Torrent>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -115,7 +127,6 @@ impl Deref for Map {
 #[derive(Clone, Deserialize)]
 pub struct Torrent {
     pub id: u32,
-    pub info_hash: InfoHash,
     pub status: Status,
     pub is_deleted: bool,
     #[serde(skip)]
