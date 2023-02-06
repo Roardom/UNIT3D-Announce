@@ -382,7 +382,20 @@ pub async fn announce(
                     }
                     update_peer_counts = true;
                 } else {
-                    update_peer_counts = false;
+                    if old_peer.is_active {
+                        update_peer_counts = false;
+                    } else {
+                        update_peer_counts = true;
+                        if queries.left == 0 {
+                            // seeder is reactivated
+                            user.num_seeding += 1;
+                            torrent.seeders += 1;
+                        } else {
+                            // leecher is reactivated
+                            user.num_leeching += 1;
+                            torrent.leechers += 1;
+                        }
+                    }
                 }
 
                 // Calculate change in upload and download compared to previous
