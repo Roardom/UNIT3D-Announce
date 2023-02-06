@@ -26,8 +26,8 @@ impl Map {
                     users.can_download as `can_download: bool`,
                     groups.download_slots as `download_slots: u32`,
                     groups.is_immune as `is_immune: bool`,
-                    0 as `seeding_count: u32`,
-                    0 as `leeching_count: u32`,
+                    COUNT(peers.id) as `num_seeding: u32`,
+                    COUNT(peers.id) as `num_leeching: u32`,
                     IF(groups.is_freeleech, 0, 100) as `download_factor: u8`,
                     IF(groups.is_double_upload, 200, 100) as `upload_factor: u8`
                 FROM
@@ -38,11 +38,17 @@ impl Map {
                     users.group_id = `groups`.id
                     AND groups.slug NOT IN ('banned', 'validating', 'disabled')
                     AND users.deleted_at IS NULL
+                INNER JOIN
+                    peers
+                ON
+                    users.id = peers.user_id
+                GROUP BY
+                    peers.user_id
             "#
         )
         .fetch_all(db)
         .await
-        .map_err(|_| Error("Failed loading personal freeleeches."))?;
+        .map_err(|_| Error("Failed loading users."))?;
 
         let user_map = Map::new();
 
@@ -76,8 +82,8 @@ pub struct User {
     pub can_download: bool,
     pub download_slots: Option<u32>,
     pub is_immune: bool,
-    pub seeding_count: u32,
-    pub leeching_count: u32,
+    pub num_seeding: u32,
+    pub num_leeching: u32,
     pub download_factor: u8,
     pub upload_factor: u8,
 }

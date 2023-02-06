@@ -271,8 +271,7 @@ pub async fn announce(
     }
 
     // Make sure user isn't leeching more torrents than their group allows
-    if queries.left > 0 && matches!(user.download_slots, Some(slots) if slots > user.leeching_count)
-    {
+    if queries.left > 0 && matches!(user.download_slots, Some(slots) if slots > user.num_leeching) {
         return Err(Error("Your download slot limit is reached."));
     }
 
@@ -294,10 +293,10 @@ pub async fn announce(
             downloaded_delta = std::cmp::max(0, queries.downloaded - peer.downloaded);
 
             if peer.is_seeder {
-                user.seeding_count -= 1;
+                user.num_seeding -= 1;
                 torrent.seeders -= 1;
             } else {
-                user.leeching_count -= 1;
+                user.num_leeching -= 1;
                 torrent.leechers -= 1;
             }
             // Schedule a peer deletion in the mysql db
@@ -356,15 +355,15 @@ pub async fn announce(
             Some(old_peer) => {
                 if queries.left == 0 && !old_peer.is_seeder {
                     // leech has turned into a seed
-                    user.seeding_count += 1;
-                    user.leeching_count -= 1;
+                    user.num_seeding += 1;
+                    user.num_leeching -= 1;
                     torrent.seeders += 1;
                     torrent.leechers -= 1;
                     update_peer_counts = true;
                 } else if queries.left > 0 && old_peer.is_seeder {
                     // seed has turned into a leech
-                    user.seeding_count -= 1;
-                    user.leeching_count += 1;
+                    user.num_seeding -= 1;
+                    user.num_leeching += 1;
                     torrent.seeders -= 1;
                     torrent.leechers += 1;
                     update_peer_counts = true;
@@ -382,11 +381,11 @@ pub async fn announce(
                 update_peer_counts = true;
                 if queries.left == 0 {
                     // new seeder is inserted
-                    user.seeding_count += 1;
+                    user.num_seeding += 1;
                     torrent.seeders += 1;
                 } else {
                     // new leecher is inserted
-                    user.leeching_count += 1;
+                    user.num_leeching += 1;
                     torrent.leechers += 1;
                 }
 
