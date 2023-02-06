@@ -10,6 +10,9 @@ pub struct Index {
     pub user_id: u32,
 }
 
+// TODO: Ideally unit3d should have `num_seeding` and `num_leeching` columns
+// on the user table so that the navbar doesn't query the history table.
+// If those columns existed, they should be updated too.
 #[derive(Clone, Copy)]
 pub struct UserUpdate {
     pub user_id: u32,

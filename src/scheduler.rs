@@ -27,6 +27,7 @@ pub async fn handle(tracker: &Arc<Tracker>) {
     }
 }
 
+/// Send queued updates to mysql database
 pub async fn flush(tracker: &Arc<Tracker>) {
     tracker
         .history_updates
@@ -49,34 +50,45 @@ pub async fn reap(tracker: &Arc<Tracker>) {
     let inactive_cutoff = Utc::now().checked_sub_signed(ttl).unwrap();
 
     tracker.torrents.iter_mut().for_each(|mut torrent| {
-        let mut num_reaped_seeders: u32 = 0;
-        let mut num_reaped_leechers: u32 = 0;
+        let mut num_inactivated_seeders: u32 = 0;
+        let mut num_inactivated_leechers: u32 = 0;
 
         torrent.peers.iter_mut().for_each(|mut peer| {
             match peer.updated_at {
-                updated_at if updated_at < inactive_cutoff => {
+                // If a peer is marked as inactive and it has not announced for
+                // more than inactive_peer_ttl, then it is permanently deleted.
+                updated_at if updated_at < inactive_cutoff && !peer.is_active => {
                     if let Some((index, _)) = torrent.peers.remove(peer.key()) {
                         tracker
                             .peer_deletions
                             .upsert(torrent.id, index.user_id, index.peer_id);
-
-                        match peer.is_seeder {
-                            true => num_reaped_seeders += 1,
-                            false => num_reaped_leechers += 1,
-                        }
                     }
                 }
-                updated_at if updated_at < active_cutoff => {
+                // Peers get marked as inactive if not announced for more than
+                // active_peer_ttl seconds. User peer count and torrent peer
+                // count are updated to reflect.
+                updated_at if updated_at < active_cutoff && peer.is_active => {
                     peer.is_active = false;
+                    tracker.users.entry(peer.user_id).and_modify(|user| {
+                        if peer.is_seeder {
+                            user.num_seeding -= 1;
+                        } else {
+                            user.num_leeching -= 1;
+                        }
+                    });
+                    match peer.is_seeder {
+                        true => num_inactivated_seeders += 1,
+                        false => num_inactivated_leechers += 1,
+                    }
                 }
                 _ => (),
             };
         });
 
-        torrent.seeders += num_reaped_seeders;
-        torrent.leechers += num_reaped_leechers;
+        torrent.seeders += num_inactivated_seeders;
+        torrent.leechers += num_inactivated_leechers;
 
-        if num_reaped_seeders > 0 || num_reaped_leechers > 0 {
+        if num_inactivated_seeders > 0 || num_inactivated_leechers > 0 {
             tracker.torrent_updates.upsert(
                 torrent.id,
                 torrent.seeders,

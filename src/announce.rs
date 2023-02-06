@@ -299,12 +299,14 @@ pub async fn announce(
             uploaded_delta = std::cmp::max(0, queries.uploaded - peer.uploaded);
             downloaded_delta = std::cmp::max(0, queries.downloaded - peer.downloaded);
 
-            if peer.is_seeder {
-                user.num_seeding -= 1;
-                torrent.seeders -= 1;
-            } else {
-                user.num_leeching -= 1;
-                torrent.leechers -= 1;
+            if peer.is_active {
+                if peer.is_seeder {
+                    user.num_seeding -= 1;
+                    torrent.seeders -= 1;
+                } else {
+                    user.num_leeching -= 1;
+                    torrent.leechers -= 1;
+                }
             }
             // Schedule a peer deletion in the mysql db
             tracker
@@ -362,16 +364,22 @@ pub async fn announce(
                 if queries.left == 0 && !old_peer.is_seeder {
                     // leech has turned into a seed
                     user.num_seeding += 1;
-                    user.num_leeching -= 1;
                     torrent.seeders += 1;
-                    torrent.leechers -= 1;
+
+                    if old_peer.is_active {
+                        user.num_leeching -= 1;
+                        torrent.leechers -= 1;
+                    }
                     update_peer_counts = true;
                 } else if queries.left > 0 && old_peer.is_seeder {
                     // seed has turned into a leech
-                    user.num_seeding -= 1;
                     user.num_leeching += 1;
-                    torrent.seeders -= 1;
                     torrent.leechers += 1;
+
+                    if old_peer.is_active {
+                        user.num_seeding -= 1;
+                        torrent.seeders -= 1;
+                    }
                     update_peer_counts = true;
                 } else {
                     update_peer_counts = false;
@@ -409,9 +417,6 @@ pub async fn announce(
                 torrent.leechers,
                 torrent.times_completed,
             );
-            // TODO: Ideally unit3d should have `num_seeding` and `num_leeching` columns
-            // on the user table so that the navbar doesn't query the history table.
-            // If those columns existed, they should be updated here.
         }
     }
 
