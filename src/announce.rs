@@ -7,7 +7,7 @@ use axum::{
         HeaderMap,
     },
 };
-use rand::{rngs::SmallRng, seq::IteratorRandom, SeedableRng};
+use rand::{rngs::SmallRng, seq::IteratorRandom, Rng, SeedableRng};
 use sqlx::types::chrono::Utc;
 use std::{
     net::{IpAddr, SocketAddr},
@@ -511,15 +511,18 @@ pub async fn announce(
     for peer in peer_list.iter() {
         match peer.ip_address {
             IpAddr::V4(ip) => {
-                peers.extend_from_slice(&ip.octets());
-                peers.extend_from_slice(&peer.port.to_be_bytes());
+                peers.extend(&ip.octets());
+                peers.extend(&peer.port.to_be_bytes());
             }
             IpAddr::V6(ip) => {
-                peers6.extend_from_slice(&ip.octets());
-                peers6.extend_from_slice(&peer.port.to_be_bytes());
+                peers6.extend(&ip.octets());
+                peers6.extend(&peer.port.to_be_bytes());
             }
         }
     }
+
+    let interval = SmallRng::from_entropy()
+        .gen_range(tracker.config.announce_min..=tracker.config.announce_max);
 
     // Write out bencoded response (keys must be sorted to be within spec)
     let mut response: Vec<u8> = vec![];
@@ -529,6 +532,10 @@ pub async fn announce(
     response.extend(torrent.times_completed.to_string().as_bytes());
     response.extend(b"e10:incompletei");
     response.extend(torrent.leechers.to_string().as_bytes());
+    response.extend(b"e8:intervali");
+    response.extend(interval.to_string().as_bytes());
+    response.extend(b"e12:min intervali");
+    response.extend(tracker.config.announce_min.to_string().as_bytes());
     response.extend(b"e5:peers");
     response.extend(peers.len().to_string().as_bytes());
     response.extend(b":");
@@ -541,7 +548,7 @@ pub async fn announce(
         response.extend(peers6);
     }
 
-    response.extend_from_slice(b"e");
+    response.extend(b"e");
 
     Ok(response)
 }
