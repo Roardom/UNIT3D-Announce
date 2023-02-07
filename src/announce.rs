@@ -296,16 +296,16 @@ pub async fn announce(
         if let Some((_, peer)) = removed_peer {
             // Calculate change in upload and download compared to previous
             // announce
-            uploaded_delta = std::cmp::max(0, queries.uploaded - peer.uploaded);
-            downloaded_delta = std::cmp::max(0, queries.downloaded - peer.downloaded);
+            uploaded_delta = queries.uploaded.checked_sub(peer.uploaded).unwrap_or(0);
+            downloaded_delta = queries.downloaded.checked_sub(peer.downloaded).unwrap_or(0);
 
             if peer.is_active {
                 if peer.is_seeder {
-                    user.num_seeding -= 1;
-                    torrent.seeders -= 1;
+                    user.num_seeding = user.num_seeding.checked_sub(1).unwrap_or(0);
+                    torrent.seeders = torrent.seeders.checked_sub(1).unwrap_or(0);
                 } else {
-                    user.num_leeching -= 1;
-                    torrent.leechers -= 1;
+                    user.num_leeching = user.num_leeching.checked_sub(1).unwrap_or(0);
+                    torrent.leechers = torrent.leechers.checked_sub(1).unwrap_or(0);
                 }
             }
             // Schedule a peer deletion in the mysql db
@@ -367,8 +367,8 @@ pub async fn announce(
                     torrent.seeders += 1;
 
                     if old_peer.is_active {
-                        user.num_leeching -= 1;
-                        torrent.leechers -= 1;
+                        user.num_leeching = user.num_leeching.checked_sub(1).unwrap_or(0);
+                        torrent.leechers = torrent.leechers.checked_sub(1).unwrap_or(0);
                     }
                     update_peer_counts = true;
                 } else if queries.left > 0 && old_peer.is_seeder {
@@ -377,8 +377,8 @@ pub async fn announce(
                     torrent.leechers += 1;
 
                     if old_peer.is_active {
-                        user.num_seeding -= 1;
-                        torrent.seeders -= 1;
+                        user.num_seeding = user.num_seeding.checked_sub(1).unwrap_or(0);
+                        torrent.seeders = torrent.seeders.checked_sub(1).unwrap_or(0);
                     }
                     update_peer_counts = true;
                 } else {
@@ -400,8 +400,11 @@ pub async fn announce(
 
                 // Calculate change in upload and download compared to previous
                 // announce
-                uploaded_delta = std::cmp::max(0, queries.uploaded - old_peer.uploaded);
-                downloaded_delta = std::cmp::max(0, queries.downloaded - old_peer.downloaded);
+                uploaded_delta = queries.uploaded.checked_sub(old_peer.uploaded).unwrap_or(0);
+                downloaded_delta = queries
+                    .downloaded
+                    .checked_sub(old_peer.downloaded)
+                    .unwrap_or(0);
             }
             None => {
                 // new peer is inserted
@@ -500,7 +503,7 @@ pub async fn announce(
                 .filter(|peer| !peer.is_seeder)
                 .choose_multiple(
                     &mut SmallRng::from_entropy(),
-                    std::cmp::max(0, queries.numwant - peer_list.len()),
+                    queries.numwant.checked_sub(peer_list.len()).unwrap_or(0),
                 ),
         );
     }

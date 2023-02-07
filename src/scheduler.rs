@@ -71,9 +71,9 @@ pub async fn reap(tracker: &Arc<Tracker>) {
                     peer.is_active = false;
                     tracker.users.entry(peer.user_id).and_modify(|user| {
                         if peer.is_seeder {
-                            user.num_seeding -= 1;
+                            user.num_seeding = user.num_seeding.checked_sub(1).unwrap_or(0);
                         } else {
-                            user.num_leeching -= 1;
+                            user.num_leeching = user.num_leeching.checked_sub(1).unwrap_or(0);
                         }
                     });
                     match peer.is_seeder {
@@ -85,10 +85,16 @@ pub async fn reap(tracker: &Arc<Tracker>) {
             };
         });
 
-        torrent.seeders += num_inactivated_seeders;
-        torrent.leechers += num_inactivated_leechers;
-
+        // Update peer count of torrents and users
         if num_inactivated_seeders > 0 || num_inactivated_leechers > 0 {
+            torrent.seeders = torrent
+                .seeders
+                .checked_sub(num_inactivated_seeders)
+                .unwrap_or(0);
+            torrent.leechers = torrent
+                .leechers
+                .checked_sub(num_inactivated_leechers)
+                .unwrap_or(0);
             tracker.torrent_updates.upsert(
                 torrent.id,
                 torrent.seeders,
