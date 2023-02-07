@@ -44,12 +44,18 @@ impl Map {
                     users.group_id = `groups`.id
                     AND groups.slug NOT IN ('banned', 'validating', 'disabled')
                     AND users.deleted_at IS NULL
-                INNER JOIN
+                LEFT JOIN
                     peers
                 ON
                     users.id = peers.user_id
                 GROUP BY
-                    peers.user_id
+                    users.id,
+                    users.passkey,
+                    users.can_download,
+                    groups.download_slots,
+                    groups.is_immune,
+                    groups.is_freeleech,
+                    groups.is_double_upload
             "#
         )
         .fetch_all(db)
