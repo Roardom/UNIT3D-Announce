@@ -3,7 +3,10 @@ use std::{fmt, ops::Deref, str::FromStr};
 use serde::Deserialize;
 use sqlx::{database::HasValueRef, Database, Decode};
 
-use crate::error::Error;
+use crate::{
+    error::Error,
+    utils::{hex_decode, hex_encode},
+};
 
 #[derive(Clone, Copy, Deserialize, Debug, Eq, Hash, PartialEq)]
 pub struct InfoHash(pub [u8; 20]);
@@ -12,10 +15,16 @@ impl FromStr for InfoHash {
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut bytes = [0u8; 20];
-        hex::decode_to_slice(s, &mut bytes as &mut [u8]).map_err(|_| Error("Invalid infohash."))?;
+        let bytes = s.as_bytes();
+        let mut out = [0u8; 20];
+        // hex::decode_to_slice(s, &mut bytes as &mut [u8]).map_err(|_| Error("Invalid infohash."))?;
 
-        Ok(InfoHash(bytes))
+        for pos in 0..20 {
+            out[pos] = hex_decode([bytes[pos * 2], bytes[pos * 2 + 1]])
+                .map_err(|_| Error("Invalid infohash."))?;
+        }
+
+        Ok(InfoHash(out))
     }
 }
 
@@ -27,7 +36,13 @@ impl From<[u8; 20]> for InfoHash {
 
 impl fmt::Display for InfoHash {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.write_str(&hex::encode(self.0))
+        let mut bytes: Vec<u8> = vec![];
+
+        for pos in 0..20 {
+            bytes.extend(hex_encode(self.0[pos]));
+        }
+
+        fmt.write_str(&String::from_utf8_lossy(&bytes))
     }
 }
 

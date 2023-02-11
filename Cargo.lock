@@ -1507,7 +1507,6 @@ dependencies = [
  "chrono",
  "dashmap",
  "dotenvy",
- "hex",
  "memchr",
  "rand",
  "serde",
