@@ -365,6 +365,7 @@ pub async fn announce(
                     // leech has turned into a seed
                     user.num_seeding += 1;
                     torrent.seeders += 1;
+                    torrent.times_completed += 1;
 
                     if old_peer.is_active {
                         user.num_leeching = user.num_leeching.saturating_sub(1);
