@@ -53,18 +53,28 @@ impl Map {
         )
         .map(|row| {
             let mut peer_map = peer::Map::default();
+            let mut seeders = 0;
+            let mut leechers = 0;
 
             for (index, peer) in peers.iter() {
                 if peer.torrent_id == row.id {
                     peer_map.insert(*index, *peer);
+
+                    if peer.is_active {
+                        if peer.is_seeder {
+                            seeders += 1;
+                        } else {
+                            leechers += 1;
+                        }
+                    }
                 }
             }
 
             let torrent = Torrent {
                 id: row.id,
                 status: row.status,
-                seeders: row.seeders,
-                leechers: row.leechers,
+                seeders,
+                leechers,
                 times_completed: row.times_completed,
                 download_factor: row.download_factor,
                 upload_factor: row.upload_factor,
