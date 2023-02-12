@@ -80,13 +80,24 @@ async fn main() -> Result<(), Error> {
         .unwrap();
 
     // Flush all remaining updates before shutting down.
-    while tracker_clone2.history_updates.read().await.len() > 0
-        || tracker_clone2.peer_updates.read().await.len() > 0
-        || tracker_clone2.peer_deletions.read().await.len() > 0
-        || tracker_clone2.torrent_updates.read().await.len() > 0
-        || tracker_clone2.user_updates.read().await.len() > 0
+    let max_flushes = 1000;
+    let mut flushes = 0;
+
+    while flushes < max_flushes
+        && (tracker_clone2.history_updates.read().await.len() > 0
+            || tracker_clone2.peer_updates.read().await.len() > 0
+            || tracker_clone2.peer_deletions.read().await.len() > 0
+            || tracker_clone2.torrent_updates.read().await.len() > 0
+            || tracker_clone2.user_updates.read().await.len() > 0)
     {
         scheduler::flush(&tracker_clone2.clone()).await;
+        flushes += 1;
+    }
+
+    if flushes == max_flushes {
+        println!("Graceful shutdown failed");
+    } else {
+        println!("Graceful shutdown succeeded")
     }
 
     Ok(())
