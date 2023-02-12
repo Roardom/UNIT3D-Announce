@@ -1,11 +1,15 @@
-use std::{net::IpAddr, ops::Deref};
+use std::{
+    cmp::min,
+    net::IpAddr,
+    ops::{Deref, DerefMut},
+};
 
 use crate::tracker::peer::{PeerId, UserAgent};
 use chrono::{DateTime, Utc};
-use dashmap::DashMap;
+use indexmap::IndexMap;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
-pub struct Queue(pub DashMap<Index, PeerUpdate>);
+pub struct Queue(pub IndexMap<Index, PeerUpdate>);
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Index {
@@ -31,11 +35,11 @@ pub struct PeerUpdate {
 
 impl Queue {
     pub fn new() -> Queue {
-        Queue(DashMap::new())
+        Queue(IndexMap::new())
     }
 
     pub fn upsert(
-        &self,
+        &mut self,
         peer_id: PeerId,
         ip: IpAddr,
         port: u16,
@@ -70,8 +74,10 @@ impl Queue {
     }
 
     /// Flushes peer updates to the mysql db
-    pub async fn flush_to_db(&self, db: &MySqlPool) {
-        if self.len() == 0 {
+    pub async fn flush_to_db(&mut self, db: &MySqlPool) {
+        let len = self.len();
+
+        if len == 0 {
             return;
         }
 
@@ -79,17 +85,9 @@ impl Queue {
         const NUM_PEER_COLUMNS: usize = 13;
         const PEER_LIMIT: usize = BIND_LIMIT / NUM_PEER_COLUMNS;
 
-        let mut peer_updates: Vec<_> = vec![];
+        let mut peer_updates: Vec<PeerUpdate> = vec![];
 
-        for _ in 0..std::cmp::min(PEER_LIMIT, self.len()) {
-            let peer_update = *self.iter().next().unwrap();
-            self.remove(&Index {
-                torrent_id: peer_update.torrent_id,
-                user_id: peer_update.user_id,
-                peer_id: peer_update.peer_id,
-            });
-            peer_updates.push(peer_update);
-        }
+        peer_updates.extend(self.split_off(len - min(PEER_LIMIT, len)).values());
 
         let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
             r#"
@@ -175,9 +173,15 @@ impl Queue {
 }
 
 impl Deref for Queue {
-    type Target = DashMap<Index, PeerUpdate>;
+    type Target = IndexMap<Index, PeerUpdate>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for Queue {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }

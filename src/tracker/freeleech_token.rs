@@ -1,7 +1,8 @@
+use std::ops::DerefMut;
 use std::{ops::Deref, sync::Arc};
 
 use axum::extract::{Query, State};
-use dashmap::DashSet;
+use indexmap::IndexSet;
 use serde::Deserialize;
 use sqlx::MySqlPool;
 
@@ -9,11 +10,11 @@ use crate::Error;
 
 use crate::tracker::Tracker;
 
-pub struct Set(DashSet<FreeleechToken>);
+pub struct Set(IndexSet<FreeleechToken>);
 
 impl Set {
     pub fn new() -> Set {
-        Set(DashSet::new())
+        Set(IndexSet::new())
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Set, Error> {
@@ -31,7 +32,7 @@ impl Set {
         .await
         .map_err(|_| Error("Failed loading freeleech tokens."))?;
 
-        let freeleech_token_set = Set::new();
+        let mut freeleech_token_set = Set::new();
 
         for freeleech_token in freeleech_tokens {
             freeleech_token_set.insert(freeleech_token);
@@ -41,19 +42,25 @@ impl Set {
     }
 
     pub async fn upsert(State(tracker): State<Arc<Tracker>>, Query(token): Query<FreeleechToken>) {
-        tracker.freeleech_tokens.insert(token);
+        tracker.freeleech_tokens.write().await.insert(token);
     }
 
     pub async fn destroy(State(tracker): State<Arc<Tracker>>, Query(token): Query<FreeleechToken>) {
-        tracker.freeleech_tokens.remove(&token);
+        tracker.freeleech_tokens.write().await.remove(&token);
     }
 }
 
 impl Deref for Set {
-    type Target = DashSet<FreeleechToken>;
+    type Target = IndexSet<FreeleechToken>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for Set {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 

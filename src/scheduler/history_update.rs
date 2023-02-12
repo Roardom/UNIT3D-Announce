@@ -1,12 +1,15 @@
-use std::ops::Deref;
+use std::{
+    cmp::min,
+    ops::{Deref, DerefMut},
+};
 
 use chrono::Utc;
-use dashmap::DashMap;
+use indexmap::IndexMap;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
 use crate::tracker::peer::UserAgent;
 
-pub struct Queue(pub DashMap<Index, HistoryUpdate>);
+pub struct Queue(pub IndexMap<Index, HistoryUpdate>);
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Index {
@@ -32,11 +35,11 @@ pub struct HistoryUpdate {
 
 impl Queue {
     pub fn new() -> Queue {
-        Queue(DashMap::new())
+        Queue(IndexMap::new())
     }
 
     pub fn upsert(
-        &self,
+        &mut self,
         user_id: u32,
         torrent_id: u32,
         user_agent: UserAgent,
@@ -82,8 +85,10 @@ impl Queue {
     }
 
     /// Flushes history updates to the mysql db
-    pub async fn flush_to_db(&self, db: &MySqlPool, seedtime_ttl: u64) {
-        if self.len() == 0 {
+    pub async fn flush_to_db(&mut self, db: &MySqlPool, seedtime_ttl: u64) {
+        let len = self.len();
+
+        if len == 0 {
             return;
         }
 
@@ -93,16 +98,9 @@ impl Queue {
 
         let now = Utc::now();
 
-        let mut history_updates: Vec<_> = vec![];
+        let mut history_updates: Vec<HistoryUpdate> = vec![];
 
-        for _ in 0..std::cmp::min(HISTORY_LIMIT, self.len()) {
-            let history_update = *self.iter().next().unwrap();
-            self.remove(&Index {
-                torrent_id: history_update.torrent_id,
-                user_id: history_update.user_id,
-            });
-            history_updates.push(history_update);
-        }
+        history_updates.extend(self.split_off(len - min(HISTORY_LIMIT, len)).values());
 
         let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
             r#"INSERT INTO
@@ -128,6 +126,7 @@ impl Queue {
 
         // Mysql 8.0.20 deprecates use of VALUES() so will have to update it eventually to use aliases instead
         query_builder
+            // .push_values(history_updates., |mut bind, (index, history_update)| {
             .push_values(history_updates.clone(), |mut bind, history_update| {
                 bind.push_bind(history_update.user_id)
                     .push_bind(history_update.torrent_id)
@@ -207,9 +206,15 @@ impl Queue {
 }
 
 impl Deref for Queue {
-    type Target = DashMap<Index, HistoryUpdate>;
+    type Target = IndexMap<Index, HistoryUpdate>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for Queue {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }

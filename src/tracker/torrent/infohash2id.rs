@@ -1,24 +1,30 @@
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 use crate::tracker::torrent::InfoHash;
-use dashmap::DashMap;
+use indexmap::IndexMap;
 use sqlx::MySqlPool;
 
 use crate::Error;
 
-pub struct Map(DashMap<InfoHash, u32>);
+pub struct Map(IndexMap<InfoHash, u32>);
 
 impl Deref for Map {
-    type Target = DashMap<InfoHash, u32>;
+    type Target = IndexMap<InfoHash, u32>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
+impl DerefMut for Map {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 impl Map {
     pub fn new() -> Map {
-        Map(DashMap::new())
+        Map(IndexMap::new())
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Map, Error> {
@@ -36,7 +42,7 @@ impl Map {
         .await
         .map_err(|_| Error("Failed loading torrent infohash to id mappings."))?;
 
-        let info_hash2id_map = Map::new();
+        let mut info_hash2id_map = Map::new();
 
         for info_hash2id in info_hash2ids {
             info_hash2id_map.insert(info_hash2id.info_hash, info_hash2id.id);

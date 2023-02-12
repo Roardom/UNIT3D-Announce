@@ -1,11 +1,14 @@
-use std::ops::Deref;
+use std::{
+    cmp::min,
+    ops::{Deref, DerefMut},
+};
 
-use dashmap::DashSet;
+use indexmap::IndexSet;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
 use crate::tracker::peer::PeerId;
 
-pub struct Queue(pub DashSet<PeerDeletion>);
+pub struct Queue(pub IndexSet<PeerDeletion>);
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct PeerDeletion {
@@ -16,10 +19,10 @@ pub struct PeerDeletion {
 
 impl Queue {
     pub fn new() -> Queue {
-        Queue(DashSet::new())
+        Queue(IndexSet::new())
     }
 
-    pub fn upsert(&self, torrent_id: u32, user_id: u32, peer_id: PeerId) {
+    pub fn upsert(&mut self, torrent_id: u32, user_id: u32, peer_id: PeerId) {
         self.insert(PeerDeletion {
             torrent_id,
             user_id,
@@ -27,8 +30,10 @@ impl Queue {
         });
     }
 
-    pub async fn flush_to_db(&self, db: &MySqlPool) {
-        if self.len() == 0 {
+    pub async fn flush_to_db(&mut self, db: &MySqlPool) {
+        let len = self.len();
+
+        if len == 0 {
             return;
         }
 
@@ -36,17 +41,9 @@ impl Queue {
         const NUM_PEER_COLUMNS: usize = 3;
         const PEER_LIMIT: usize = BIND_LIMIT / NUM_PEER_COLUMNS;
 
-        let mut peer_deletions: Vec<_> = vec![];
+        let mut peer_deletions: Vec<PeerDeletion> = vec![];
 
-        for _ in 0..std::cmp::min(PEER_LIMIT, self.len()) {
-            let peer_deletion = *self.iter().next().unwrap();
-            self.remove(&PeerDeletion {
-                torrent_id: peer_deletion.torrent_id,
-                user_id: peer_deletion.user_id,
-                peer_id: peer_deletion.peer_id,
-            });
-            peer_deletions.push(peer_deletion);
-        }
+        peer_deletions.extend(self.split_off(len - min(PEER_LIMIT, len)));
 
         // Requires trailing space last before push_tuples
         // Requires leading space after push_tuples
@@ -90,9 +87,15 @@ impl Queue {
 }
 
 impl Deref for Queue {
-    type Target = DashSet<PeerDeletion>;
+    type Target = IndexSet<PeerDeletion>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for Queue {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }

@@ -1,7 +1,7 @@
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
-use dashmap::DashMap;
+use indexmap::IndexMap;
 use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::MySqlPool;
 
@@ -12,9 +12,9 @@ pub use peer_id::PeerId;
 pub mod user_agent;
 pub use user_agent::UserAgent;
 
-pub struct Map(DashMap<Index, Peer>);
+pub struct Map(IndexMap<Index, Peer>);
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Index {
     pub user_id: u32,
     pub peer_id: PeerId,
@@ -35,7 +35,7 @@ pub struct Peer {
 
 impl Map {
     pub fn new() -> Map {
-        Map(DashMap::new())
+        Map(IndexMap::new())
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Map, Error> {
@@ -86,7 +86,7 @@ impl Map {
         .await
         .map_err(|_| Error("Failed loading peers."))?;
 
-        let peer_map = Map::new();
+        let mut peer_map = Map::new();
 
         for (index, peer) in peers {
             peer_map.insert(index, peer);
@@ -97,10 +97,16 @@ impl Map {
 }
 
 impl Deref for Map {
-    type Target = DashMap<Index, Peer>;
+    type Target = IndexMap<Index, Peer>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for Map {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 

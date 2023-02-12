@@ -1,7 +1,8 @@
+use std::ops::DerefMut;
 use std::{ops::Deref, sync::Arc};
 
 use axum::extract::{Query, State};
-use dashmap::DashMap;
+use indexmap::IndexMap;
 use serde::Deserialize;
 use sqlx::MySqlPool;
 
@@ -15,11 +16,11 @@ pub use passkey::Passkey;
 pub mod passkey2id;
 pub use passkey2id::Passkey2Id;
 
-pub struct Map(DashMap<u32, User>);
+pub struct Map(IndexMap<u32, User>);
 
 impl Map {
     pub fn new() -> Map {
-        Map(DashMap::new())
+        Map(IndexMap::new())
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Map, Error> {
@@ -62,7 +63,7 @@ impl Map {
         .await
         .map_err(|_| Error("Failed loading users."))?;
 
-        let user_map = Map::new();
+        let mut user_map = Map::new();
 
         for user in users {
             user_map.insert(user.id, user);
@@ -71,19 +72,25 @@ impl Map {
     }
 
     pub async fn upsert(State(tracker): State<Arc<Tracker>>, Query(user): Query<User>) {
-        tracker.users.insert(user.id, user);
+        tracker.users.write().await.insert(user.id, user);
     }
 
     pub async fn destroy(State(tracker): State<Arc<Tracker>>, Query(user): Query<User>) {
-        tracker.users.remove(&user.id);
+        tracker.users.write().await.remove(&user.id);
     }
 }
 
 impl Deref for Map {
-    type Target = DashMap<u32, User>;
+    type Target = IndexMap<u32, User>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for Map {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 

@@ -1,24 +1,30 @@
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 use super::Passkey;
-use dashmap::DashMap;
+use indexmap::IndexMap;
 use sqlx::MySqlPool;
 
 use crate::Error;
 
-pub struct Map(DashMap<Passkey, u32>);
+pub struct Map(IndexMap<Passkey, u32>);
 
 impl Deref for Map {
-    type Target = DashMap<Passkey, u32>;
+    type Target = IndexMap<Passkey, u32>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
+impl DerefMut for Map {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 impl Map {
     pub fn new() -> Map {
-        Map(DashMap::new())
+        Map(IndexMap::new())
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Map, Error> {
@@ -36,7 +42,7 @@ impl Map {
         .await
         .map_err(|_| Error("Failed loading user passkey to id mappings."))?;
 
-        let passkey2id_map = Map::new();
+        let mut passkey2id_map = Map::new();
 
         for passkey2id in passkey2ids {
             passkey2id_map.insert(passkey2id.passkey, passkey2id.id);

@@ -1,9 +1,12 @@
-use std::ops::Deref;
+use std::{
+    cmp::min,
+    ops::{Deref, DerefMut},
+};
 
-use dashmap::DashMap;
+use indexmap::IndexMap;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
-pub struct Queue(pub DashMap<Index, UserUpdate>);
+pub struct Queue(pub IndexMap<Index, UserUpdate>);
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Index {
@@ -22,10 +25,10 @@ pub struct UserUpdate {
 
 impl Queue {
     pub fn new() -> Queue {
-        Queue(DashMap::new())
+        Queue(IndexMap::new())
     }
 
-    pub fn upsert(&self, user_id: u32, uploaded_delta: u64, downloaded_delta: u64) {
+    pub fn upsert(&mut self, user_id: u32, uploaded_delta: u64, downloaded_delta: u64) {
         self.insert(
             Index { user_id },
             UserUpdate {
@@ -37,8 +40,10 @@ impl Queue {
     }
 
     /// Flushes user updates to the mysql db
-    pub async fn flush_to_db(&self, db: &MySqlPool) {
-        if self.len() == 0 {
+    pub async fn flush_to_db(&mut self, db: &MySqlPool) {
+        let len = self.len();
+
+        if len == 0 {
             return;
         }
 
@@ -46,15 +51,9 @@ impl Queue {
         const NUM_USER_COLUMNS: usize = 9;
         const USER_LIMIT: usize = BIND_LIMIT / NUM_USER_COLUMNS;
 
-        let mut user_updates: Vec<_> = vec![];
+        let mut user_updates: Vec<UserUpdate> = vec![];
 
-        for _ in 0..std::cmp::min(USER_LIMIT, self.len()) {
-            let user_update = *self.iter().next().unwrap();
-            self.remove(&Index {
-                user_id: user_update.user_id,
-            });
-            user_updates.push(user_update);
-        }
+        user_updates.extend(self.split_off(len - min(USER_LIMIT, len)).values());
 
         // Trailing space required before the push values function
         // Leading space required after the push values function
@@ -119,9 +118,15 @@ impl Queue {
 }
 
 impl Deref for Queue {
-    type Target = DashMap<Index, UserUpdate>;
+    type Target = IndexMap<Index, UserUpdate>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for Queue {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }

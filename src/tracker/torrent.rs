@@ -1,12 +1,13 @@
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use axum::extract::{Query, State};
-use dashmap::DashMap;
+use indexmap::IndexMap;
 use serde::Deserialize;
 use sqlx::MySqlPool;
+use tokio::sync::RwLock;
 
-use crate::tracker::peer::{self, Peer};
+use crate::tracker::peer;
 use crate::Error;
 
 pub mod infohash;
@@ -20,11 +21,11 @@ pub use status::Status;
 
 use crate::tracker::Tracker;
 
-pub struct Map(DashMap<u32, Torrent>);
+pub struct Map(IndexMap<u32, Torrent>);
 
 impl Map {
     pub fn new() -> Map {
-        Map(DashMap::new())
+        Map(IndexMap::new())
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Map, Error> {
@@ -51,6 +52,14 @@ impl Map {
             "#
         )
         .map(|row| {
+            let mut peer_map = peer::Map::default();
+
+            for (index, peer) in peers.iter() {
+                if peer.torrent_id == row.id {
+                    peer_map.insert(*index, *peer);
+                }
+            }
+
             let torrent = Torrent {
                 id: row.id,
                 status: row.status,
@@ -60,45 +69,16 @@ impl Map {
                 download_factor: row.download_factor,
                 upload_factor: row.upload_factor,
                 is_deleted: row.is_deleted,
-                peers: Arc::new(peer::Map::default()),
+                peers: Arc::new(RwLock::new(peer_map)),
             };
 
-            // TODO: use drain_filter once stabilized.
-            let peers = peers.iter().filter_map(|peer| {
-                if peer.torrent_id == row.id {
-                    Some((
-                        peer::Index {
-                            user_id: peer.user_id,
-                            peer_id: peer.key().peer_id
-                        },
-                        Peer {
-                            ip_address: peer.ip_address,
-                            user_id: peer.user_id,
-                            torrent_id: peer.torrent_id,
-                            port: peer.port,
-                            is_seeder: peer.is_seeder,
-                            is_active: peer.is_active,
-                            updated_at: peer.updated_at,
-                            uploaded: peer.uploaded,
-                            downloaded: peer.downloaded,
-                        }
-                    ))
-                } else {
-                    None
-                }
-            });
-
-            for (index, peer) in peers {
-                torrent.peers.insert(index, peer);
-            }
-
             torrent
-    })
+        })
         .fetch_all(db)
         .await
         .map_err(|_| Error("Failed loading torrents."))?;
 
-        let torrent_map = Map::new();
+        let mut torrent_map = Map::new();
 
         for torrent in torrents {
             torrent_map.insert(torrent.id, torrent);
@@ -108,19 +88,25 @@ impl Map {
     }
 
     pub async fn upsert(State(tracker): State<Arc<Tracker>>, Query(torrent): Query<Torrent>) {
-        tracker.torrents.insert(torrent.id, torrent);
+        tracker.torrents.write().await.insert(torrent.id, torrent);
     }
 
     pub async fn destroy(State(tracker): State<Arc<Tracker>>, Query(torrent): Query<Torrent>) {
-        tracker.torrents.remove(&torrent.id);
+        tracker.torrents.write().await.remove(&torrent.id);
     }
 }
 
 impl Deref for Map {
-    type Target = DashMap<u32, Torrent>;
+    type Target = IndexMap<u32, Torrent>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for Map {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -130,7 +116,7 @@ pub struct Torrent {
     pub status: Status,
     pub is_deleted: bool,
     #[serde(skip)]
-    pub peers: Arc<peer::Map>,
+    pub peers: Arc<RwLock<peer::Map>>,
     pub seeders: u32,
     pub leechers: u32,
     pub times_completed: u32,
