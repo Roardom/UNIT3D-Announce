@@ -334,6 +334,13 @@ pub async fn announce(
                     user.num_leeching = user.num_leeching.saturating_sub(1);
                     torrent.leechers = torrent.leechers.saturating_sub(1);
                 }
+                // Schedule a torrent update in the mysql db
+                tracker.torrent_updates.write().await.upsert(
+                    torrent.id,
+                    torrent.seeders,
+                    torrent.leechers,
+                    torrent.times_completed,
+                );
             }
             // Schedule a peer deletion in the mysql db
             tracker
@@ -341,13 +348,6 @@ pub async fn announce(
                 .write()
                 .await
                 .upsert(torrent.id, user.id, queries.peer_id);
-            // Schedule a torrent update in the mysql db
-            tracker.torrent_updates.write().await.upsert(
-                torrent.id,
-                torrent.seeders,
-                torrent.leechers,
-                torrent.times_completed,
-            );
         } else {
             return Err(Error("Stopped torrent doesn't exist."));
         }
