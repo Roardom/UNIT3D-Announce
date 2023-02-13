@@ -40,26 +40,26 @@ async fn main() -> Result<(), Error> {
                     &("/".to_string() + &tracker.config.apikey),
                     Router::new()
                         .route(
-                            "/announce/torrents",
+                            "/torrents",
                             put(tracker::torrent::Map::upsert)
                                 .delete(tracker::torrent::Map::destroy),
                         )
                         .route(
-                            "/announce/users",
+                            "/users",
                             put(tracker::user::Map::upsert).delete(tracker::user::Map::destroy),
                         )
                         .route(
-                            "/announce/blacklisted-agents",
+                            "/blacklisted-agents",
                             put(tracker::blacklisted_agent::Set::upsert)
                                 .delete(tracker::blacklisted_agent::Set::destroy),
                         )
                         .route(
-                            "/announce/freeleech-tokens",
+                            "/freeleech-tokens",
                             put(tracker::freeleech_token::Set::upsert)
                                 .delete(tracker::freeleech_token::Set::destroy),
                         )
                         .route(
-                            "/announce/personal-freeleech",
+                            "/personal-freeleech",
                             put(tracker::personal_freeleech::Set::upsert)
                                 .delete(tracker::personal_freeleech::Set::destroy),
                         ),
