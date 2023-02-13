@@ -239,24 +239,14 @@ pub async fn announce(
     let passkey: Passkey = Passkey::from_str(&passkey).map_err(|_| Error("Invalid passkey."))?;
 
     // Validate passkey
-    let user_id = tracker
-        .passkey2id
-        .read()
-        .await
-        .get(&passkey)
-        .ok_or(Error(
-            "Passkey does not exist. Please re-download the .torrent file.",
-        ))?
-        .to_owned();
-    let mut user = tracker
-        .users
-        .write()
-        .await
-        .get_mut(&user_id)
-        .ok_or(Error(
-            "Passkey does not exist. Please re-download the .torrent file.",
-        ))?
-        .to_owned();
+    let user_guard = tracker.passkey2id.read().await;
+    let user_id = user_guard.get(&passkey).ok_or(Error(
+        "Passkey does not exist. Please re-download the .torrent file.",
+    ))?;
+    let mut user_guard = tracker.users.write().await;
+    let mut user = user_guard.get_mut(user_id).ok_or(Error(
+        "User does not exist. Please re-download the .torrent file.",
+    ))?;
 
     // Validate user
     if !user.can_download && queries.left != 0 {
@@ -272,20 +262,15 @@ pub async fn announce(
     }
 
     // Validate torrent
-    let torrent_id = tracker
-        .infohash2id
-        .read()
-        .await
+    let torrent_guard = tracker.infohash2id.read().await;
+    let torrent_id = torrent_guard
         .get(&queries.info_hash)
-        .ok_or(Error("torrent not found"))?
+        .ok_or(Error("Infohash not found."))?
         .to_owned();
-    let mut torrent = tracker
-        .torrents
-        .write()
-        .await
+    let mut torrent_guard = tracker.torrents.write().await;
+    let mut torrent = torrent_guard
         .get_mut(&torrent_id)
-        .ok_or(Error("Torrent not found."))?
-        .to_owned();
+        .ok_or(Error("Torrent not found."))?;
 
     if torrent.is_deleted {
         return Err(Error("Torrent has been deleted."));
@@ -519,8 +504,7 @@ pub async fn announce(
     let peers_guard = torrent.peers.read().await;
     let valid_peers = peers_guard
         .iter()
-        .filter(|(_index, peer)| peer.user_id != user.id && peer.is_active)
-        .to_owned();
+        .filter(|(_index, peer)| peer.user_id != user.id && peer.is_active);
 
     // Make sure leech peerlists are filled with seeds
     if queries.left > 0 && torrent.seeders > 0 {
