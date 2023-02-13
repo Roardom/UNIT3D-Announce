@@ -35,7 +35,7 @@ pub struct Tracker {
     pub pool: MySqlPool,
     pub port_blacklist: RwLock<blacklisted_port::Set>,
     pub stats: Stats,
-    pub torrents: Arc<RwLock<torrent::Map>>,
+    pub torrents: RwLock<torrent::Map>,
     pub torrent_updates: RwLock<torrent_update::Queue>,
     pub users: RwLock<user::Map>,
     pub user_updates: RwLock<user_update::Queue>,
@@ -75,7 +75,7 @@ impl Tracker {
         let config = config::Config::from_env()?;
 
         println!("Loading from database into memory: torrents...");
-        let torrents = Arc::new(RwLock::new(torrent::Map::from_db(&pool).await?));
+        let torrents = RwLock::new(torrent::Map::from_db(&pool).await?);
 
         println!("Loading from database into memory: infohash to torrent id mapping...");
         let infohash2id = RwLock::new(torrent::infohash2id::Map::from_db(&pool).await?);
