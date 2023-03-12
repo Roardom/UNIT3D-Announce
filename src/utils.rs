@@ -16,6 +16,7 @@ use crate::Error;
 /// ```
 ///
 /// Used for decoding the peer_id and infohash from the HTTP GET request query string.
+#[inline(always)]
 pub async fn urlencoded_to_bytes(input: &str) -> Result<[u8; 20], Error> {
     let mut output: [u8; 20] = [0; 20];
     let input = input.as_bytes();
@@ -56,6 +57,7 @@ pub async fn urlencoded_to_bytes(input: &str) -> Result<[u8; 20], Error> {
 /// let incompatible_ascii_char: u8 = b"zz";
 /// assert_eq!(hex_decode(incompatible_ascii_char).is_err());
 /// ```
+#[inline(always)]
 pub fn hex_decode(chars: [u8; 2]) -> Result<u8, Error> {
     Ok(match chars[0] {
         b'0'..=b'9' => chars[0] - b'0' << 4,
@@ -78,6 +80,7 @@ pub fn hex_decode(chars: [u8; 2]) -> Result<u8, Error> {
 /// let byte: u8 = 0x7C;
 /// assert_eq!(hex_encode(byte), b"7C");
 /// ```
+#[inline(always)]
 pub fn hex_encode(char: u8) -> [u8; 2] {
     [
         match char >> 4 {
