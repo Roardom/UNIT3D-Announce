@@ -56,7 +56,7 @@ impl Tracker {
         println!("Connecting to database...");
         let pool = MySqlPoolOptions::new()
             .max_connections(5)
-            .acquire_timeout(Duration::from_secs(3))
+            .acquire_timeout(Duration::from_secs(30))
             .connect(&database_url)
             .await
             .map_err(|_| {
