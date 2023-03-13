@@ -82,15 +82,17 @@ pub fn hex_decode(chars: [u8; 2]) -> Result<u8, Error> {
 /// ```
 #[inline(always)]
 pub fn hex_encode(char: u8) -> [u8; 2] {
+    let char_1 = char >> 4;
+    let char_2 = char & 0x0F;
     [
-        match char >> 4 {
-            0x0..=0x9 => char + b'0',
-            0xA..=0xF => char + b'A',
+        match char_1 {
+            0x0..=0x9 => char_1 + b'0',
+            0xA..=0xF => char_1 - 0xA + b'A',
             _ => unreachable!(),
         },
-        match char & 0x0F {
-            0x0..=0x9 => char + b'0',
-            0xA..=0xF => char + b'A',
+        match char_2 {
+            0x0..=0x9 => char_2 + b'0',
+            0xA..=0xF => char_2 - 0xA + b'A',
             _ => unreachable!(),
         },
     ]
