@@ -2,19 +2,6 @@ use crate::Error;
 
 /// Decodes a url-encoded string to 20 bytes.
 ///
-/// # Example
-///
-/// ```
-/// let url_encoded = "%00%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F%00%01%02%03";
-/// assert_eq!(url_encoded_to_bytes(url_encoded), 0x000102030405060708090A0B0C0D0E0F00010203);
-/// let url_encoded = "33333333333333333333";
-/// assert_eq!(url_encoded_to_bytes(url_encoded), 0x3333333333333333333333333333333333333333);
-/// let url_encoded = "%00%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F3333";
-/// assert_eq!(url_encoded_to_bytes(url_encoded), 0x000102030405060708090A0B0C0D0E0F33333333);
-/// let url_encoded = "%00";
-/// assert_eq!(url_encoded_to_bytes(url_encoded)is_err());
-/// ```
-///
 /// Used for decoding the peer_id and infohash from the HTTP GET request query string.
 #[inline(always)]
 pub async fn urlencoded_to_bytes(input: &str) -> Result<[u8; 20], Error> {
@@ -46,17 +33,6 @@ pub async fn urlencoded_to_bytes(input: &str) -> Result<[u8; 20], Error> {
 }
 
 /// Decodes two ascii-encoded hex digits into one byte.
-///
-/// # Examples
-///
-/// ```
-/// let lowercase_ascii_char: u8 = b"7c";
-/// assert_eq!(hex_decode(lowercase_ascii_char), 0x7C);
-/// let uppercase_ascii_char: u8 = b"7C";
-/// assert_eq!(hex_decode(uppercase_ascii_char), 0x7C);
-/// let incompatible_ascii_char: u8 = b"zz";
-/// assert_eq!(hex_decode(incompatible_ascii_char).is_err());
-/// ```
 #[inline(always)]
 pub fn hex_decode(chars: [u8; 2]) -> Result<u8, Error> {
     Ok(match chars[0] {
@@ -72,14 +48,7 @@ pub fn hex_decode(chars: [u8; 2]) -> Result<u8, Error> {
     })
 }
 
-/// Encodes one byte into 2 hex digits.
-///
-/// # Example
-///
-/// ```
-/// let byte: u8 = 0x7C;
-/// assert_eq!(hex_encode(byte), b"7C");
-/// ```
+/// Encodes one byte into 2 ascii-encoded hex digits.
 #[inline(always)]
 pub fn hex_encode(char: u8) -> [u8; 2] {
     let char_1 = char >> 4;
@@ -96,4 +65,110 @@ pub fn hex_encode(char: u8) -> [u8; 2] {
             _ => unreachable!(),
         },
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[tokio::test]
+    async fn urlencoded_all_percents() -> Result<(), Error> {
+        let url_encoded = "%00%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F%00%01%02%03";
+        let bytes = urlencoded_to_bytes(url_encoded).await?;
+        assert_eq!(
+            bytes,
+            [
+                0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
+                0x0E, 0x0F, 0x00, 0x01, 0x02, 0x03
+            ]
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn urlencoded_no_percents() -> Result<(), Error> {
+        let url_encoded = "33333333333333333333";
+        let bytes = urlencoded_to_bytes(url_encoded).await?;
+        assert_eq!(
+            bytes,
+            // ASCII character '3' is 0x33 in hex
+            [
+                0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33,
+                0x33, 0x33, 0x33, 0x33, 0x33, 0x33
+            ]
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn urlencoded_mixed_percents() -> Result<(), Error> {
+        let url_encoded = "%00%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F3333";
+        let bytes = urlencoded_to_bytes(url_encoded).await?;
+        assert_eq!(
+            bytes,
+            [
+                0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D,
+                0x0E, 0x0F, 0x33, 0x33, 0x33, 0x33
+            ]
+        );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn urlencoded_incorrect_length() {
+        let url_encoded = "%00";
+        let bytes = urlencoded_to_bytes(url_encoded).await;
+        assert!(bytes.is_err());
+    }
+
+    #[tokio::test]
+    async fn urlencoded_too_many_percents() {
+        let url_encoded = "%0%%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F%00%01%02%03";
+        let bytes = urlencoded_to_bytes(url_encoded).await;
+        assert!(bytes.is_err());
+    }
+
+    #[test]
+    fn hex_decode_lowercase() -> Result<(), Error> {
+        let lowercase_ascii_chars: [u8; 2] = [b'7', b'c'];
+        let hex = hex_decode(lowercase_ascii_chars)?;
+        assert_eq!(hex, 0x7C);
+        Ok(())
+    }
+
+    #[test]
+    fn hex_decode_uppercase() -> Result<(), Error> {
+        let uppercase_ascii_chars: [u8; 2] = [b'7', b'C'];
+        let hex = hex_decode(uppercase_ascii_chars)?;
+        assert_eq!(hex, 0x7C);
+        Ok(())
+    }
+
+    #[test]
+    fn hex_decode_invalid() -> Result<(), Error> {
+        let invalid_ascii_chars: [u8; 2] = [b'z', b'z'];
+        let hex = hex_decode(invalid_ascii_chars);
+        assert!(hex.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn hex_encode_letters() {
+        let hex: u8 = 0xCC;
+        let chars = hex_encode(hex);
+        assert_eq!(chars, [b'C', b'C']);
+    }
+
+    #[test]
+    fn hex_encode_numbers() {
+        let hex: u8 = 0x77;
+        let chars = hex_encode(hex);
+        assert_eq!(chars, [b'7', b'7']);
+    }
+
+    #[test]
+    fn hex_encode_mixed() {
+        let hex: u8 = 0x7C;
+        let chars = hex_encode(hex);
+        assert_eq!(chars, [b'7', b'C']);
+    }
 }
