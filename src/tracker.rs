@@ -59,7 +59,8 @@ impl Tracker {
             .acquire_timeout(Duration::from_secs(30))
             .connect(&database_url)
             .await
-            .map_err(|_| {
+            .map_err(|error| {
+                println!("{}", error);
                 Error(
                 "Could not connect to the database located at DATABASE_URL in .env file. Aborting.",
             )

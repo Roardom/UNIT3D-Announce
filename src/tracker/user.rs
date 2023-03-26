@@ -61,7 +61,10 @@ impl Map {
         )
         .fetch_all(db)
         .await
-        .map_err(|_| Error("Failed loading users."))?;
+        .map_err(|error| {
+            println!("{}", error);
+            Error("Failed loading users.")
+        })?;
 
         let mut user_map = Map::new();
 

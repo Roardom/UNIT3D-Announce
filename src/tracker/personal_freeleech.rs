@@ -29,7 +29,10 @@ impl Set {
         )
         .fetch_all(db)
         .await
-        .map_err(|_| Error("Failed loading personal freeleeches."))?;
+        .map_err(|error| {
+            println!("{}", error);
+            Error("Failed loading personal freeleeches.")
+        })?;
 
         let mut personal_freeleech_set = Set::new();
 

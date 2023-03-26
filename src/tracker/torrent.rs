@@ -86,7 +86,10 @@ impl Map {
         })
         .fetch_all(db)
         .await
-        .map_err(|_| Error("Failed loading torrents."))?;
+        .map_err(|error| {
+            println!("{}", error);
+            Error("Failed loading torrents.")
+        })?;
 
         let mut torrent_map = Map::new();
 

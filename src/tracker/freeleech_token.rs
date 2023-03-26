@@ -30,7 +30,10 @@ impl Set {
         )
         .fetch_all(db)
         .await
-        .map_err(|_| Error("Failed loading freeleech tokens."))?;
+        .map_err(|error| {
+            println!("{}", error);
+            Error("Failed loading freeleech tokens.")
+        })?;
 
         let mut freeleech_token_set = Set::new();
 

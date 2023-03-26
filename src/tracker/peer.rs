@@ -84,7 +84,10 @@ impl Map {
         })
         .fetch_all(db)
         .await
-        .map_err(|_| Error("Failed loading peers."))?;
+        .map_err(|error| {
+            println!("{}", error);
+            Error("Failed loading peers.")
+        })?;
 
         let mut peer_map = Map::new();
 

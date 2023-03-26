@@ -29,7 +29,10 @@ impl Set {
         )
         .fetch_all(db)
         .await
-        .map_err(|_| Error("Failed loading blacklisted clients."))?;
+        .map_err(|error| {
+            println!("{}", error);
+            Error("Failed loading blacklisted clients.")
+        })?;
 
         let mut agent_set = Set::new();
 

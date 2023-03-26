@@ -40,7 +40,10 @@ impl Map {
         )
         .fetch_all(db)
         .await
-        .map_err(|_| Error("Failed loading torrent infohash to id mappings."))?;
+        .map_err(|error| {
+            println!("{}", error);
+            return Error("Failed loading torrent infohash to id mappings.");
+        })?;
 
         let mut info_hash2id_map = Map::new();
 

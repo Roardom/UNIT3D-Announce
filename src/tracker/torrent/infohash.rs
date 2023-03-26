@@ -17,11 +17,17 @@ impl FromStr for InfoHash {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let bytes = s.as_bytes();
         let mut out = [0u8; 20];
-        // hex::decode_to_slice(s, &mut bytes as &mut [u8]).map_err(|_| Error("Invalid infohash."))?;
+
+        if bytes.len() != 40 {
+            println!("`{s}` is not a valid infohash.");
+            return Err(Error("Invalid infohash."));
+        }
 
         for pos in 0..20 {
-            out[pos] = hex_decode([bytes[pos * 2], bytes[pos * 2 + 1]])
-                .map_err(|_| Error("Invalid infohash."))?;
+            out[pos] = hex_decode([bytes[pos * 2], bytes[pos * 2 + 1]]).map_err(|_| {
+                println!("`{s}` is not a valid infohash");
+                Error("Invalid infohash.")
+            })?;
         }
 
         Ok(InfoHash(out))
