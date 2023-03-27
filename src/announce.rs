@@ -290,7 +290,8 @@ pub async fn announce(
     }
 
     // Make sure user isn't leeching more torrents than their group allows
-    if queries.left > 0 && matches!(user.download_slots, Some(slots) if slots > user.num_leeching) {
+    if queries.left > 0 && matches!(user.download_slots, Some(slots) if slots <= user.num_leeching)
+    {
         return Err(Error("Your download slot limit is reached."));
     }
 
