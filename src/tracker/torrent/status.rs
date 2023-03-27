@@ -1,8 +1,9 @@
-use serde::Deserialize;
+use serde_repr::Deserialize_repr;
 use sqlx::{database::HasValueRef, Database, Decode};
 
 /// Torrent moderation status
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize_repr, Eq, PartialEq)]
+#[repr(i16)]
 pub enum Status {
     /// A torrent with pending status is currently in moderation queue
     /// and have not yet been moderated. Pending torrents are only visible

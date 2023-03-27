@@ -44,10 +44,14 @@ impl Set {
     }
 
     pub async fn upsert(State(tracker): State<Arc<Tracker>>, Query(agent): Query<Agent>) {
+        println!("Inserting agent with name {}.", agent.name);
+
         tracker.agent_blacklist.write().await.insert(agent);
     }
 
     pub async fn destroy(State(tracker): State<Arc<Tracker>>, Query(agent): Query<Agent>) {
+        println!("Removing agent with name {}.", agent.name);
+
         tracker.agent_blacklist.write().await.remove(&agent);
     }
 }

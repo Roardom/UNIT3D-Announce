@@ -47,6 +47,11 @@ impl Set {
         State(tracker): State<Arc<Tracker>>,
         Query(personal_freeleech): Query<PersonalFreeleech>,
     ) {
+        println!(
+            "Inserting personal freeleech with user_id {}.",
+            personal_freeleech.user_id
+        );
+
         tracker
             .personal_freeleeches
             .write()
@@ -58,6 +63,11 @@ impl Set {
         State(tracker): State<Arc<Tracker>>,
         Query(personal_freeleech): Query<PersonalFreeleech>,
     ) {
+        println!(
+            "Removing personal freeleech with user_id {}.",
+            personal_freeleech.user_id
+        );
+
         tracker
             .personal_freeleeches
             .write()

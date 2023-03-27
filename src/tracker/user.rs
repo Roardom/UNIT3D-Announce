@@ -1,7 +1,9 @@
 use std::ops::DerefMut;
+use std::str::FromStr;
 use std::{ops::Deref, sync::Arc};
 
 use axum::extract::{Query, State};
+use axum::http::StatusCode;
 use indexmap::IndexMap;
 use serde::Deserialize;
 use sqlx::MySqlPool;
@@ -74,12 +76,50 @@ impl Map {
         Ok(user_map)
     }
 
-    pub async fn upsert(State(tracker): State<Arc<Tracker>>, Query(user): Query<User>) {
-        tracker.users.write().await.insert(user.id, user);
+    pub async fn upsert(
+        State(tracker): State<Arc<Tracker>>,
+        Query(user): Query<APIInsertUser>,
+    ) -> StatusCode {
+        if let Ok(passkey) = Passkey::from_str(&user.passkey) {
+            println!("Inserting user with id {}.", user.id);
+
+            tracker.users.write().await.insert(
+                user.id,
+                User {
+                    id: user.id,
+                    passkey,
+                    can_download: user.can_download,
+                    download_slots: user.download_slots,
+                    is_immune: user.is_immune,
+                    num_seeding: user.num_seeding,
+                    num_leeching: user.num_leeching,
+                    download_factor: user.download_factor,
+                    upload_factor: user.upload_factor,
+                },
+            );
+
+            tracker.passkey2id.write().await.insert(passkey, user.id);
+
+            return StatusCode::OK;
+        }
+
+        StatusCode::BAD_REQUEST
     }
 
-    pub async fn destroy(State(tracker): State<Arc<Tracker>>, Query(user): Query<User>) {
-        tracker.users.write().await.remove(&user.id);
+    pub async fn destroy(
+        State(tracker): State<Arc<Tracker>>,
+        Query(user): Query<APIRemoveUser>,
+    ) -> StatusCode {
+        if let Ok(passkey) = Passkey::from_str(&user.passkey) {
+            println!("Removing user with id {}.", user.id);
+
+            tracker.users.write().await.remove(&user.id);
+            tracker.passkey2id.write().await.remove(&passkey);
+
+            return StatusCode::OK;
+        }
+
+        StatusCode::BAD_REQUEST
     }
 }
 
@@ -108,4 +148,23 @@ pub struct User {
     pub num_leeching: u32,
     pub download_factor: u8,
     pub upload_factor: u8,
+}
+
+#[derive(Clone, Deserialize, Hash)]
+pub struct APIInsertUser {
+    pub id: u32,
+    pub passkey: String,
+    pub can_download: bool,
+    pub download_slots: Option<u32>,
+    pub is_immune: bool,
+    pub num_seeding: u32,
+    pub num_leeching: u32,
+    pub download_factor: u8,
+    pub upload_factor: u8,
+}
+
+#[derive(Clone, Deserialize, Hash)]
+pub struct APIRemoveUser {
+    pub id: u32,
+    pub passkey: String,
 }

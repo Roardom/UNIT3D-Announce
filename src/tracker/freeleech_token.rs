@@ -45,10 +45,20 @@ impl Set {
     }
 
     pub async fn upsert(State(tracker): State<Arc<Tracker>>, Query(token): Query<FreeleechToken>) {
+        println!(
+            "Inserting freeleech token with user_id {} and torrent_id {}.",
+            token.user_id, token.torrent_id
+        );
+
         tracker.freeleech_tokens.write().await.insert(token);
     }
 
     pub async fn destroy(State(tracker): State<Arc<Tracker>>, Query(token): Query<FreeleechToken>) {
+        println!(
+            "Removing freeleech token with user_id {} and torrent_id {}.",
+            token.user_id, token.torrent_id
+        );
+
         tracker.freeleech_tokens.write().await.remove(&token);
     }
 }

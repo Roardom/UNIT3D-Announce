@@ -1,7 +1,9 @@
 use std::ops::{Deref, DerefMut};
+use std::str::FromStr;
 use std::sync::Arc;
 
-use axum::extract::{Query, State};
+use axum::extract::{Json, State};
+use axum::http::StatusCode;
 use indexmap::IndexMap;
 use serde::Deserialize;
 use sqlx::MySqlPool;
@@ -100,12 +102,57 @@ impl Map {
         Ok(torrent_map)
     }
 
-    pub async fn upsert(State(tracker): State<Arc<Tracker>>, Query(torrent): Query<Torrent>) {
-        tracker.torrents.write().await.insert(torrent.id, torrent);
+    pub async fn upsert(
+        State(tracker): State<Arc<Tracker>>,
+        Json(torrent): Json<APIInsertTorrent>,
+    ) -> StatusCode {
+        if let Ok(info_hash) = InfoHash::from_str(&torrent.info_hash) {
+            println!("Inserting torrent with id {}.", torrent.id);
+            let mut torrent_guard = tracker.torrents.write().await;
+            let old_torrent = torrent_guard.remove(&torrent.id);
+            let peers = old_torrent.unwrap_or_default().peers;
+
+            tracker.torrents.write().await.insert(
+                torrent.id,
+                Torrent {
+                    id: torrent.id,
+                    status: torrent.status,
+                    is_deleted: torrent.is_deleted,
+                    seeders: torrent.seeders,
+                    leechers: torrent.leechers,
+                    times_completed: torrent.times_completed,
+                    download_factor: torrent.download_factor,
+                    upload_factor: torrent.upload_factor,
+                    peers,
+                },
+            );
+
+            tracker
+                .infohash2id
+                .write()
+                .await
+                .insert(info_hash, torrent.id);
+
+            return StatusCode::OK;
+        }
+
+        StatusCode::BAD_REQUEST
     }
 
-    pub async fn destroy(State(tracker): State<Arc<Tracker>>, Query(torrent): Query<Torrent>) {
-        tracker.torrents.write().await.remove(&torrent.id);
+    pub async fn destroy(
+        State(tracker): State<Arc<Tracker>>,
+        Json(torrent): Json<APIRemoveTorrent>,
+    ) -> StatusCode {
+        if let Ok(info_hash) = InfoHash::from_str(&torrent.info_hash) {
+            println!("Removing torrent with id {}.", torrent.id);
+
+            tracker.torrents.write().await.remove(&torrent.id);
+            tracker.infohash2id.write().await.remove(&info_hash);
+
+            return StatusCode::OK;
+        }
+
+        StatusCode::BAD_REQUEST
     }
 }
 
@@ -123,16 +170,34 @@ impl DerefMut for Map {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Default)]
 pub struct Torrent {
     pub id: u32,
     pub status: Status,
     pub is_deleted: bool,
-    #[serde(skip)]
     pub peers: Arc<RwLock<peer::Map>>,
     pub seeders: u32,
     pub leechers: u32,
     pub times_completed: u32,
     pub download_factor: u8,
     pub upload_factor: u8,
+}
+
+#[derive(Clone, Deserialize)]
+pub struct APIInsertTorrent {
+    pub id: u32,
+    pub status: Status,
+    pub info_hash: String,
+    pub is_deleted: bool,
+    pub seeders: u32,
+    pub leechers: u32,
+    pub times_completed: u32,
+    pub download_factor: u8,
+    pub upload_factor: u8,
+}
+
+#[derive(Clone, Deserialize)]
+pub struct APIRemoveTorrent {
+    pub id: u32,
+    pub info_hash: String,
 }
