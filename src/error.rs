@@ -11,7 +11,7 @@ impl IntoResponse for Error {
         (
             StatusCode::OK,
             format!(
-                "d14:failure reason{}:{}12:min intervali5400e8intervali5400ee",
+                "d14:failure reason{}:{}8:intervali5400e12:min intervali5400ee",
                 self.0.to_string().chars().count(),
                 self.0,
             ),
