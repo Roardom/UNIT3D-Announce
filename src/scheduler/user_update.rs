@@ -16,7 +16,6 @@ pub struct Index {
 // TODO: Ideally unit3d should have `num_seeding` and `num_leeching` columns
 // on the user table so that the navbar doesn't query the history table.
 // If those columns existed, they should be updated too.
-#[derive(Clone, Copy)]
 pub struct UserUpdate {
     pub user_id: u32,
     pub uploaded_delta: u64,
@@ -51,9 +50,7 @@ impl Queue {
         const NUM_USER_COLUMNS: usize = 9;
         const USER_LIMIT: usize = BIND_LIMIT / NUM_USER_COLUMNS;
 
-        let mut user_updates: Vec<UserUpdate> = vec![];
-
-        user_updates.extend(self.split_off(len - min(USER_LIMIT, len)).values());
+        let user_updates = self.split_off(len - min(USER_LIMIT, len));
 
         // Trailing space required before the push values function
         // Leading space required after the push values function
@@ -75,7 +72,7 @@ impl Queue {
         );
 
         query_builder
-            .push_values(user_updates.clone(), |mut bind, user_update| {
+            .push_values(&user_updates, |mut bind, (_index, user_update)| {
                 bind.push_bind(user_update.user_id)
                     .push_bind("")
                     .push_bind("")
@@ -105,13 +102,14 @@ impl Queue {
             Ok(_) => (),
             Err(e) => {
                 println!("User update failed: {}", e);
-                user_updates.into_iter().for_each(|user_update| {
+
+                for (_index, user_update) in user_updates.iter() {
                     self.upsert(
                         user_update.user_id,
                         user_update.uploaded_delta,
                         user_update.downloaded_delta,
                     );
-                })
+                }
             }
         }
     }

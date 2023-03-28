@@ -18,7 +18,6 @@ pub struct Index {
     pub peer_id: PeerId,
 }
 
-#[derive(Clone, Copy)]
 pub struct PeerUpdate {
     pub peer_id: PeerId,
     pub ip: std::net::IpAddr,
@@ -85,9 +84,7 @@ impl Queue {
         const NUM_PEER_COLUMNS: usize = 13;
         const PEER_LIMIT: usize = BIND_LIMIT / NUM_PEER_COLUMNS;
 
-        let mut peer_updates: Vec<PeerUpdate> = vec![];
-
-        peer_updates.extend(self.split_off(len - min(PEER_LIMIT, len)).values());
+        let peer_updates = self.split_off(len - min(PEER_LIMIT, len));
 
         let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
             r#"
@@ -110,7 +107,7 @@ impl Queue {
         );
 
         query_builder
-            .push_values(peer_updates.clone(), |mut bind, peer_update| {
+            .push_values(&peer_updates, |mut bind, (_index, peer_update)| {
                 bind.push_bind(peer_update.peer_id.to_vec())
                     .push("INET6_ATON(")
                     .push_bind_unseparated(peer_update.ip.to_string())
@@ -153,7 +150,8 @@ impl Queue {
             Ok(_) => (),
             Err(e) => {
                 println!("Peer update failed: {}", e);
-                peer_updates.into_iter().for_each(|peer_update| {
+
+                for (_index, peer_update) in peer_updates.iter() {
                     self.upsert(
                         peer_update.peer_id,
                         peer_update.ip,
@@ -166,7 +164,7 @@ impl Queue {
                         peer_update.torrent_id,
                         peer_update.user_id,
                     );
-                });
+                }
             }
         }
     }

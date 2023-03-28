@@ -11,13 +11,12 @@ use crate::tracker::peer::UserAgent;
 
 pub struct Queue(pub IndexMap<Index, HistoryUpdate>);
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Eq, Hash, PartialEq)]
 pub struct Index {
     pub torrent_id: u32,
     pub user_id: u32,
 }
 
-#[derive(Clone, Copy)]
 pub struct HistoryUpdate {
     pub user_id: u32,
     pub torrent_id: u32,
@@ -98,9 +97,7 @@ impl Queue {
 
         let now = Utc::now();
 
-        let mut history_updates: Vec<HistoryUpdate> = vec![];
-
-        history_updates.extend(self.split_off(len - min(HISTORY_LIMIT, len)).values());
+        let history_updates = self.split_off(len - min(HISTORY_LIMIT, len));
 
         let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
             r#"INSERT INTO
@@ -127,7 +124,7 @@ impl Queue {
         // Mysql 8.0.20 deprecates use of VALUES() so will have to update it eventually to use aliases instead
         query_builder
             // .push_values(history_updates., |mut bind, (index, history_update)| {
-            .push_values(history_updates.clone(), |mut bind, history_update| {
+            .push_values(&history_updates, |mut bind, (_index, history_update)| {
                 bind.push_bind(history_update.user_id)
                     .push_bind(history_update.torrent_id)
                     .push("TRIM(")
@@ -184,7 +181,8 @@ impl Queue {
             Ok(_) => (),
             Err(e) => {
                 println!("History update failed: {}", e);
-                history_updates.into_iter().for_each(|history_update| {
+
+                for (_index, history_update) in history_updates.iter() {
                     self.upsert(
                         history_update.user_id,
                         history_update.torrent_id,
@@ -199,7 +197,7 @@ impl Queue {
                         history_update.is_active,
                         history_update.is_immune,
                     );
-                });
+                }
             }
         }
     }

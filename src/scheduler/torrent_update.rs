@@ -14,7 +14,6 @@ pub struct Index {
     pub torrent_id: u32,
 }
 
-#[derive(Clone, Copy)]
 pub struct TorrentUpdate {
     pub torrent_id: u32,
     pub seeders: u32,
@@ -51,9 +50,7 @@ impl Queue {
         const NUM_TORRENT_COLUMNS: usize = 18;
         const TORRENT_LIMIT: usize = BIND_LIMIT / NUM_TORRENT_COLUMNS;
 
-        let mut torrent_updates: Vec<TorrentUpdate> = vec![];
-
-        torrent_updates.extend(self.split_off(len - min(TORRENT_LIMIT, len)).values());
+        let torrent_updates = self.split_off(len - min(TORRENT_LIMIT, len));
 
         let now = Utc::now();
 
@@ -85,7 +82,7 @@ impl Queue {
         );
 
         query_builder
-            .push_values(torrent_updates.clone(), |mut bind, torrent_update| {
+            .push_values(&torrent_updates, |mut bind, (_index, torrent_update)| {
                 bind.push_bind(torrent_update.torrent_id)
                     .push_bind("")
                     .push_bind("")
@@ -125,14 +122,15 @@ impl Queue {
             Ok(_) => (),
             Err(e) => {
                 println!("Torrent update failed: {}", e);
-                torrent_updates.into_iter().for_each(|torrent_update| {
+
+                for (_index, torrent_update) in torrent_updates.iter() {
                     self.upsert(
                         torrent_update.torrent_id,
                         torrent_update.seeders,
                         torrent_update.leechers,
                         torrent_update.times_completed,
                     );
-                })
+                }
             }
         }
     }

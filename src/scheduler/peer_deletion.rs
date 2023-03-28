@@ -10,7 +10,7 @@ use crate::tracker::peer::PeerId;
 
 pub struct Queue(pub IndexSet<PeerDeletion>);
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Eq, Hash, PartialEq)]
 pub struct PeerDeletion {
     pub torrent_id: u32,
     pub user_id: u32,
@@ -41,9 +41,7 @@ impl Queue {
         const NUM_PEER_COLUMNS: usize = 3;
         const PEER_LIMIT: usize = BIND_LIMIT / NUM_PEER_COLUMNS;
 
-        let mut peer_deletions: Vec<PeerDeletion> = vec![];
-
-        peer_deletions.extend(self.split_off(len - min(PEER_LIMIT, len)));
+        let peer_deletions = self.split_off(len - min(PEER_LIMIT, len));
 
         // Requires trailing space last before push_tuples
         // Requires leading space after push_tuples
@@ -57,7 +55,7 @@ impl Queue {
             "#,
         );
 
-        query_builder.push_tuples(peer_deletions.clone(), |mut bind, peer_deletion| {
+        query_builder.push_tuples(&peer_deletions, |mut bind, peer_deletion| {
             bind.push_bind(peer_deletion.torrent_id)
                 .push_bind(peer_deletion.user_id)
                 .push_bind(peer_deletion.peer_id.to_vec());
@@ -74,13 +72,14 @@ impl Queue {
             Ok(_) => (),
             Err(e) => {
                 println!("Peer deletion failed: {}", e);
-                peer_deletions.into_iter().for_each(|peer_deletion| {
+
+                for peer_deletion in peer_deletions.iter() {
                     self.upsert(
                         peer_deletion.torrent_id,
                         peer_deletion.user_id,
                         peer_deletion.peer_id,
                     );
-                });
+                }
             }
         }
     }
