@@ -108,8 +108,7 @@ impl Map {
     ) -> StatusCode {
         if let Ok(info_hash) = InfoHash::from_str(&torrent.info_hash) {
             println!("Inserting torrent with id {}.", torrent.id);
-            let mut torrent_guard = tracker.torrents.write().await;
-            let old_torrent = torrent_guard.remove(&torrent.id);
+            let old_torrent = tracker.torrents.write().await.remove(&torrent.id);
             let peers = old_torrent.unwrap_or_default().peers;
 
             tracker.torrents.write().await.insert(
