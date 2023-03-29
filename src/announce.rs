@@ -178,13 +178,46 @@ where
     }
 }
 
+pub struct ClientIp(pub std::net::IpAddr);
+
+#[async_trait]
+impl<S> FromRequestParts<S> for ClientIp
+where
+    S: Send + Sync,
+{
+    type Rejection = Error;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        if let Some(ips) = parts.headers.get("X-Forwarded-For") {
+            let ips_bytes = ips.as_bytes();
+            // Extract the first  IP (the last one is UNIT3D's nginx reverse proxy).
+            // Notes: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For
+            if let Some(comma_position) = memchr::memchr(b',', &ips_bytes) {
+                if let Ok(ip_str) = std::str::from_utf8(&ips_bytes[0..comma_position]) {
+                    if let Ok(ip) = IpAddr::from_str(&ip_str) {
+                        return Ok(ClientIp(ip));
+                    }
+                }
+            }
+        }
+
+        // If the X-Forwarded-For header isn't included, doesn't include a comma, or if parsing
+        // the ip from it fails, then use the connecting ip.
+        let ConnectInfo(addr) = ConnectInfo::<SocketAddr>::from_request_parts(parts, state)
+            .await
+            .map_err(|_| Error("Invalid client ip."))?;
+
+        Ok(ClientIp(addr.ip()))
+    }
+}
+
 #[debug_handler]
 pub async fn announce(
     State(tracker): State<Arc<Tracker>>,
     Path(passkey): Path<String>,
     Request(queries): Request<Announce>,
     headers: HeaderMap,
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    ClientIp(client_ip): ClientIp,
 ) -> Result<Vec<u8>, Error> {
     // Validate headers
     if headers.contains_key(ACCEPT_LANGUAGE)
@@ -342,7 +375,7 @@ pub async fn announce(
         // Schedule a peer update in the mysql db
         tracker.peer_updates.write().await.upsert(
             queries.peer_id,
-            addr.ip(),
+            client_ip,
             queries.port,
             CompactString::from(user_agent),
             queries.uploaded,
@@ -360,7 +393,7 @@ pub async fn announce(
                 peer_id: queries.peer_id,
             },
             tracker::Peer {
-                ip_address: addr.ip(),
+                ip_address: client_ip,
                 user_id: user.id,
                 torrent_id: torrent.id,
                 port: queries.port,
