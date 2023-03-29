@@ -4,8 +4,9 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::tracker::peer::{PeerId, UserAgent};
+use crate::tracker::peer::PeerId;
 use chrono::{DateTime, Utc};
+use compact_str::CompactString;
 use indexmap::IndexMap;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
@@ -22,7 +23,7 @@ pub struct PeerUpdate {
     pub peer_id: PeerId,
     pub ip: std::net::IpAddr,
     pub port: u16,
-    pub agent: UserAgent,
+    pub agent: CompactString,
     pub uploaded: u64,
     pub downloaded: u64,
     pub is_seeder: bool,
@@ -42,7 +43,7 @@ impl Queue {
         peer_id: PeerId,
         ip: IpAddr,
         port: u16,
-        agent: UserAgent,
+        agent: CompactString,
         uploaded: u64,
         downloaded: u64,
         is_seeder: bool,
@@ -113,9 +114,7 @@ impl Queue {
                     .push_bind_unseparated(peer_update.ip.to_string())
                     .push_unseparated(")")
                     .push_bind(peer_update.port)
-                    .push("TRIM(")
-                    .push_bind_unseparated(peer_update.agent.to_vec())
-                    .push_unseparated(")")
+                    .push_bind(peer_update.agent.as_str())
                     .push_bind(peer_update.uploaded)
                     .push_bind(peer_update.downloaded)
                     .push_bind(peer_update.left)
@@ -156,7 +155,7 @@ impl Queue {
                         peer_update.peer_id,
                         peer_update.ip,
                         peer_update.port,
-                        peer_update.agent,
+                        peer_update.agent.to_owned(),
                         peer_update.uploaded,
                         peer_update.downloaded,
                         peer_update.is_seeder,

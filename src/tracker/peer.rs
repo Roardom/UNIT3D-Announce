@@ -9,8 +9,6 @@ use crate::Error;
 
 pub mod peer_id;
 pub use peer_id::PeerId;
-pub mod user_agent;
-pub use user_agent::UserAgent;
 
 pub struct Map(IndexMap<Index, Peer>);
 

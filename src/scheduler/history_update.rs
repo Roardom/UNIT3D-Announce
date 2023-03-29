@@ -4,10 +4,9 @@ use std::{
 };
 
 use chrono::Utc;
+use compact_str::CompactString;
 use indexmap::IndexMap;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
-
-use crate::tracker::peer::UserAgent;
 
 pub struct Queue(pub IndexMap<Index, HistoryUpdate>);
 
@@ -20,7 +19,7 @@ pub struct Index {
 pub struct HistoryUpdate {
     pub user_id: u32,
     pub torrent_id: u32,
-    pub user_agent: UserAgent,
+    pub user_agent: CompactString,
     pub is_active: bool,
     pub is_seeder: bool,
     pub is_immune: bool,
@@ -41,7 +40,7 @@ impl Queue {
         &mut self,
         user_id: u32,
         torrent_id: u32,
-        user_agent: UserAgent,
+        user_agent: CompactString,
         credited_uploaded_delta: u64,
         uploaded_delta: u64,
         uploaded: u64,
@@ -57,7 +56,7 @@ impl Queue {
             user_id,
         })
         .and_modify(|history_update| {
-            history_update.user_agent = user_agent;
+            history_update.user_agent = user_agent.to_owned();
             history_update.is_active = is_active;
             history_update.is_seeder = is_seeder;
             history_update.uploaded = uploaded;
@@ -70,7 +69,7 @@ impl Queue {
         .or_insert(HistoryUpdate {
             user_id,
             torrent_id,
-            user_agent,
+            user_agent: user_agent.to_owned(),
             is_active,
             is_seeder,
             is_immune,
@@ -127,9 +126,7 @@ impl Queue {
             .push_values(&history_updates, |mut bind, (_index, history_update)| {
                 bind.push_bind(history_update.user_id)
                     .push_bind(history_update.torrent_id)
-                    .push("TRIM(")
-                    .push_bind_unseparated(history_update.user_agent.to_vec())
-                    .push_unseparated(")")
+                    .push_bind(history_update.user_agent.as_str())
                     .push_bind(history_update.credited_uploaded_delta)
                     .push_bind(history_update.uploaded_delta)
                     .push_bind(history_update.uploaded)
@@ -186,7 +183,7 @@ impl Queue {
                     self.upsert(
                         history_update.user_id,
                         history_update.torrent_id,
-                        history_update.user_agent,
+                        history_update.user_agent.to_owned(),
                         history_update.credited_uploaded_delta,
                         history_update.uploaded_delta,
                         history_update.uploaded,

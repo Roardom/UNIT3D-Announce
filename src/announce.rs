@@ -7,6 +7,7 @@ use axum::{
         HeaderMap,
     },
 };
+use compact_str::CompactString;
 use peer::Peer;
 use rand::{rngs::SmallRng, seq::IteratorRandom, Rng, SeedableRng};
 use sqlx::types::chrono::Utc;
@@ -16,6 +17,7 @@ use std::{
     sync::Arc,
 };
 
+use crate::error::Error;
 use crate::tracker::{
     self,
     blacklisted_agent::Agent,
@@ -27,7 +29,6 @@ use crate::tracker::{
     Tracker,
 };
 use crate::utils;
-use crate::{error::Error, tracker::peer::UserAgent};
 
 #[derive(Clone, Copy, PartialEq, Default)]
 enum Event {
@@ -343,7 +344,7 @@ pub async fn announce(
             queries.peer_id,
             addr.ip(),
             queries.port,
-            UserAgent::from_str(user_agent).unwrap(),
+            CompactString::from(user_agent),
             queries.uploaded,
             queries.downloaded,
             queries.left == 0,
@@ -481,7 +482,7 @@ pub async fn announce(
     tracker.history_updates.write().await.upsert(
         user.id,
         torrent.id,
-        UserAgent::from_str(user_agent).unwrap(),
+        CompactString::from(user_agent),
         credited_uploaded_delta,
         uploaded_delta,
         queries.uploaded,
