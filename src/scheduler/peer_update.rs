@@ -109,20 +109,34 @@ impl Queue {
 
         query_builder
             .push_values(&peer_updates, |mut bind, (_index, peer_update)| {
-                bind.push_bind(peer_update.peer_id.to_vec())
-                    .push("INET6_ATON(")
-                    .push_bind_unseparated(peer_update.ip.to_string())
-                    .push_unseparated(")")
-                    .push_bind(peer_update.port)
-                    .push_bind(peer_update.agent.as_str())
-                    .push_bind(peer_update.uploaded)
-                    .push_bind(peer_update.downloaded)
-                    .push_bind(peer_update.left)
-                    .push_bind(peer_update.is_seeder)
-                    .push_bind(peer_update.updated_at)
-                    .push_bind(peer_update.updated_at)
-                    .push_bind(peer_update.torrent_id)
-                    .push_bind(peer_update.user_id);
+                match peer_update.ip {
+                    IpAddr::V4(ip) => bind
+                        .push_bind(peer_update.peer_id.to_vec())
+                        .push_bind(ip.octets().to_vec())
+                        .push_bind(peer_update.port)
+                        .push_bind(peer_update.agent.as_str())
+                        .push_bind(peer_update.uploaded)
+                        .push_bind(peer_update.downloaded)
+                        .push_bind(peer_update.left)
+                        .push_bind(peer_update.is_seeder)
+                        .push_bind(peer_update.updated_at)
+                        .push_bind(peer_update.updated_at)
+                        .push_bind(peer_update.torrent_id)
+                        .push_bind(peer_update.user_id),
+                    IpAddr::V6(ip) => bind
+                        .push_bind(peer_update.peer_id.to_vec())
+                        .push_bind(ip.octets().to_vec())
+                        .push_bind(peer_update.port)
+                        .push_bind(peer_update.agent.as_str())
+                        .push_bind(peer_update.uploaded)
+                        .push_bind(peer_update.downloaded)
+                        .push_bind(peer_update.left)
+                        .push_bind(peer_update.is_seeder)
+                        .push_bind(peer_update.updated_at)
+                        .push_bind(peer_update.updated_at)
+                        .push_bind(peer_update.torrent_id)
+                        .push_bind(peer_update.user_id),
+                };
             })
             .push(
                 r#"
