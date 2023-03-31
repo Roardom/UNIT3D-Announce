@@ -1,0 +1,554 @@
+{
+  "db": "MySQL",
+  "21f0be7ff2b18ca0ce85b5a539c7fd68afecea97d9ae290088eaa5431d150ebd": {
+    "describe": {
+      "columns": [
+        {
+          "name": "ip_address: String",
+          "ordinal": 0,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 0
+            },
+            "max_size": 156,
+            "type": "VarString"
+          }
+        },
+        {
+          "name": "user_id: u32",
+          "ordinal": 1,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4137
+            },
+            "max_size": 10,
+            "type": "Long"
+          }
+        },
+        {
+          "name": "torrent_id: u32",
+          "ordinal": 2,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4137
+            },
+            "max_size": 10,
+            "type": "Long"
+          }
+        },
+        {
+          "name": "port: u16",
+          "ordinal": 3,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4129
+            },
+            "max_size": 5,
+            "type": "Short"
+          }
+        },
+        {
+          "name": "is_seeder: bool",
+          "ordinal": 4,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4105
+            },
+            "max_size": 1,
+            "type": "Tiny"
+          }
+        },
+        {
+          "name": "is_active: bool",
+          "ordinal": 5,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 129
+            },
+            "max_size": 2,
+            "type": "LongLong"
+          }
+        },
+        {
+          "name": "updated_at: DateTime<Utc>",
+          "ordinal": 6,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 128
+            },
+            "max_size": 19,
+            "type": "Timestamp"
+          }
+        },
+        {
+          "name": "uploaded: u64",
+          "ordinal": 7,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4129
+            },
+            "max_size": 20,
+            "type": "LongLong"
+          }
+        },
+        {
+          "name": "downloaded: u64",
+          "ordinal": 8,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4129
+            },
+            "max_size": 20,
+            "type": "LongLong"
+          }
+        },
+        {
+          "name": "peer_id: PeerId",
+          "ordinal": 9,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4225
+            },
+            "max_size": 20,
+            "type": "String"
+          }
+        }
+      ],
+      "nullable": [
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "\n                SELECT\n                    INET6_NTOA(peers.ip) as `ip_address: String`,\n                    peers.user_id as `user_id: u32`,\n                    peers.torrent_id as `torrent_id: u32`,\n                    peers.port as `port: u16`,\n                    peers.seeder as `is_seeder: bool`,\n                    1 as `is_active: bool`,\n                    peers.updated_at as `updated_at: DateTime<Utc>`,\n                    peers.uploaded as `uploaded: u64`,\n                    peers.downloaded as `downloaded: u64`,\n                    peers.peer_id as `peer_id: PeerId`\n                FROM\n                    peers\n            "
+  },
+  "33a01cd2a2f8dbfed30fc05f6c6bb6925636bac30b24d7ee2492aa16b7582c05": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id: u32",
+          "ordinal": 0,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 547
+            },
+            "max_size": 10,
+            "type": "Long"
+          }
+        },
+        {
+          "name": "status: Status",
+          "ordinal": 1,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 9
+            },
+            "max_size": 6,
+            "type": "Short"
+          }
+        },
+        {
+          "name": "seeders: u32",
+          "ordinal": 2,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 9
+            },
+            "max_size": 11,
+            "type": "Long"
+          }
+        },
+        {
+          "name": "leechers: u32",
+          "ordinal": 3,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 9
+            },
+            "max_size": 11,
+            "type": "Long"
+          }
+        },
+        {
+          "name": "times_completed: u32",
+          "ordinal": 4,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 1
+            },
+            "max_size": 11,
+            "type": "Long"
+          }
+        },
+        {
+          "name": "download_factor: u8",
+          "ordinal": 5,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 129
+            },
+            "max_size": 7,
+            "type": "LongLong"
+          }
+        },
+        {
+          "name": "upload_factor: u8",
+          "ordinal": 6,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 129
+            },
+            "max_size": 4,
+            "type": "LongLong"
+          }
+        },
+        {
+          "name": "is_deleted: bool",
+          "ordinal": 7,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 129
+            },
+            "max_size": 2,
+            "type": "LongLong"
+          }
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "\n                SELECT\n                    torrents.id as `id: u32`,\n                    torrents.status as `status: Status`,\n                    torrents.seeders as `seeders: u32`,\n                    torrents.leechers as `leechers: u32`,\n                    torrents.times_completed as `times_completed: u32`,\n                    LEAST(100 - torrents.free, IF(featured_torrents.torrent_id IS NULL, 100, 0)) as `download_factor: u8`,\n                    IF(featured_torrents.torrent_id IS NULL, 100, 200) as `upload_factor: u8`,\n                    0 as `is_deleted: bool`\n                FROM\n                    torrents\n                LEFT JOIN\n                    featured_torrents\n                ON\n                    torrents.id = featured_torrents.torrent_id\n            "
+  },
+  "93a361f6b181ae589b339449074cd53db47ab9a51b66ba57bbac0fc6f57bbcf1": {
+    "describe": {
+      "columns": [
+        {
+          "name": "user_id: u32",
+          "ordinal": 0,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4137
+            },
+            "max_size": 10,
+            "type": "Long"
+          }
+        },
+        {
+          "name": "torrent_id: u32",
+          "ordinal": 1,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4137
+            },
+            "max_size": 10,
+            "type": "Long"
+          }
+        }
+      ],
+      "nullable": [
+        false,
+        false
+      ],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "\n                SELECT\n                    user_id as `user_id: u32`,\n                    torrent_id as `torrent_id: u32`\n                FROM\n                    freeleech_tokens\n            "
+  },
+  "ba531067097459412c5da533b578044d06eec50640a96e20d4004bd2359cddf4": {
+    "describe": {
+      "columns": [
+        {
+          "name": "name",
+          "ordinal": 0,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4101
+            },
+            "max_size": 1020,
+            "type": "VarString"
+          }
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "\n                SELECT\n                    name\n                FROM\n                    blacklist_clients\n            "
+  },
+  "c1548846bf56ba7cbae801a925187f42ecf1a59e973d71a169d497aed56dfb7d": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id: u32",
+          "ordinal": 0,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 547
+            },
+            "max_size": 10,
+            "type": "Long"
+          }
+        },
+        {
+          "name": "info_hash: InfoHash",
+          "ordinal": 1,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4105
+            },
+            "max_size": 1020,
+            "type": "VarString"
+          }
+        }
+      ],
+      "nullable": [
+        false,
+        false
+      ],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "\n                SELECT\n                    torrents.id as `id: u32`,\n                    torrents.info_hash as `info_hash: InfoHash`\n                FROM\n                    torrents\n            "
+  },
+  "c1bfcff4e2fb7600d6d525ecb4308419bce20f48ed7b410027b4fe2fdd77ebcb": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id: u32",
+          "ordinal": 0,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 547
+            },
+            "max_size": 10,
+            "type": "Long"
+          }
+        },
+        {
+          "name": "passkey: Passkey",
+          "ordinal": 1,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4101
+            },
+            "max_size": 1020,
+            "type": "VarString"
+          }
+        }
+      ],
+      "nullable": [
+        false,
+        false
+      ],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "\n                SELECT\n                    users.id as `id: u32`,\n                    users.passkey as `passkey: Passkey`\n                FROM\n                    users\n            "
+  },
+  "c6e7ae372562ad142590cf97fa444ecc6c14590efc0f411641d891e400a25b09": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id: u32",
+          "ordinal": 0,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 547
+            },
+            "max_size": 10,
+            "type": "Long"
+          }
+        },
+        {
+          "name": "passkey: Passkey",
+          "ordinal": 1,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4101
+            },
+            "max_size": 1020,
+            "type": "VarString"
+          }
+        },
+        {
+          "name": "can_download: bool",
+          "ordinal": 2,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 1
+            },
+            "max_size": 1,
+            "type": "Tiny"
+          }
+        },
+        {
+          "name": "download_slots: u32",
+          "ordinal": 3,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 8
+            },
+            "max_size": 11,
+            "type": "Long"
+          }
+        },
+        {
+          "name": "is_immune: bool",
+          "ordinal": 4,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 1
+            },
+            "max_size": 1,
+            "type": "Tiny"
+          }
+        },
+        {
+          "name": "num_seeding: u32",
+          "ordinal": 5,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 129
+            },
+            "max_size": 21,
+            "type": "LongLong"
+          }
+        },
+        {
+          "name": "num_leeching: u32",
+          "ordinal": 6,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 129
+            },
+            "max_size": 21,
+            "type": "LongLong"
+          }
+        },
+        {
+          "name": "download_factor: u8",
+          "ordinal": 7,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 129
+            },
+            "max_size": 4,
+            "type": "LongLong"
+          }
+        },
+        {
+          "name": "upload_factor: u8",
+          "ordinal": 8,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 129
+            },
+            "max_size": 4,
+            "type": "LongLong"
+          }
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "\n                SELECT\n                    users.id as `id: u32`,\n                    users.passkey as `passkey: Passkey`,\n                    users.can_download as `can_download: bool`,\n                    groups.download_slots as `download_slots: u32`,\n                    groups.is_immune as `is_immune: bool`,\n                    COUNT(peers.id) as `num_seeding: u32`,\n                    COUNT(peers.id) as `num_leeching: u32`,\n                    IF(groups.is_freeleech, 0, 100) as `download_factor: u8`,\n                    IF(groups.is_double_upload, 200, 100) as `upload_factor: u8`\n                FROM\n                    users\n                INNER JOIN\n                    `groups`\n                ON\n                    users.group_id = `groups`.id\n                    AND groups.slug NOT IN ('banned', 'validating', 'disabled')\n                    AND users.deleted_at IS NULL\n                LEFT JOIN\n                    peers\n                ON\n                    users.id = peers.user_id\n                GROUP BY\n                    users.id,\n                    users.passkey,\n                    users.can_download,\n                    groups.download_slots,\n                    groups.is_immune,\n                    groups.is_freeleech,\n                    groups.is_double_upload\n            "
+  },
+  "d1a8df573eea48ec6241c4441b78307d9ce846a46486443268f1bcfff7ced50c": {
+    "describe": {
+      "columns": [
+        {
+          "name": "user_id: u32",
+          "ordinal": 0,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4137
+            },
+            "max_size": 10,
+            "type": "Long"
+          }
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "\n                SELECT\n                    user_id as `user_id: u32`\n                FROM\n                    personal_freeleech\n            "
+  }
+}
