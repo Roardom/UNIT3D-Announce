@@ -188,24 +188,20 @@ where
     type Rejection = Error;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        if let Some(ips) = parts.headers.get("X-Forwarded-For") {
-            let ips_bytes = ips.as_bytes();
-            // Extract the first  IP (the last one is UNIT3D's nginx reverse proxy).
-            // Notes: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Forwarded-For
-            if let Some(comma_position) = memchr::memchr(b',', &ips_bytes) {
-                if let Ok(ip_str) = std::str::from_utf8(&ips_bytes[0..comma_position]) {
-                    if let Ok(ip) = IpAddr::from_str(&ip_str) {
-                        return Ok(ClientIp(ip));
-                    }
+        // Extract the IP from the X-Real-IP header set by nginx using real_ip_recursive
+        if let Some(ip_header) = parts.headers.get("X-Real-IP") {
+            if let Ok(ip_str) = ip_header.to_str() {
+                if let Ok(ip) = IpAddr::from_str(ip_str) {
+                    return Ok(ClientIp(ip));
                 }
             }
         }
 
-        // If the X-Forwarded-For header isn't included, doesn't include a comma, or if parsing
-        // the ip from it fails, then use the connecting ip.
+        // If the X-Real-IP header isn't included, or if parsing the ip from it fails, then use the
+        // connecting ip.
         let ConnectInfo(addr) = ConnectInfo::<SocketAddr>::from_request_parts(parts, state)
             .await
-            .map_err(|_| Error("Invalid client ip."))?;
+            .map_err(|_| Error("Internal tracker error."))?;
 
         Ok(ClientIp(addr.ip()))
     }
