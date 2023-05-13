@@ -54,22 +54,23 @@ impl fmt::Display for InfoHash {
 
 impl<'r, DB: Database> Decode<'r, DB> for InfoHash
 where
-    &'r str: Decode<'r, DB>,
+    &'r [u8]: Decode<'r, DB>,
 {
     /// Decodes the database's string representation of the 40 character long
     /// infohash in hex into a byte slice
     fn decode(
         value: <DB as HasValueRef<'r>>::ValueRef,
     ) -> Result<InfoHash, Box<dyn std::error::Error + 'static + Send + Sync>> {
-        let value = <&str as Decode<DB>>::decode(value)?;
+        let value = <&[u8] as Decode<DB>>::decode(value)?;
 
-        match InfoHash::from_str(value) {
-            Ok(infohash) => Ok(infohash),
-            Err(e) => {
-                let error: Box<dyn std::error::Error + Send + Sync> = Box::new(e);
-                Err(error)
-            }
+        if value.len() != 20 {
+            let error: Box<dyn std::error::Error + Send + Sync> =
+                Box::new(Error("Invalid infohash."));
+
+            return Err(error);
         }
+
+        Ok(InfoHash(<[u8; 20]>::try_from(&value[0..20])?))
     }
 }
 
