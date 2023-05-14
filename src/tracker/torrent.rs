@@ -142,11 +142,11 @@ impl Map {
         State(tracker): State<Arc<Tracker>>,
         Json(torrent): Json<APIRemoveTorrent>,
     ) -> StatusCode {
-        if let Ok(info_hash) = InfoHash::from_str(&torrent.info_hash) {
-            println!("Removing torrent with id {}.", torrent.id);
+        let mut torrent_guard = tracker.torrents.write().await;
 
-            tracker.torrents.write().await.remove(&torrent.id);
-            tracker.infohash2id.write().await.remove(&info_hash);
+        if let Some(torrent) = torrent_guard.get_mut(&torrent.id) {
+            println!("Removing torrent with id {}.", torrent.id);
+            torrent.is_deleted = true;
 
             return StatusCode::OK;
         }
