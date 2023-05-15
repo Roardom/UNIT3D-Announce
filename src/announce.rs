@@ -524,7 +524,7 @@ pub async fn announce(
         credited_downloaded_delta,
         downloaded_delta,
         queries.downloaded,
-        queries.left != 0,
+        queries.left == 0,
         queries.event != Event::Stopped,
         user.is_immune,
         completed_at,
