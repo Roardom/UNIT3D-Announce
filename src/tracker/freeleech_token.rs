@@ -1,7 +1,8 @@
 use std::ops::DerefMut;
 use std::{ops::Deref, sync::Arc};
 
-use axum::extract::{Query, State};
+use axum::extract::State;
+use axum::Json;
 use indexmap::IndexSet;
 use serde::Deserialize;
 use sqlx::MySqlPool;
@@ -44,7 +45,7 @@ impl Set {
         Ok(freeleech_token_set)
     }
 
-    pub async fn upsert(State(tracker): State<Arc<Tracker>>, Query(token): Query<FreeleechToken>) {
+    pub async fn upsert(State(tracker): State<Arc<Tracker>>, Json(token): Json<FreeleechToken>) {
         println!(
             "Inserting freeleech token with user_id {} and torrent_id {}.",
             token.user_id, token.torrent_id
@@ -53,7 +54,7 @@ impl Set {
         tracker.freeleech_tokens.write().await.insert(token);
     }
 
-    pub async fn destroy(State(tracker): State<Arc<Tracker>>, Query(token): Query<FreeleechToken>) {
+    pub async fn destroy(State(tracker): State<Arc<Tracker>>, Json(token): Json<FreeleechToken>) {
         println!(
             "Removing freeleech token with user_id {} and torrent_id {}.",
             token.user_id, token.torrent_id

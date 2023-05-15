@@ -2,8 +2,9 @@ use std::ops::DerefMut;
 use std::str::FromStr;
 use std::{ops::Deref, sync::Arc};
 
-use axum::extract::{Query, State};
+use axum::extract::State;
 use axum::http::StatusCode;
+use axum::Json;
 use indexmap::IndexMap;
 use serde::Deserialize;
 use sqlx::MySqlPool;
@@ -78,7 +79,7 @@ impl Map {
 
     pub async fn upsert(
         State(tracker): State<Arc<Tracker>>,
-        Query(user): Query<APIInsertUser>,
+        Json(user): Json<APIInsertUser>,
     ) -> StatusCode {
         if let Ok(passkey) = Passkey::from_str(&user.passkey) {
             println!("Inserting user with id {}.", user.id);
@@ -108,7 +109,7 @@ impl Map {
 
     pub async fn destroy(
         State(tracker): State<Arc<Tracker>>,
-        Query(user): Query<APIRemoveUser>,
+        Json(user): Json<APIRemoveUser>,
     ) -> StatusCode {
         if let Ok(passkey) = Passkey::from_str(&user.passkey) {
             println!("Removing user with id {}.", user.id);

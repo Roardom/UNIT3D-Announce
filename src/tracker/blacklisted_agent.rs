@@ -1,7 +1,8 @@
 use std::ops::DerefMut;
 use std::{ops::Deref, sync::Arc};
 
-use axum::extract::{Query, State};
+use axum::extract::State;
+use axum::Json;
 use indexmap::IndexSet;
 use serde::Deserialize;
 use sqlx::MySqlPool;
@@ -43,13 +44,13 @@ impl Set {
         Ok(agent_set)
     }
 
-    pub async fn upsert(State(tracker): State<Arc<Tracker>>, Query(agent): Query<Agent>) {
+    pub async fn upsert(State(tracker): State<Arc<Tracker>>, Json(agent): Json<Agent>) {
         println!("Inserting agent with name {}.", agent.name);
 
         tracker.agent_blacklist.write().await.insert(agent);
     }
 
-    pub async fn destroy(State(tracker): State<Arc<Tracker>>, Query(agent): Query<Agent>) {
+    pub async fn destroy(State(tracker): State<Arc<Tracker>>, Json(agent): Json<Agent>) {
         println!("Removing agent with name {}.", agent.name);
 
         tracker.agent_blacklist.write().await.remove(&agent);
