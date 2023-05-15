@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use compact_str::CompactString;
 use indexmap::IndexMap;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
@@ -29,6 +29,7 @@ pub struct HistoryUpdate {
     pub downloaded_delta: u64,
     pub credited_uploaded_delta: u64,
     pub credited_downloaded_delta: u64,
+    pub completed_at: Option<DateTime<Utc>>,
 }
 
 impl Queue {
@@ -50,6 +51,7 @@ impl Queue {
         is_seeder: bool,
         is_active: bool,
         is_immune: bool,
+        completed_at: Option<DateTime<Utc>>,
     ) {
         self.entry(Index {
             torrent_id,
@@ -65,6 +67,7 @@ impl Queue {
             history_update.downloaded_delta += downloaded_delta;
             history_update.credited_uploaded_delta += credited_uploaded_delta;
             history_update.credited_downloaded_delta += credited_downloaded_delta;
+            history_update.completed_at = completed_at;
         })
         .or_insert(HistoryUpdate {
             user_id,
@@ -79,6 +82,7 @@ impl Queue {
             downloaded_delta,
             credited_uploaded_delta,
             credited_downloaded_delta,
+            completed_at,
         });
     }
 
@@ -115,7 +119,8 @@ impl Queue {
                     seedtime,
                     immune,
                     created_at,
-                    updated_at
+                    updated_at,
+                    completed_at
                 )
             "#,
         );
@@ -138,7 +143,8 @@ impl Queue {
                     .push_bind(0)
                     .push_bind(history_update.is_immune)
                     .push_bind(now)
-                    .push_bind(now);
+                    .push_bind(now)
+                    .push_bind(history_update.completed_at);
             })
             .push(
                 r#"
@@ -163,7 +169,8 @@ impl Queue {
                         ),
                         updated_at = VALUES(updated_at),
                         seeder = VALUES(seeder),
-                        active = VALUES(active)
+                        active = VALUES(active),
+                        completed_at = COALESCE(completed_at, VALUES(completed_at))
                 "#,
             );
 
@@ -193,6 +200,7 @@ impl Queue {
                         history_update.is_seeder,
                         history_update.is_active,
                         history_update.is_immune,
+                        history_update.completed_at,
                     );
                 }
             }

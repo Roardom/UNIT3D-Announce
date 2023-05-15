@@ -508,6 +508,12 @@ pub async fn announce(
     let credited_uploaded_delta = upload_factor as u64 * uploaded_delta / 100;
     let credited_downloaded_delta = download_factor as u64 * downloaded_delta / 100;
 
+    let completed_at = if queries.event == Event::Completed {
+        Some(Utc::now())
+    } else {
+        None
+    };
+
     tracker.history_updates.write().await.upsert(
         user.id,
         torrent.id,
@@ -521,6 +527,7 @@ pub async fn announce(
         queries.left != 0,
         queries.event != Event::Stopped,
         user.is_immune,
+        completed_at,
     );
 
     tracker.user_updates.write().await.upsert(
