@@ -35,8 +35,8 @@ impl Map {
                     users.can_download as `can_download: bool`,
                     groups.download_slots as `download_slots: u32`,
                     groups.is_immune as `is_immune: bool`,
-                    COUNT(peers.id) as `num_seeding: u32`,
-                    COUNT(peers.id) as `num_leeching: u32`,
+                    COALESCE(SUM(peers.seeder = 1), 0) as `num_seeding: u32`,
+                    COALESCE(SUM(peers.seeder = 0), 0) as `num_leeching: u32`,
                     IF(groups.is_freeleech, 0, 100) as `download_factor: u8`,
                     IF(groups.is_double_upload, 200, 100) as `upload_factor: u8`
                 FROM

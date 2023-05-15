@@ -340,12 +340,12 @@
           "name": "info_hash: InfoHash",
           "ordinal": 1,
           "type_info": {
-            "char_set": 224,
+            "char_set": 63,
             "flags": {
-              "bits": 4105
+              "bits": 4233
             },
-            "max_size": 1020,
-            "type": "VarString"
+            "max_size": 20,
+            "type": "String"
           }
         }
       ],
@@ -397,7 +397,32 @@
     },
     "query": "\n                SELECT\n                    users.id as `id: u32`,\n                    users.passkey as `passkey: Passkey`\n                FROM\n                    users\n            "
   },
-  "c6e7ae372562ad142590cf97fa444ecc6c14590efc0f411641d891e400a25b09": {
+  "d1a8df573eea48ec6241c4441b78307d9ce846a46486443268f1bcfff7ced50c": {
+    "describe": {
+      "columns": [
+        {
+          "name": "user_id: u32",
+          "ordinal": 0,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 4137
+            },
+            "max_size": 10,
+            "type": "Long"
+          }
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "\n                SELECT\n                    user_id as `user_id: u32`\n                FROM\n                    personal_freeleech\n            "
+  },
+  "f2429b39806d40bcc60deaf263160613ed73c2e74ee02293b3f629378a49b3ab": {
     "describe": {
       "columns": [
         {
@@ -468,8 +493,8 @@
             "flags": {
               "bits": 129
             },
-            "max_size": 21,
-            "type": "LongLong"
+            "max_size": 24,
+            "type": "NewDecimal"
           }
         },
         {
@@ -480,8 +505,8 @@
             "flags": {
               "bits": 129
             },
-            "max_size": 21,
-            "type": "LongLong"
+            "max_size": 24,
+            "type": "NewDecimal"
           }
         },
         {
@@ -524,31 +549,6 @@
         "Right": 0
       }
     },
-    "query": "\n                SELECT\n                    users.id as `id: u32`,\n                    users.passkey as `passkey: Passkey`,\n                    users.can_download as `can_download: bool`,\n                    groups.download_slots as `download_slots: u32`,\n                    groups.is_immune as `is_immune: bool`,\n                    COUNT(peers.id) as `num_seeding: u32`,\n                    COUNT(peers.id) as `num_leeching: u32`,\n                    IF(groups.is_freeleech, 0, 100) as `download_factor: u8`,\n                    IF(groups.is_double_upload, 200, 100) as `upload_factor: u8`\n                FROM\n                    users\n                INNER JOIN\n                    `groups`\n                ON\n                    users.group_id = `groups`.id\n                    AND groups.slug NOT IN ('banned', 'validating', 'disabled')\n                    AND users.deleted_at IS NULL\n                LEFT JOIN\n                    peers\n                ON\n                    users.id = peers.user_id\n                GROUP BY\n                    users.id,\n                    users.passkey,\n                    users.can_download,\n                    groups.download_slots,\n                    groups.is_immune,\n                    groups.is_freeleech,\n                    groups.is_double_upload\n            "
-  },
-  "d1a8df573eea48ec6241c4441b78307d9ce846a46486443268f1bcfff7ced50c": {
-    "describe": {
-      "columns": [
-        {
-          "name": "user_id: u32",
-          "ordinal": 0,
-          "type_info": {
-            "char_set": 63,
-            "flags": {
-              "bits": 4137
-            },
-            "max_size": 10,
-            "type": "Long"
-          }
-        }
-      ],
-      "nullable": [
-        false
-      ],
-      "parameters": {
-        "Right": 0
-      }
-    },
-    "query": "\n                SELECT\n                    user_id as `user_id: u32`\n                FROM\n                    personal_freeleech\n            "
+    "query": "\n                SELECT\n                    users.id as `id: u32`,\n                    users.passkey as `passkey: Passkey`,\n                    users.can_download as `can_download: bool`,\n                    groups.download_slots as `download_slots: u32`,\n                    groups.is_immune as `is_immune: bool`,\n                    COALESCE(SUM(peers.seeder = 1), 0) as `num_seeding: u32`,\n                    COALESCE(SUM(peers.seeder = 0), 0) as `num_leeching: u32`,\n                    IF(groups.is_freeleech, 0, 100) as `download_factor: u8`,\n                    IF(groups.is_double_upload, 200, 100) as `upload_factor: u8`\n                FROM\n                    users\n                INNER JOIN\n                    `groups`\n                ON\n                    users.group_id = `groups`.id\n                    AND groups.slug NOT IN ('banned', 'validating', 'disabled')\n                    AND users.deleted_at IS NULL\n                LEFT JOIN\n                    peers\n                ON\n                    users.id = peers.user_id\n                GROUP BY\n                    users.id,\n                    users.passkey,\n                    users.can_download,\n                    groups.download_slots,\n                    groups.is_immune,\n                    groups.is_freeleech,\n                    groups.is_double_upload\n            "
   }
 }
