@@ -47,7 +47,7 @@ impl Queue {
         }
 
         const BIND_LIMIT: usize = 65535;
-        const NUM_TORRENT_COLUMNS: usize = 18;
+        const NUM_TORRENT_COLUMNS: usize = 17;
         const TORRENT_LIMIT: usize = BIND_LIMIT / NUM_TORRENT_COLUMNS;
 
         let torrent_updates = self.split_off(len - min(TORRENT_LIMIT, len));

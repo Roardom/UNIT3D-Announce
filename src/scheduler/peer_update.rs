@@ -82,7 +82,7 @@ impl Queue {
         }
 
         const BIND_LIMIT: usize = 65535;
-        const NUM_PEER_COLUMNS: usize = 13;
+        const NUM_PEER_COLUMNS: usize = 12;
         const PEER_LIMIT: usize = BIND_LIMIT / NUM_PEER_COLUMNS;
 
         let peer_updates = self.split_off(len - min(PEER_LIMIT, len));

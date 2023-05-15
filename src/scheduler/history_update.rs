@@ -95,8 +95,8 @@ impl Queue {
         }
 
         const BIND_LIMIT: usize = 65535;
-        const NUM_HISTORY_COLUMNS: usize = 3;
-        const HISTORY_LIMIT: usize = BIND_LIMIT / NUM_HISTORY_COLUMNS;
+        const NUM_HISTORY_COLUMNS: usize = 16;
+        const HISTORY_LIMIT: usize = (BIND_LIMIT / NUM_HISTORY_COLUMNS) - 1;
 
         let now = Utc::now();
 
