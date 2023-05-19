@@ -258,6 +258,135 @@
     },
     "query": "\n                SELECT\n                    torrents.id as `id: u32`,\n                    torrents.status as `status: Status`,\n                    torrents.seeders as `seeders: u32`,\n                    torrents.leechers as `leechers: u32`,\n                    torrents.times_completed as `times_completed: u32`,\n                    LEAST(100 - torrents.free, IF(featured_torrents.torrent_id IS NULL, 100, 0)) as `download_factor: u8`,\n                    IF(featured_torrents.torrent_id IS NULL, 100, 200) as `upload_factor: u8`,\n                    0 as `is_deleted: bool`\n                FROM\n                    torrents\n                LEFT JOIN\n                    featured_torrents\n                ON\n                    torrents.id = featured_torrents.torrent_id\n            "
   },
+  "51f4aa665cd2ab38e810d354c364455ce1fe39a063e6904d70b3438adaad8dd1": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id: u32",
+          "ordinal": 0,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 547
+            },
+            "max_size": 10,
+            "type": "Long"
+          }
+        },
+        {
+          "name": "passkey: Passkey",
+          "ordinal": 1,
+          "type_info": {
+            "char_set": 224,
+            "flags": {
+              "bits": 4101
+            },
+            "max_size": 1020,
+            "type": "VarString"
+          }
+        },
+        {
+          "name": "can_download: bool",
+          "ordinal": 2,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 1
+            },
+            "max_size": 1,
+            "type": "Tiny"
+          }
+        },
+        {
+          "name": "download_slots: u32",
+          "ordinal": 3,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 8
+            },
+            "max_size": 11,
+            "type": "Long"
+          }
+        },
+        {
+          "name": "is_immune: bool",
+          "ordinal": 4,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 1
+            },
+            "max_size": 1,
+            "type": "Tiny"
+          }
+        },
+        {
+          "name": "num_seeding: u32",
+          "ordinal": 5,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 161
+            },
+            "max_size": 21,
+            "type": "LongLong"
+          }
+        },
+        {
+          "name": "num_leeching: u32",
+          "ordinal": 6,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 161
+            },
+            "max_size": 21,
+            "type": "LongLong"
+          }
+        },
+        {
+          "name": "download_factor: u8",
+          "ordinal": 7,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 129
+            },
+            "max_size": 4,
+            "type": "LongLong"
+          }
+        },
+        {
+          "name": "upload_factor: u8",
+          "ordinal": 8,
+          "type_info": {
+            "char_set": 63,
+            "flags": {
+              "bits": 129
+            },
+            "max_size": 4,
+            "type": "LongLong"
+          }
+        }
+      ],
+      "nullable": [
+        false,
+        false,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "parameters": {
+        "Right": 0
+      }
+    },
+    "query": "\n                SELECT\n                    users.id as `id: u32`,\n                    users.passkey as `passkey: Passkey`,\n                    users.can_download as `can_download: bool`,\n                    groups.download_slots as `download_slots: u32`,\n                    groups.is_immune as `is_immune: bool`,\n                    CAST(COALESCE(SUM(peers.seeder = 1), 0) AS UNSIGNED) as `num_seeding: u32`,\n                    CAST(COALESCE(SUM(peers.seeder = 0), 0) AS UNSIGNED) as `num_leeching: u32`,\n                    IF(groups.is_freeleech, 0, 100) as `download_factor: u8`,\n                    IF(groups.is_double_upload, 200, 100) as `upload_factor: u8`\n                FROM\n                    users\n                INNER JOIN\n                    `groups`\n                ON\n                    users.group_id = `groups`.id\n                    AND groups.slug NOT IN ('banned', 'validating', 'disabled')\n                    AND users.deleted_at IS NULL\n                LEFT JOIN\n                    peers\n                ON\n                    users.id = peers.user_id\n                GROUP BY\n                    users.id,\n                    users.passkey,\n                    users.can_download,\n                    groups.download_slots,\n                    groups.is_immune,\n                    groups.is_freeleech,\n                    groups.is_double_upload\n            "
+  },
   "93a361f6b181ae589b339449074cd53db47ab9a51b66ba57bbac0fc6f57bbcf1": {
     "describe": {
       "columns": [
@@ -421,134 +550,5 @@
       }
     },
     "query": "\n                SELECT\n                    user_id as `user_id: u32`\n                FROM\n                    personal_freeleech\n            "
-  },
-  "f2429b39806d40bcc60deaf263160613ed73c2e74ee02293b3f629378a49b3ab": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id: u32",
-          "ordinal": 0,
-          "type_info": {
-            "char_set": 63,
-            "flags": {
-              "bits": 547
-            },
-            "max_size": 10,
-            "type": "Long"
-          }
-        },
-        {
-          "name": "passkey: Passkey",
-          "ordinal": 1,
-          "type_info": {
-            "char_set": 224,
-            "flags": {
-              "bits": 4101
-            },
-            "max_size": 1020,
-            "type": "VarString"
-          }
-        },
-        {
-          "name": "can_download: bool",
-          "ordinal": 2,
-          "type_info": {
-            "char_set": 63,
-            "flags": {
-              "bits": 1
-            },
-            "max_size": 1,
-            "type": "Tiny"
-          }
-        },
-        {
-          "name": "download_slots: u32",
-          "ordinal": 3,
-          "type_info": {
-            "char_set": 63,
-            "flags": {
-              "bits": 8
-            },
-            "max_size": 11,
-            "type": "Long"
-          }
-        },
-        {
-          "name": "is_immune: bool",
-          "ordinal": 4,
-          "type_info": {
-            "char_set": 63,
-            "flags": {
-              "bits": 1
-            },
-            "max_size": 1,
-            "type": "Tiny"
-          }
-        },
-        {
-          "name": "num_seeding: u32",
-          "ordinal": 5,
-          "type_info": {
-            "char_set": 63,
-            "flags": {
-              "bits": 129
-            },
-            "max_size": 24,
-            "type": "NewDecimal"
-          }
-        },
-        {
-          "name": "num_leeching: u32",
-          "ordinal": 6,
-          "type_info": {
-            "char_set": 63,
-            "flags": {
-              "bits": 129
-            },
-            "max_size": 24,
-            "type": "NewDecimal"
-          }
-        },
-        {
-          "name": "download_factor: u8",
-          "ordinal": 7,
-          "type_info": {
-            "char_set": 63,
-            "flags": {
-              "bits": 129
-            },
-            "max_size": 4,
-            "type": "LongLong"
-          }
-        },
-        {
-          "name": "upload_factor: u8",
-          "ordinal": 8,
-          "type_info": {
-            "char_set": 63,
-            "flags": {
-              "bits": 129
-            },
-            "max_size": 4,
-            "type": "LongLong"
-          }
-        }
-      ],
-      "nullable": [
-        false,
-        false,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false,
-        false
-      ],
-      "parameters": {
-        "Right": 0
-      }
-    },
-    "query": "\n                SELECT\n                    users.id as `id: u32`,\n                    users.passkey as `passkey: Passkey`,\n                    users.can_download as `can_download: bool`,\n                    groups.download_slots as `download_slots: u32`,\n                    groups.is_immune as `is_immune: bool`,\n                    COALESCE(SUM(peers.seeder = 1), 0) as `num_seeding: u32`,\n                    COALESCE(SUM(peers.seeder = 0), 0) as `num_leeching: u32`,\n                    IF(groups.is_freeleech, 0, 100) as `download_factor: u8`,\n                    IF(groups.is_double_upload, 200, 100) as `upload_factor: u8`\n                FROM\n                    users\n                INNER JOIN\n                    `groups`\n                ON\n                    users.group_id = `groups`.id\n                    AND groups.slug NOT IN ('banned', 'validating', 'disabled')\n                    AND users.deleted_at IS NULL\n                LEFT JOIN\n                    peers\n                ON\n                    users.id = peers.user_id\n                GROUP BY\n                    users.id,\n                    users.passkey,\n                    users.can_download,\n                    groups.download_slots,\n                    groups.is_immune,\n                    groups.is_freeleech,\n                    groups.is_double_upload\n            "
   }
 }
