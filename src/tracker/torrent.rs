@@ -32,15 +32,45 @@ impl Map {
 
     pub async fn from_db(db: &MySqlPool) -> Result<Map, Error> {
         let peers = peer::Map::from_db(db).await?;
+
+        // First, group the peers by their torrent id.
+
+        struct GroupedPeer {
+            peers: peer::Map,
+            num_seeders: u32,
+            num_leechers: u32,
+        }
+
+        let mut grouped_peers: IndexMap<u32, GroupedPeer> = IndexMap::new();
+
+        peers.iter().for_each(|(index, peer)| {
+            grouped_peers
+                .entry(peer.torrent_id)
+                .and_modify(|torrent| {
+                    torrent.peers.insert(*index, *peer);
+                    torrent.num_seeders += (peer.is_active && peer.is_seeder) as u32;
+                    torrent.num_leechers += (peer.is_active && !peer.is_seeder) as u32;
+                })
+                .or_insert_with(|| {
+                    let mut peers = peer::Map::new();
+                    peers.insert(*index, *peer);
+
+                    GroupedPeer {
+                        peers,
+                        num_seeders: (peer.is_active && peer.is_seeder) as u32,
+                        num_leechers: (peer.is_active && !peer.is_seeder) as u32,
+                    }
+                });
+        });
+
         // TODO: deleted_at column still needs added to unit3d. Until then, no
         // torrents are considered deleted.
-        let torrents: Vec<Torrent> = sqlx::query!(
+        let torrents: Vec<DBImportTorrent> = sqlx::query_as!(
+            DBImportTorrent,
             r#"
                 SELECT
                     torrents.id as `id: u32`,
                     torrents.status as `status: Status`,
-                    torrents.seeders as `seeders: u32`,
-                    torrents.leechers as `leechers: u32`,
                     torrents.times_completed as `times_completed: u32`,
                     LEAST(100 - torrents.free, IF(featured_torrents.torrent_id IS NULL, 100, 0)) as `download_factor: u8`,
                     IF(featured_torrents.torrent_id IS NULL, 100, 200) as `upload_factor: u8`,
@@ -53,39 +83,6 @@ impl Map {
                     torrents.id = featured_torrents.torrent_id
             "#
         )
-        .map(|row| {
-            let mut peer_map = peer::Map::default();
-            let mut seeders = 0;
-            let mut leechers = 0;
-
-            for (index, peer) in peers.iter() {
-                if peer.torrent_id == row.id {
-                    peer_map.insert(*index, *peer);
-
-                    if peer.is_active {
-                        if peer.is_seeder {
-                            seeders += 1;
-                        } else {
-                            leechers += 1;
-                        }
-                    }
-                }
-            }
-
-            let torrent = Torrent {
-                id: row.id,
-                status: row.status,
-                seeders,
-                leechers,
-                times_completed: row.times_completed,
-                download_factor: row.download_factor,
-                upload_factor: row.upload_factor,
-                is_deleted: row.is_deleted,
-                peers: Arc::new(RwLock::new(peer_map)),
-            };
-
-            torrent
-        })
         .fetch_all(db)
         .await
         .map_err(|error| {
@@ -95,9 +92,35 @@ impl Map {
 
         let mut torrent_map = Map::new();
 
-        for torrent in torrents {
-            torrent_map.insert(torrent.id, torrent);
-        }
+        torrents.iter().for_each(|torrent| {
+            // Default values if torrent doesn't exist
+            let mut peer_map = peer::Map::new();
+            let mut seeders = 0;
+            let mut leechers = 0;
+
+            // Overwrite default values if peers exists
+            if let Some(peer_group) = grouped_peers.get(&torrent.id) {
+                peer_map.extend(peer_group.peers.iter());
+                seeders = peer_group.num_seeders;
+                leechers = peer_group.num_leechers;
+            }
+
+            // Insert torrent with its peers
+            torrent_map.insert(
+                torrent.id,
+                Torrent {
+                    id: torrent.id,
+                    status: torrent.status,
+                    seeders,
+                    leechers,
+                    times_completed: torrent.times_completed,
+                    download_factor: torrent.download_factor,
+                    upload_factor: torrent.upload_factor,
+                    is_deleted: torrent.is_deleted,
+                    peers: Arc::new(RwLock::new(peer_map)),
+                },
+            );
+        });
 
         Ok(torrent_map)
     }
@@ -167,6 +190,16 @@ impl DerefMut for Map {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
+}
+
+#[derive(Clone, Default)]
+pub struct DBImportTorrent {
+    pub id: u32,
+    pub status: Status,
+    pub times_completed: u32,
+    pub download_factor: u8,
+    pub upload_factor: u8,
+    pub is_deleted: bool,
 }
 
 #[derive(Clone, Default)]
