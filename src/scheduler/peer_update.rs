@@ -26,6 +26,7 @@ pub struct PeerUpdate {
     pub agent: CompactString,
     pub uploaded: u64,
     pub downloaded: u64,
+    pub is_active: bool,
     pub is_seeder: bool,
     pub left: u64,
     pub torrent_id: u32,
@@ -46,6 +47,7 @@ impl Queue {
         agent: CompactString,
         uploaded: u64,
         downloaded: u64,
+        is_active: bool,
         is_seeder: bool,
         left: u64,
         torrent_id: u32,
@@ -64,6 +66,7 @@ impl Queue {
                 agent,
                 uploaded,
                 downloaded,
+                is_active,
                 is_seeder,
                 left,
                 torrent_id,
@@ -98,6 +101,7 @@ impl Queue {
                         uploaded,
                         downloaded,
                         `left`,
+                        active,
                         seeder,
                         created_at,
                         updated_at,
@@ -118,6 +122,7 @@ impl Queue {
                         .push_bind(peer_update.uploaded)
                         .push_bind(peer_update.downloaded)
                         .push_bind(peer_update.left)
+                        .push_bind(peer_update.is_active)
                         .push_bind(peer_update.is_seeder)
                         .push_bind(peer_update.updated_at)
                         .push_bind(peer_update.updated_at)
@@ -131,6 +136,7 @@ impl Queue {
                         .push_bind(peer_update.uploaded)
                         .push_bind(peer_update.downloaded)
                         .push_bind(peer_update.left)
+                        .push_bind(peer_update.is_active)
                         .push_bind(peer_update.is_seeder)
                         .push_bind(peer_update.updated_at)
                         .push_bind(peer_update.updated_at)
@@ -147,6 +153,7 @@ impl Queue {
                     uploaded = VALUES(uploaded),
                     downloaded = VALUES(downloaded),
                     `left` = VALUES(`left`),
+                    active = VALUES(active),
                     seeder = VALUES(seeder),
                     updated_at = VALUES(updated_at)
             "#,
@@ -172,6 +179,7 @@ impl Queue {
                         peer_update.agent.to_owned(),
                         peer_update.uploaded,
                         peer_update.downloaded,
+                        peer_update.is_active,
                         peer_update.is_seeder,
                         peer_update.left,
                         peer_update.torrent_id,

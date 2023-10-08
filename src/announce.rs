@@ -357,6 +357,7 @@ pub async fn announce(
             CompactString::from(user_agent),
             queries.uploaded,
             queries.downloaded,
+            queries.event != Event::Stopped,
             queries.left == 0,
             queries.left,
             torrent.id,
