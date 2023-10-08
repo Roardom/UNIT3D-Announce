@@ -64,11 +64,11 @@ pub struct Announce {
     numwant: usize,
 }
 
-pub struct Request<Announce>(pub Announce);
+pub struct Query<T>(pub T);
 
 /// Extracts the query parameters in the HTTP GET request.
 #[async_trait]
-impl<S> FromRequestParts<S> for Request<Announce>
+impl<S> FromRequestParts<S> for Query<Announce>
 where
     S: Send + Sync,
     Arc<Tracker>: FromRef<S>,
@@ -157,7 +157,7 @@ where
             .await
             .map_err(|_| Error("Internal tracker error."))?;
 
-        Ok(Request(Announce {
+        Ok(Query(Announce {
             info_hash: info_hash.ok_or(Error("Query parameter 'info_hash' is missing."))?,
             peer_id: peer_id.ok_or(Error("Query parameter 'peer_id' is missing."))?,
             port: port.ok_or(Error("Query parameter 'port' is missing."))?,
@@ -211,7 +211,7 @@ where
 pub async fn announce(
     State(tracker): State<Arc<Tracker>>,
     Path(passkey): Path<String>,
-    Request(queries): Request<Announce>,
+    Query(queries): Query<Announce>,
     headers: HeaderMap,
     ClientIp(client_ip): ClientIp,
 ) -> Result<Vec<u8>, Error> {
