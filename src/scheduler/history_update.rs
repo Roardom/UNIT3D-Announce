@@ -170,6 +170,7 @@ impl Queue {
                         updated_at = VALUES(updated_at),
                         seeder = VALUES(seeder),
                         active = VALUES(active),
+                        immune = immune AND VALUES(immune),
                         completed_at = COALESCE(completed_at, VALUES(completed_at))
                 "#,
             );
