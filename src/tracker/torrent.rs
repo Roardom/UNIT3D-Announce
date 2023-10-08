@@ -10,7 +10,8 @@ use sqlx::MySqlPool;
 use tokio::sync::RwLock;
 
 use crate::tracker::peer;
-use crate::Error;
+
+use anyhow::{Context, Result};
 
 pub mod infohash;
 pub use infohash::InfoHash;
@@ -30,7 +31,7 @@ impl Map {
         Map(IndexMap::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Map, Error> {
+    pub async fn from_db(db: &MySqlPool) -> Result<Map> {
         let peers = peer::Map::from_db(db).await?;
 
         // First, group the peers by their torrent id.
@@ -85,10 +86,7 @@ impl Map {
         )
         .fetch_all(db)
         .await
-        .map_err(|error| {
-            println!("{}", error);
-            Error("Failed loading torrents.")
-        })?;
+        .context("Failed loading torrents.")?;
 
         let mut torrent_map = Map::new();
 

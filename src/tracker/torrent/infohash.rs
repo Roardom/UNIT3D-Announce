@@ -3,31 +3,27 @@ use std::{fmt, ops::Deref, str::FromStr};
 use serde::Deserialize;
 use sqlx::{database::HasValueRef, Database, Decode};
 
-use crate::{
-    error::Error,
-    utils::{hex_decode, hex_encode},
-};
+use crate::utils::{hex_decode, hex_encode};
+
+use anyhow::{bail, Context, Result};
 
 #[derive(Clone, Copy, Deserialize, Debug, Eq, Hash, PartialEq)]
 pub struct InfoHash(pub [u8; 20]);
 
 impl FromStr for InfoHash {
-    type Err = Error;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let bytes = s.as_bytes();
         let mut out = [0u8; 20];
 
         if bytes.len() != 40 {
-            println!("`{s}` is not a valid infohash.");
-            return Err(Error("Invalid infohash."));
+            bail!("`{s}` is not a valid infohash.");
         }
 
         for pos in 0..20 {
-            out[pos] = hex_decode([bytes[pos * 2], bytes[pos * 2 + 1]]).map_err(|_| {
-                println!("`{s}` is not a valid infohash");
-                Error("Invalid infohash.")
-            })?;
+            out[pos] = hex_decode([bytes[pos * 2], bytes[pos * 2 + 1]])
+                .context("`{s}` is not a valid infohash")?;
         }
 
         Ok(InfoHash(out))
@@ -65,7 +61,7 @@ where
 
         if value.len() != 20 {
             let error: Box<dyn std::error::Error + Send + Sync> =
-                Box::new(Error("Invalid infohash."));
+                Box::new(crate::error::DecodeError::InfoHash);
 
             return Err(error);
         }

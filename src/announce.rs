@@ -1,5 +1,5 @@
 use axum::{
-    async_trait, debug_handler,
+    async_trait,
     extract::{ConnectInfo, FromRef, FromRequestParts, Path, State},
     http::{
         header::{ACCEPT_CHARSET, ACCEPT_LANGUAGE, REFERER, USER_AGENT},
@@ -17,7 +17,17 @@ use std::{
     sync::Arc,
 };
 
-use crate::error::Error;
+use crate::error::AnnounceError::{
+    self, AbnormalAccess, BlacklistedClient, BlacklistedPort, DownloadPrivilegesRevoked,
+    DownloadSlotLimitReached, InfoHashNotFound, InternalTrackerError, InvalidCompact,
+    InvalidDownloaded, InvalidInfoHash, InvalidLeft, InvalidNumwant, InvalidPasskey, InvalidPeerId,
+    InvalidPort, InvalidQueryStringKey, InvalidQueryStringValue, InvalidUploaded, InvalidUserAgent,
+    MissingDownloaded, MissingInfoHash, MissingLeft, MissingPeerId, MissingPort, MissingUploaded,
+    NotAClient, PasskeyNotFound, StoppedPeerDoesntExist, TorrentIsDeleted,
+    TorrentIsPendingModeration, TorrentIsPostponed, TorrentIsRejected, TorrentNotFound,
+    TorrentUnknownModerationStatus, UnsupportedEvent, UserAgentTooLong, UserNotFound,
+};
+
 use crate::tracker::{
     self,
     blacklisted_agent::Agent,
@@ -40,15 +50,15 @@ enum Event {
 }
 
 impl FromStr for Event {
-    type Err = Error;
+    type Err = AnnounceError;
 
-    fn from_str(event: &str) -> Result<Self, Error> {
+    fn from_str(event: &str) -> Result<Self, AnnounceError> {
         match event {
             "" | "empty" => Ok(Self::Empty),
             "completed" => Ok(Self::Completed),
             "started" => Ok(Self::Started),
             "stopped" => Ok(Self::Stopped),
-            _ => Err(Error("Unsupported event type")),
+            _ => Err(UnsupportedEvent),
         }
     }
 }
@@ -73,7 +83,7 @@ where
     S: Send + Sync,
     Arc<Tracker>: FromRef<S>,
 {
-    type Rejection = Error;
+    type Rejection = AnnounceError;
 
     async fn from_request_parts(parts: &mut Parts, tracker: &S) -> Result<Self, Self::Rejection> {
         let query_string = parts.uri.query().unwrap_or_default();
@@ -96,53 +106,37 @@ where
 
             let parameter = query_string
                 .get(pos..equal_sign_pos)
-                .ok_or(Error("Invalid query string parameter."))?;
+                .ok_or(InvalidQueryStringKey)?;
             let value = query_string
                 .get(equal_sign_pos + 1..value_end_pos)
-                .ok_or(Error("Invalid query string value."))?;
+                .ok_or(InvalidQueryStringValue)?;
 
             match parameter {
                 "info_hash" => {
-                    info_hash = Some(InfoHash::from(utils::urlencoded_to_bytes(value).await?))
+                    info_hash = Some(InfoHash::from(
+                        utils::urlencoded_to_bytes(value)
+                            .await
+                            .or(Err(InvalidInfoHash))?,
+                    ))
                 }
-                "peer_id" => peer_id = Some(PeerId::from(utils::urlencoded_to_bytes(value).await?)),
-                "port" => {
-                    port = Some(value.parse().map_err(|_| {
-                        Error("Invalid 'port' (must be greater than or equal to 0).")
-                    })?)
+                "peer_id" => {
+                    peer_id = Some(PeerId::from(
+                        utils::urlencoded_to_bytes(value)
+                            .await
+                            .or(Err(InvalidPeerId))?,
+                    ))
                 }
-                "uploaded" => {
-                    uploaded = Some(value.parse().map_err(|_| {
-                        Error("Invalid 'uploaded' (must be greater than or equal to 0).")
-                    })?)
-                }
-                "downloaded" => {
-                    downloaded = Some(value.parse().map_err(|_| {
-                        Error("Invalid 'downloaded' (must be greater than or equal to 0).")
-                    })?)
-                }
-                "left" => {
-                    left = Some(value.parse().map_err(|_| {
-                        Error("Invalid 'left' (must be greater than or equal to 0).")
-                    })?)
-                }
+                "port" => port = Some(value.parse().or(Err(InvalidPort))?),
+                "uploaded" => uploaded = Some(value.parse().or(Err(InvalidUploaded))?),
+                "downloaded" => downloaded = Some(value.parse().or(Err(InvalidDownloaded))?),
+                "left" => left = Some(value.parse().or(Err(InvalidLeft))?),
                 "compact" => {
                     if value != "1" {
-                        return Err(Error("Your client does not support compact announces."));
+                        return Err(InvalidCompact);
                     }
                 }
-                "event" => {
-                    event = Some(
-                        value
-                            .parse()
-                            .map_err(|_| Error("Unsupported 'event' type."))?,
-                    )
-                }
-                "numwant" => {
-                    numwant = Some(value.parse().map_err(|_| {
-                        Error("Invalid 'numwant' (must be greater than or equal to 0).")
-                    })?)
-                }
+                "event" => event = Some(value.parse()?),
+                "numwant" => numwant = Some(value.parse().or(Err(InvalidNumwant))?),
                 _ => (),
             }
 
@@ -155,15 +149,15 @@ where
 
         let State(tracker): State<Arc<Tracker>> = State::from_request_parts(parts, tracker)
             .await
-            .map_err(|_| Error("Internal tracker error."))?;
+            .or(Err(InternalTrackerError))?;
 
         Ok(Query(Announce {
-            info_hash: info_hash.ok_or(Error("Query parameter 'info_hash' is missing."))?,
-            peer_id: peer_id.ok_or(Error("Query parameter 'peer_id' is missing."))?,
-            port: port.ok_or(Error("Query parameter 'port' is missing."))?,
-            uploaded: uploaded.ok_or(Error("Query parameter 'uploaded' is missing."))?,
-            downloaded: downloaded.ok_or(Error("Query parameter 'downloaded' is missing."))?,
-            left: left.ok_or(Error("Query parameter 'left' is missing."))?,
+            info_hash: info_hash.ok_or(MissingInfoHash)?,
+            peer_id: peer_id.ok_or(MissingPeerId)?,
+            port: port.ok_or(MissingPort)?,
+            uploaded: uploaded.ok_or(MissingUploaded)?,
+            downloaded: downloaded.ok_or(MissingDownloaded)?,
+            left: left.ok_or(MissingLeft)?,
             event: event.unwrap_or_default(),
             numwant: {
                 if event.unwrap_or_default() == Event::Stopped {
@@ -185,7 +179,7 @@ impl<S> FromRequestParts<S> for ClientIp
 where
     S: Send + Sync,
 {
-    type Rejection = Error;
+    type Rejection = AnnounceError;
 
     async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         // Extract the IP from the X-Real-IP header set by nginx using real_ip_recursive
@@ -201,20 +195,19 @@ where
         // connecting ip.
         let ConnectInfo(addr) = ConnectInfo::<SocketAddr>::from_request_parts(parts, state)
             .await
-            .map_err(|_| Error("Internal tracker error."))?;
+            .or(Err(InternalTrackerError))?;
 
         Ok(ClientIp(addr.ip()))
     }
 }
 
-#[debug_handler]
 pub async fn announce(
     State(tracker): State<Arc<Tracker>>,
     Path(passkey): Path<String>,
     Query(queries): Query<Announce>,
     headers: HeaderMap,
     ClientIp(client_ip): ClientIp,
-) -> Result<Vec<u8>, Error> {
+) -> Result<Vec<u8>, AnnounceError> {
     // Validate headers
     if headers.contains_key(ACCEPT_LANGUAGE)
         || headers.contains_key(REFERER)
@@ -225,28 +218,26 @@ pub async fn announce(
         // See: https://blog.rhilip.info/archives/1010/ ( in Chinese )
         || headers.contains_key("want-digest")
     {
-        return Err(Error("Abnormal access blocked."));
+        return Err(AbnormalAccess);
     }
 
     // User agent header is required.
     let user_agent = headers
         .get(USER_AGENT)
-        .ok_or(Error("Invalid user agent."))?
+        .ok_or(InvalidUserAgent)?
         .to_str()
-        .map_err(|_| Error("Invalid user agent."))?;
+        .or(Err(InvalidUserAgent))?;
 
     // Block user agent strings that are too long. (For Database reasons)
     if user_agent.len() > 64 {
-        return Err(Error("The user agent of this client is too long."));
+        return Err(UserAgentTooLong);
     }
 
     // Block user agent strings on the blacklist
     if tracker.agent_blacklist.read().await.contains(&Agent {
         name: user_agent.to_string(),
     }) {
-        return Err(Error(
-            "Client is not acceptable. Please check our blacklist.",
-        ));
+        return Err(BlacklistedClient);
     }
 
     // Block user agent strings on the regex blacklist
@@ -263,24 +254,20 @@ pub async fn announce(
         || user_agent_lower.contains("bot")
         || user_agent_lower.contains("unknown")
     {
-        return Err(Error("Browser, crawler or cheater is not allowed."));
+        return Err(NotAClient);
     }
 
-    let passkey: Passkey = Passkey::from_str(&passkey).map_err(|_| Error("Invalid passkey."))?;
+    let passkey: Passkey = Passkey::from_str(&passkey).or(Err(InvalidPasskey))?;
 
     // Validate passkey
     let user_guard = tracker.passkey2id.read().await;
-    let user_id = user_guard.get(&passkey).ok_or(Error(
-        "Passkey does not exist. Please re-download the .torrent file.",
-    ))?;
+    let user_id = user_guard.get(&passkey).ok_or(PasskeyNotFound)?;
     let mut user_guard = tracker.users.write().await;
-    let mut user = user_guard.get_mut(user_id).ok_or(Error(
-        "User does not exist. Please re-download the .torrent file.",
-    ))?;
+    let mut user = user_guard.get_mut(user_id).ok_or(UserNotFound)?;
 
     // Validate user
     if !user.can_download && queries.left != 0 {
-        return Err(Error("Your downloading privileges have been disabled."));
+        return Err(DownloadPrivilegesRevoked);
     }
 
     // Validate port
@@ -288,41 +275,35 @@ pub async fn announce(
     if tracker.port_blacklist.read().await.contains(&queries.port)
         && queries.event != Event::Stopped
     {
-        return Err(Error("Illegal port. Port should be between 6881-64999."));
+        return Err(BlacklistedPort);
     }
 
     // Validate torrent
     let torrent_guard = tracker.infohash2id.read().await;
     let torrent_id = torrent_guard
         .get(&queries.info_hash)
-        .ok_or(Error("Infohash not found."))?
+        .ok_or(InfoHashNotFound)?
         .to_owned();
     let mut torrent_guard = tracker.torrents.write().await;
-    let mut torrent = torrent_guard
-        .get_mut(&torrent_id)
-        .ok_or(Error("Torrent not found."))?;
+    let mut torrent = torrent_guard.get_mut(&torrent_id).ok_or(TorrentNotFound)?;
 
     if torrent.is_deleted {
-        return Err(Error("Torrent has been deleted."));
+        return Err(TorrentIsDeleted);
     }
 
     if torrent.status != tracker::torrent::Status::Approved {
         match torrent.status {
-            tracker::torrent::Status::Pending => {
-                return Err(Error("Torrent is pending moderation."))
-            }
-            tracker::torrent::Status::Rejected => return Err(Error("Torrent has been rejected.")),
-            tracker::torrent::Status::Postponed => {
-                return Err(Error("Torrent has been postponed."))
-            }
-            _ => return Err(Error("Torrent not approved.")),
+            tracker::torrent::Status::Pending => return Err(TorrentIsPendingModeration),
+            tracker::torrent::Status::Rejected => return Err(TorrentIsRejected),
+            tracker::torrent::Status::Postponed => return Err(TorrentIsPostponed),
+            _ => return Err(TorrentUnknownModerationStatus),
         }
     }
 
     // Make sure user isn't leeching more torrents than their group allows
     if queries.left > 0 && matches!(user.download_slots, Some(slots) if slots <= user.num_leeching)
     {
-        return Err(Error("Your download slot limit is reached."));
+        return Err(DownloadSlotLimitReached);
     }
 
     // Change of upload/download compared to previous announce
@@ -365,7 +346,7 @@ pub async fn announce(
                 .await
                 .upsert(torrent.id, user.id, queries.peer_id);
         } else {
-            return Err(Error("Stopped torrent doesn't exist."));
+            return Err(StoppedPeerDoesntExist);
         }
     } else {
         // Schedule a peer update in the mysql db

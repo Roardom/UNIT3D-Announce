@@ -12,8 +12,9 @@ pub use user::User;
 
 use sqlx::MySqlPool;
 
+use anyhow::{Context, Result};
+
 use crate::config;
-use crate::error::Error;
 use crate::scheduler::{history_update, peer_deletion, peer_update, torrent_update, user_update};
 use crate::stats::Stats;
 
@@ -45,9 +46,9 @@ impl Tracker {
     /// Creates a database connection pool, and loads all relevant tracker
     /// data into this shared tracker context. This is then passed to all
     /// handlers.
-    pub async fn default() -> Result<Arc<Tracker>, Error> {
+    pub async fn default() -> Result<Arc<Tracker>> {
         println!(".env file: verifying file exists...");
-        dotenv().map_err(|_| Error(".env file not found. Aborting."))?;
+        dotenv().context(".env file not found.")?;
 
         println!("Connecting to database...");
         let pool = connect_to_database().await;

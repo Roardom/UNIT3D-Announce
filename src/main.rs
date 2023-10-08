@@ -1,11 +1,10 @@
+use anyhow::Result;
 use axum::{
     routing::{get, put},
     Router,
 };
 use std::net::SocketAddr;
 use tokio::signal;
-
-use error::Error;
 
 #[cfg(not(target_env = "msvc"))]
 use tikv_jemallocator::Jemalloc;
@@ -23,7 +22,7 @@ mod tracker;
 mod utils;
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() -> Result<()> {
     // The Tracker struct keeps track of all state within the application.
     let tracker = tracker::Tracker::default().await?;
 

@@ -5,7 +5,7 @@ use indexmap::IndexMap;
 use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::MySqlPool;
 
-use crate::Error;
+use anyhow::{Context, Result};
 
 pub mod peer_id;
 pub use peer_id::PeerId;
@@ -36,7 +36,7 @@ impl Map {
         Map(IndexMap::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Map, Error> {
+    pub async fn from_db(db: &MySqlPool) -> Result<Map> {
         // TODO: is_active still isn't handled by unit3d
         let peers: Vec<(Index, Peer)> = sqlx::query!(
             r#"
@@ -82,10 +82,7 @@ impl Map {
         })
         .fetch_all(db)
         .await
-        .map_err(|error| {
-            println!("{}", error);
-            Error("Failed loading peers.")
-        })?;
+        .context("Failed loading peers.")?;
 
         let mut peer_map = Map::new();
 

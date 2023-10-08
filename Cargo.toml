@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+anyhow = { version = "1.0.0", default-features = true, features = ["std"] }
 axum = { version = "0.6.0", default-features = false, features = ["http1", "tokio", "query", "macros", "json"] }
 chrono = { version = "0.4.22", default-features = false }
 compact_str = { version = "0.7.0", default-features = false }
@@ -14,6 +15,7 @@ rand = { version = "0.8.5", default-features = false, features = ["alloc", "smal
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde_repr = { version = "0.1", default-features = false }
 sqlx = { version = "0.7.0", default-features = false, features = ["runtime-tokio-rustls", "macros", "mysql", "chrono", "ipnetwork" ] }
+thiserror = { version = "1.0.0", default-features = false }
 tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "macros", "signal", "sync"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]

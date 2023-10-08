@@ -1,18 +1,16 @@
-use crate::Error;
+use anyhow::{bail, Result};
 
 /// Decodes a url-encoded string to 20 bytes.
 ///
 /// Used for decoding the peer_id and infohash from the HTTP GET request query string.
 #[inline(always)]
-pub async fn urlencoded_to_bytes(input: &str) -> Result<[u8; 20], Error> {
+pub async fn urlencoded_to_bytes(input: &str) -> Result<[u8; 20]> {
     let mut output: [u8; 20] = [0; 20];
     let input = input.as_bytes();
     let percent_sign_count = memchr::memchr_iter(b'%', input).count();
 
     if input.len() != 20 + 2 * percent_sign_count {
-        return Err(Error(
-            "Invalid 'info_hash' or 'peer_id' (must be 20 bytes long).",
-        ));
+        bail!("Invalid 'info_hash' or 'peer_id' (must be 20 bytes long)");
     }
 
     let mut in_pos = 0;
@@ -34,17 +32,17 @@ pub async fn urlencoded_to_bytes(input: &str) -> Result<[u8; 20], Error> {
 
 /// Decodes two ascii-encoded hex digits into one byte.
 #[inline(always)]
-pub fn hex_decode(chars: [u8; 2]) -> Result<u8, Error> {
+pub fn hex_decode(chars: [u8; 2]) -> Result<u8> {
     Ok(match chars[0] {
         b'0'..=b'9' => chars[0] - b'0' << 4,
         b'a'..=b'f' => chars[0] - b'a' + 0xA << 4,
         b'A'..=b'F' => chars[0] - b'A' + 0xA << 4,
-        _ => Err(Error("Invalid URL encoding."))?,
+        _ => bail!("Invalid URL encoding."),
     } + match chars[1] {
         b'0'..=b'9' => chars[1] - b'0',
         b'a'..=b'f' => chars[1] - b'a' + 0xA,
         b'A'..=b'F' => chars[1] - b'A' + 0xA,
-        _ => Err(Error("Invalid URL encoding."))?,
+        _ => bail!("Invalid URL encoding."),
     })
 }
 
@@ -71,7 +69,7 @@ pub fn hex_encode(char: u8) -> [u8; 2] {
 mod tests {
     use super::*;
     #[tokio::test]
-    async fn urlencoded_all_percents() -> Result<(), Error> {
+    async fn urlencoded_all_percents() -> Result<()> {
         let url_encoded = "%00%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F%00%01%02%03";
         let bytes = urlencoded_to_bytes(url_encoded).await?;
         assert_eq!(
@@ -85,7 +83,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn urlencoded_no_percents() -> Result<(), Error> {
+    async fn urlencoded_no_percents() -> Result<()> {
         let url_encoded = "33333333333333333333";
         let bytes = urlencoded_to_bytes(url_encoded).await?;
         assert_eq!(
@@ -100,7 +98,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn urlencoded_mixed_percents() -> Result<(), Error> {
+    async fn urlencoded_mixed_percents() -> Result<()> {
         let url_encoded = "%00%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F3333";
         let bytes = urlencoded_to_bytes(url_encoded).await?;
         assert_eq!(
@@ -128,7 +126,7 @@ mod tests {
     }
 
     #[test]
-    fn hex_decode_lowercase() -> Result<(), Error> {
+    fn hex_decode_lowercase() -> Result<()> {
         let lowercase_ascii_chars: [u8; 2] = [b'7', b'c'];
         let hex = hex_decode(lowercase_ascii_chars)?;
         assert_eq!(hex, 0x7C);
@@ -136,7 +134,7 @@ mod tests {
     }
 
     #[test]
-    fn hex_decode_uppercase() -> Result<(), Error> {
+    fn hex_decode_uppercase() -> Result<()> {
         let uppercase_ascii_chars: [u8; 2] = [b'7', b'C'];
         let hex = hex_decode(uppercase_ascii_chars)?;
         assert_eq!(hex, 0x7C);
@@ -144,7 +142,7 @@ mod tests {
     }
 
     #[test]
-    fn hex_decode_invalid() -> Result<(), Error> {
+    fn hex_decode_invalid() -> Result<()> {
         let invalid_ascii_chars: [u8; 2] = [b'z', b'z'];
         let hex = hex_decode(invalid_ascii_chars);
         assert!(hex.is_err());

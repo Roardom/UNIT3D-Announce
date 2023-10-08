@@ -4,7 +4,7 @@ use crate::tracker::torrent::InfoHash;
 use indexmap::IndexMap;
 use sqlx::MySqlPool;
 
-use crate::Error;
+use anyhow::{Context, Result};
 
 pub struct Map(IndexMap<InfoHash, u32>);
 
@@ -27,7 +27,7 @@ impl Map {
         Map(IndexMap::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Map, Error> {
+    pub async fn from_db(db: &MySqlPool) -> Result<Map> {
         let info_hash2ids = sqlx::query_as!(
             InfoHash2Id,
             r#"
@@ -40,10 +40,7 @@ impl Map {
         )
         .fetch_all(db)
         .await
-        .map_err(|error| {
-            println!("{}", error);
-            return Error("Failed loading torrent infohash to id mappings.");
-        })?;
+        .context("Failed loading torrent infohash to id mappings.")?;
 
         let mut info_hash2id_map = Map::new();
 

@@ -3,19 +3,19 @@ use std::str::FromStr;
 use serde::Deserialize;
 use sqlx::{database::HasValueRef, Database, Decode};
 
-use crate::error::Error;
+use anyhow::bail;
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq)]
 pub struct Passkey(pub [u8; 32]);
 
 impl FromStr for Passkey {
-    type Err = Error;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut bytes = s.bytes();
 
         if bytes.len() != 32 {
-            return Err(Error("Invalid passkey length."));
+            bail!("Invalid passkey length.");
         }
 
         let array = [(); 32].map(|_| bytes.next().unwrap());

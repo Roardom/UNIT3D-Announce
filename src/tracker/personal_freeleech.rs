@@ -7,7 +7,7 @@ use indexmap::IndexSet;
 use serde::Deserialize;
 use sqlx::MySqlPool;
 
-use crate::Error;
+use anyhow::{Context, Result};
 
 use crate::tracker::Tracker;
 
@@ -18,7 +18,7 @@ impl Set {
         Set(IndexSet::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Set, Error> {
+    pub async fn from_db(db: &MySqlPool) -> Result<Set> {
         let personal_freeleeches = sqlx::query_as!(
             PersonalFreeleech,
             r#"
@@ -30,10 +30,7 @@ impl Set {
         )
         .fetch_all(db)
         .await
-        .map_err(|error| {
-            println!("{}", error);
-            Error("Failed loading personal freeleeches.")
-        })?;
+        .context("Failed loading personal freeleeches.")?;
 
         let mut personal_freeleech_set = Set::new();
 

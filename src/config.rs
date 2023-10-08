@@ -1,5 +1,6 @@
-use crate::error::Error;
 use std::env;
+
+use anyhow::{bail, Context, Result};
 
 #[derive(Clone)]
 pub struct Config {
@@ -44,64 +45,61 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn from_env() -> Result<Config, Error> {
+    pub fn from_env() -> Result<Config> {
         let flush_interval: u64 = env::var("FLUSH_INTERVAL")
-            .map_err(|_| Error("FLUSH_INTERVAL not found in .env file. Aborting."))?
+            .context("FLUSH_INTERVAL not found in .env file.")?
             .parse()
-            .map_err(|_| Error("FLUSH_INTERVAL must be a number between 0 and 2^64 - 1"))?;
+            .context("FLUSH_INTERVAL must be a number between 0 and 2^64 - 1")?;
 
         let numwant_default = env::var("NUMWANT_DEFAULT")
-            .map_err(|_| Error("NUMWANT_DEFAULT not found in .env file. Aborting."))?
+            .context("NUMWANT_DEFAULT not found in .env file.")?
             .parse()
-            .map_err(|_| Error("NUMWANT_DEFAULT must be a number between 0 and 2^64 - 1"))?;
+            .context("NUMWANT_DEFAULT must be a number between 0 and 2^64 - 1")?;
 
         let numwant_max = env::var("NUMWANT_MAX")
-            .map_err(|_| Error("NUMWANT_MAX not found in .env file. Aborting."))?
+            .context("NUMWANT_MAX not found in .env file.")?
             .parse()
-            .map_err(|_| Error("NUMWANT_MAX must be a number between 0 and 2^64 - 1"))?;
+            .context("NUMWANT_MAX must be a number between 0 and 2^64 - 1")?;
 
         let announce_min = env::var("ANNOUNCE_MIN")
-            .map_err(|_| Error("ANNOUNCE_MIN not found in .env file. Aborting."))?
+            .context("ANNOUNCE_MIN not found in .env file.")?
             .parse()
-            .map_err(|_| Error("ANNOUNCE_MIN must be a number between 0 and 2^32 - 1"))?;
+            .context("ANNOUNCE_MIN must be a number between 0 and 2^32 - 1")?;
 
         let announce_max = env::var("ANNOUNCE_MAX")
-            .map_err(|_| Error("ANNOUNCE_MAX not found in .env file. Aborting."))?
+            .context("ANNOUNCE_MAX not found in .env file.")?
             .parse()
-            .map_err(|_| Error("ANNOUNCE_MAX must be a number between 0 and 2^32 - 1"))?;
+            .context("ANNOUNCE_MAX must be a number between 0 and 2^32 - 1")?;
 
         let upload_factor = env::var("UPLOAD_FACTOR")
-            .map_err(|_| Error("UPLOAD_FACTOR not found in .env file. Aborting."))?
+            .context("UPLOAD_FACTOR not found in .env file.")?
             .parse()
-            .map_err(|_| Error("UPLOAD_FACTOR must be a number between 0 and 255"))?;
+            .context("UPLOAD_FACTOR must be a number between 0 and 2^8 - 1")?;
 
         let download_factor = env::var("DOWNLOAD_FACTOR")
-            .map_err(|_| Error("DOWNLOAD_FACTOR not found in .env file. Aborting."))?
+            .context("DOWNLOAD_FACTOR not found in .env file.")?
             .parse()
-            .map_err(|_| Error("DOWNLOAD_FACTOR must be a number between 0 and 255"))?;
+            .context("DOWNLOAD_FACTOR must be a number between 0 and 2^8 - 1")?;
 
         let peer_expiry_interval = env::var("PEER_EXPIRY_INTERVAL")
-            .map_err(|_| Error("PEER_EXPIRY_INTERVAL not found in .env file. Aborting."))?
+            .context("PEER_EXPIRY_INTERVAL not found in .env file.")?
             .parse()
-            .map_err(|_| Error("PEER_EXPIRY_INTERVAL must be a number between 0 and 2^64 - 1"))?;
+            .context("PEER_EXPIRY_INTERVAL must be a number between 0 and 2^64 - 1")?;
 
         let active_peer_ttl = env::var("ACTIVE_PEER_TTL")
-            .map_err(|_| Error("ACTIVE_PEER_TTL not found in .env file. Aborting."))?
+            .context("ACTIVE_PEER_TTL not found in .env file.")?
             .parse()
-            .map_err(|_| Error("ACTIVE_PEER_TTL must be a number between 0 and 2^64 - 1"))?;
+            .context("ACTIVE_PEER_TTL must be a number between 0 and 2^64 - 1")?;
 
         let inactive_peer_ttl = env::var("INACTIVE_PEER_TTL")
-            .map_err(|_| Error("INACTIVE_PEER_TTL not found in .env file. Aborting."))?
+            .context("INACTIVE_PEER_TTL not found in .env file.")?
             .parse()
-            .map_err(|_| Error("INACTIVE_PEER_TTL must be a number between 0 and 2^64 - 1"))?;
+            .context("INACTIVE_PEER_TTL must be a number between 0 and 2^64 - 1")?;
 
-        let apikey =
-            env::var("APIKEY").map_err(|_| Error("APIKEY not found in .env file. Aborting."))?;
+        let apikey = env::var("APIKEY").context("APIKEY not found in .env file.")?;
 
         if apikey.len() < 32 {
-            return Err(Error(
-                "APIKEY must be at least 32 characters long. Aborting.",
-            ));
+            bail!("APIKEY must be at least 32 characters long");
         }
 
         Ok(Config {

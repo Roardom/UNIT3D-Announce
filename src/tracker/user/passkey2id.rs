@@ -4,7 +4,7 @@ use super::Passkey;
 use indexmap::IndexMap;
 use sqlx::MySqlPool;
 
-use crate::Error;
+use anyhow::{Context, Result};
 
 pub struct Map(IndexMap<Passkey, u32>);
 
@@ -27,7 +27,7 @@ impl Map {
         Map(IndexMap::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Map, Error> {
+    pub async fn from_db(db: &MySqlPool) -> Result<Map> {
         let passkey2ids = sqlx::query_as!(
             Passkey2Id,
             r#"
@@ -40,10 +40,7 @@ impl Map {
         )
         .fetch_all(db)
         .await
-        .map_err(|error| {
-            println!("{}", error);
-            Error("Failed loading user passkey to id mappings.")
-        })?;
+        .context("Failed loading user passkey to id mappings.")?;
 
         let mut passkey2id_map = Map::new();
 
