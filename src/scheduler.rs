@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 pub mod history_update;
-pub mod peer_deletion;
 pub mod peer_update;
 pub mod torrent_update;
 pub mod user_update;
@@ -45,12 +44,6 @@ pub async fn flush(tracker: &Arc<Tracker>) {
         .flush_to_db(&tracker.pool)
         .await;
     tracker
-        .peer_deletions
-        .write()
-        .await
-        .flush_to_db(&tracker.pool)
-        .await;
-    tracker
         .torrent_updates
         .write()
         .await
@@ -66,6 +59,8 @@ pub async fn flush(tracker: &Arc<Tracker>) {
 
 /// Remove peers that have not announced for some time
 pub async fn reap(tracker: &Arc<Tracker>) {
+    let flush_interval = Duration::seconds(tracker.config.flush_interval.try_into().unwrap());
+    let two_flushes_ago = Utc::now().checked_sub_signed(flush_interval * 2).unwrap();
     let ttl = Duration::seconds(tracker.config.active_peer_ttl.try_into().unwrap());
     let active_cutoff = Utc::now().checked_sub_signed(ttl).unwrap();
     let ttl = Duration::seconds(tracker.config.inactive_peer_ttl.try_into().unwrap());
@@ -79,14 +74,14 @@ pub async fn reap(tracker: &Arc<Tracker>) {
             match peer.updated_at {
                 // If a peer is marked as inactive and it has not announced for
                 // more than inactive_peer_ttl, then it is permanently deleted.
-                updated_at if updated_at < inactive_cutoff && !peer.is_active => {
-                    if let Some(_) = torrent.peers.write().await.remove(index) {
-                        tracker.peer_deletions.write().await.upsert(
-                            torrent.id,
-                            peer.user_id,
-                            index.peer_id,
-                        );
-                    }
+                // It is also permanently deleted if it was updated less than
+                // two flushes ago and was marked as inactive (meaning the user
+                // send a `stopped` event).
+                updated_at
+                    if (updated_at < inactive_cutoff || two_flushes_ago < updated_at)
+                        && !peer.is_active =>
+                {
+                    torrent.peers.write().await.remove(index);
                 }
                 // Peers get marked as inactive if not announced for more than
                 // active_peer_ttl seconds. User peer count and torrent peer

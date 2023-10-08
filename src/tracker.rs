@@ -15,7 +15,7 @@ use sqlx::MySqlPool;
 use anyhow::{Context, Result};
 
 use crate::config;
-use crate::scheduler::{history_update, peer_deletion, peer_update, torrent_update, user_update};
+use crate::scheduler::{history_update, peer_update, torrent_update, user_update};
 use crate::stats::Stats;
 
 use dotenvy::dotenv;
@@ -30,7 +30,6 @@ pub struct Tracker {
     pub history_updates: RwLock<history_update::Queue>,
     pub infohash2id: RwLock<torrent::infohash2id::Map>,
     pub passkey2id: RwLock<user::passkey2id::Map>,
-    pub peer_deletions: RwLock<peer_deletion::Queue>,
     pub peer_updates: RwLock<peer_update::Queue>,
     pub personal_freeleeches: RwLock<personal_freeleech::Set>,
     pub pool: MySqlPool,
@@ -116,7 +115,6 @@ impl Tracker {
             history_updates: RwLock::new(history_update::Queue::new()),
             infohash2id: RwLock::new(infohash2id),
             passkey2id: RwLock::new(passkey2id),
-            peer_deletions: RwLock::new(peer_deletion::Queue::new()),
             peer_updates: RwLock::new(peer_update::Queue::new()),
             personal_freeleeches: RwLock::new(personal_freeleeches),
             pool,

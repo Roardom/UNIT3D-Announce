@@ -339,31 +339,10 @@ pub async fn announce(
                     torrent.times_completed,
                 );
             }
-            // Schedule a peer deletion in the mysql db
-            tracker
-                .peer_deletions
-                .write()
-                .await
-                .upsert(torrent.id, user.id, queries.peer_id);
         } else {
             return Err(StoppedPeerDoesntExist);
         }
     } else {
-        // Schedule a peer update in the mysql db
-        tracker.peer_updates.write().await.upsert(
-            queries.peer_id,
-            client_ip,
-            queries.port,
-            CompactString::from(user_agent),
-            queries.uploaded,
-            queries.downloaded,
-            queries.event != Event::Stopped,
-            queries.left == 0,
-            queries.left,
-            torrent.id,
-            user.id,
-        );
-
         // Insert the peer into the in-memory db
         let old_peer = torrent.peers.write().await.insert(
             tracker::peer::Index {
@@ -495,6 +474,20 @@ pub async fn announce(
     } else {
         None
     };
+
+    tracker.peer_updates.write().await.upsert(
+        queries.peer_id,
+        client_ip,
+        queries.port,
+        CompactString::from(user_agent),
+        queries.uploaded,
+        queries.downloaded,
+        queries.event != Event::Stopped,
+        queries.left == 0,
+        queries.left,
+        torrent.id,
+        user.id,
+    );
 
     tracker.history_updates.write().await.upsert(
         user.id,

@@ -92,7 +92,6 @@ async fn main() -> Result<()> {
     while flushes < max_flushes
         && (tracker_clone2.history_updates.read().await.len() > 0
             || tracker_clone2.peer_updates.read().await.len() > 0
-            || tracker_clone2.peer_deletions.read().await.len() > 0
             || tracker_clone2.torrent_updates.read().await.len() > 0
             || tracker_clone2.user_updates.read().await.len() > 0)
     {
