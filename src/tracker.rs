@@ -48,9 +48,15 @@ impl Tracker {
     pub async fn default() -> Result<Arc<Tracker>> {
         println!(".env file: verifying file exists...");
         dotenv().context(".env file not found.")?;
+        println!("\x1B[1F\x1B[2KFound .env file");
+
+        println!("Loading from database into memory: config...");
+        let config = config::Config::from_env()?;
+        println!("\x1B[1F\x1B[2KLoaded config parameters");
 
         println!("Connecting to database...");
         let pool = connect_to_database().await;
+        println!("\x1B[1F\x1B[2KConnected to database");
 
         println!("Loading from database into memory: blacklisted ports...");
         let port_blacklist = blacklisted_port::Set::default();
@@ -65,10 +71,6 @@ impl Tracker {
             "\x1B[1F\x1B[2KLoaded {:?} blacklisted agents",
             agent_blacklist.len()
         );
-
-        println!("Loading from database into memory: config...");
-        let config = config::Config::from_env()?;
-        println!("\x1B[1F\x1B[2KLoaded Config");
 
         println!("Loading from database into memory: torrents...");
         let torrents = torrent::Map::from_db(&pool).await?;
