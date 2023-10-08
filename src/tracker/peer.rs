@@ -37,7 +37,6 @@ impl Map {
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Map> {
-        // TODO: is_active still isn't handled by unit3d
         let peers: Vec<(Index, Peer)> = sqlx::query!(
             r#"
                 SELECT
@@ -46,7 +45,7 @@ impl Map {
                     peers.torrent_id as `torrent_id: u32`,
                     peers.port as `port: u16`,
                     peers.seeder as `is_seeder: bool`,
-                    1 as `is_active: bool`,
+                    peers.active as `is_active: bool`,
                     peers.updated_at as `updated_at: DateTime<Utc>`,
                     peers.uploaded as `uploaded: u64`,
                     peers.downloaded as `downloaded: u64`,
