@@ -54,50 +54,77 @@ impl Tracker {
         let pool = connect_to_database().await;
 
         println!("Loading from database into memory: blacklisted ports...");
-        let port_blacklist = RwLock::new(blacklisted_port::Set::default());
+        let port_blacklist = blacklisted_port::Set::default();
+        println!(
+            "\x1B[1F\x1B[2KLoaded {:?} blacklisted ports",
+            port_blacklist.len()
+        );
 
         println!("Loading from database into memory: blacklisted user agents...");
-        let agent_blacklist = RwLock::new(blacklisted_agent::Set::from_db(&pool).await?);
+        let agent_blacklist = blacklisted_agent::Set::from_db(&pool).await?;
+        println!(
+            "\x1B[1F\x1B[2KLoaded {:?} blacklisted agents",
+            agent_blacklist.len()
+        );
 
         println!("Loading from database into memory: config...");
         let config = config::Config::from_env()?;
+        println!("\x1B[1F\x1B[2KLoaded Config");
 
         println!("Loading from database into memory: torrents...");
-        let torrents = RwLock::new(torrent::Map::from_db(&pool).await?);
+        let torrents = torrent::Map::from_db(&pool).await?;
+        println!("\x1B[1F\x1B[2KLoaded {:?} torrents", torrents.len());
 
         println!("Loading from database into memory: infohash to torrent id mapping...");
-        let infohash2id = RwLock::new(torrent::infohash2id::Map::from_db(&pool).await?);
+        let infohash2id = torrent::infohash2id::Map::from_db(&pool).await?;
+        println!(
+            "\x1B[1F\x1B[2KLoaded {:?} torrent infohash to id mappings",
+            infohash2id.len()
+        );
 
         println!("Loading from database into memory: users...");
-        let users = RwLock::new(user::Map::from_db(&pool).await?);
+        let users = user::Map::from_db(&pool).await?;
+        println!("\x1B[1F\x1B[2KLoaded {:?} users", users.len());
 
         println!("Loading from database into memory: passkey to user id mapping...");
-        let passkey2id = RwLock::new(user::passkey2id::Map::from_db(&pool).await?);
+        let passkey2id = user::passkey2id::Map::from_db(&pool).await?;
+        println!(
+            "\x1B[1F\x1B[2KLoaded {:?} user passkey to id mappings",
+            passkey2id.len()
+        );
 
         println!("Loading from database into memory: freeleech tokens...");
-        let freeleech_tokens = RwLock::new(freeleech_token::Set::from_db(&pool).await?);
+        let freeleech_tokens = freeleech_token::Set::from_db(&pool).await?;
+        println!(
+            "\x1B[1F\x1B[2KLoaded {:?} freeleech tokens",
+            freeleech_tokens.len()
+        );
 
         println!("Loading from database into memory: personal freeleeches...");
-        let personal_freeleeches = RwLock::new(personal_freeleech::Set::from_db(&pool).await?);
+        let personal_freeleeches = personal_freeleech::Set::from_db(&pool).await?;
+        println!(
+            "\x1B[1F\x1B[2KLoaded {:?} personal freeleeches",
+            personal_freeleeches.len()
+        );
 
         let stats = Stats::default();
 
         Ok(Arc::new(Tracker {
-            agent_blacklist,
+            agent_blacklist: RwLock::new(agent_blacklist),
             config,
-            freeleech_tokens,
+            freeleech_tokens: RwLock::new(freeleech_tokens),
             history_updates: RwLock::new(history_update::Queue::new()),
-            infohash2id,
-            passkey2id,
+            infohash2id: RwLock::new(infohash2id),
+            passkey2id: RwLock::new(passkey2id),
             peer_deletions: RwLock::new(peer_deletion::Queue::new()),
             peer_updates: RwLock::new(peer_update::Queue::new()),
-            personal_freeleeches,
+            personal_freeleeches: RwLock::new(personal_freeleeches),
             pool,
-            port_blacklist,
+            port_blacklist: RwLock::new(port_blacklist),
             stats,
-            torrents,
+            torrents: RwLock::new(torrents),
             torrent_updates: RwLock::new(torrent_update::Queue::new()),
-            users,
+            users: RwLock::new(users),
             user_updates: RwLock::new(user_update::Queue::new()),
         }))
     }
