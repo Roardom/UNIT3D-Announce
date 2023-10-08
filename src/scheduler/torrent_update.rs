@@ -70,7 +70,6 @@ impl Queue {
                         seeders,
                         leechers,
                         times_completed,
-                        announce,
                         user_id,
                         created_at,
                         updated_at,
@@ -93,7 +92,6 @@ impl Queue {
                     .push_bind(torrent_update.seeders)
                     .push_bind(torrent_update.leechers)
                     .push_bind(torrent_update.times_completed)
-                    .push_bind("")
                     .push_bind(1)
                     .push_bind(now)
                     .push_bind(now)
