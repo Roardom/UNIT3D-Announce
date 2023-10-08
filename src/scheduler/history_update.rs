@@ -163,7 +163,7 @@ impl Queue {
             .push_bind(seedtime_ttl)
             .push(
                 r#"
-                                                                SECOND) > VALUES(updated_at) AND seeder = 1 AND VALUES(seeder) = 1,
+                                                                SECOND) > VALUES(updated_at) AND seeder = 1 AND active = 1 AND VALUES(seeder) = 1,
                             seedtime + TIMESTAMPDIFF(second, updated_at, VALUES(updated_at)),
                             seedtime
                         ),
