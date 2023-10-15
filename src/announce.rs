@@ -613,11 +613,13 @@ pub async fn announce(
         completed_at,
     );
 
-    tracker.user_updates.write().await.upsert(
-        user_id,
-        credited_uploaded_delta,
-        credited_downloaded_delta,
-    );
+    if credited_uploaded_delta != 0 || credited_downloaded_delta != 0 {
+        tracker.user_updates.write().await.upsert(
+            user_id,
+            credited_uploaded_delta,
+            credited_downloaded_delta,
+        );
+    }
 
     if seeder_delta != 0 || leecher_delta != 0 || times_completed_delta != 0 {
         tracker.torrent_updates.write().await.upsert(
