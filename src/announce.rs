@@ -289,13 +289,15 @@ pub async fn announce(
     }
 
     // Validate torrent
-    let torrent_guard = tracker.infohash2id.read().await;
-    let torrent_id = torrent_guard
+    let torrent_id = tracker
+        .infohash2id
+        .read()
+        .await
         .get(&queries.info_hash)
         .ok_or(InfoHashNotFound)?
-        .to_owned();
+        .clone();
     let mut torrent_guard = tracker.torrents.write().await;
-    let mut torrent = torrent_guard.get_mut(&torrent_id).ok_or(TorrentNotFound)?;
+    let torrent = torrent_guard.get_mut(&torrent_id).ok_or(TorrentNotFound)?;
 
     if torrent.is_deleted {
         return Err(TorrentIsDeleted);
@@ -326,7 +328,7 @@ pub async fn announce(
     if queries.event == Event::Stopped {
         // Try and remove the peer
         let removed_peer = torrent.peers.remove(&tracker::peer::Index {
-            user_id: user_id,
+            user_id,
             peer_id: queries.peer_id,
         });
         // Check if peer was removed
@@ -357,13 +359,13 @@ pub async fn announce(
         // Insert the peer into the in-memory db
         let old_peer = torrent.peers.insert(
             tracker::peer::Index {
-                user_id: user_id,
+                user_id,
                 peer_id: queries.peer_id,
             },
             tracker::Peer {
                 ip_address: client_ip,
-                user_id: user_id,
-                torrent_id: torrent.id,
+                user_id,
+                torrent_id,
                 port: queries.port,
                 is_seeder: queries.left == 0,
                 is_active: true,
@@ -539,6 +541,9 @@ pub async fn announce(
         std::cmp::min(user.download_factor, torrent.download_factor),
     );
 
+    // Has to be dropped before any `await` calls.
+    drop(torrent_guard);
+
     let download_factor = if tracker
         .personal_freeleeches
         .read()
@@ -550,7 +555,7 @@ pub async fn announce(
             .await
             .contains(&FreeleechToken {
                 user_id,
-                torrent_id: torrent.id,
+                torrent_id,
             }) {
         0
     } else {
@@ -588,13 +593,13 @@ pub async fn announce(
         queries.event != Event::Stopped,
         queries.left == 0,
         queries.left,
-        torrent.id,
+        torrent_id,
         user_id,
     );
 
     tracker.history_updates.write().await.upsert(
         user_id,
-        torrent.id,
+        torrent_id,
         CompactString::from(user_agent),
         credited_uploaded_delta,
         uploaded_delta,
