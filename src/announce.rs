@@ -511,7 +511,7 @@ pub async fn announce(
         credited_downloaded_delta,
     );
 
-    let mut peer_list: Vec<(&peer::Index, &Peer)> = Vec::new();
+    let mut peers: Vec<(&peer::Index, &Peer)> = Vec::new();
 
     // Don't return peers with the same user id or those that are marked as inactive
     let peers_guard = torrent.peers.read().await;
@@ -521,7 +521,7 @@ pub async fn announce(
 
     // Make sure leech peerlists are filled with seeds
     if queries.left > 0 && torrent.seeders > 0 {
-        peer_list.extend(
+        peers.extend(
             valid_peers
                 .clone()
                 .filter(|(_index, peer)| peer.is_seeder)
@@ -530,29 +530,29 @@ pub async fn announce(
     }
     // Otherwise only send leeches until the numwant is reached
     if torrent.leechers > 0 {
-        peer_list.extend(
+        peers.extend(
             valid_peers
                 .clone()
                 .filter(|(_index, peer)| !peer.is_seeder)
                 .choose_multiple(
                     &mut SmallRng::from_entropy(),
-                    queries.numwant.saturating_sub(peer_list.len()),
+                    queries.numwant.saturating_sub(peers.len()),
                 ),
         );
     }
 
-    let mut peers: Vec<u8> = vec![];
-    let mut peers6: Vec<u8> = vec![];
+    let mut peers_ipv4: Vec<u8> = vec![];
+    let mut peers_ipv6: Vec<u8> = vec![];
 
-    for (_index, peer) in peer_list.iter() {
+    for (_index, peer) in peers.iter() {
         match peer.ip_address {
             IpAddr::V4(ip) => {
-                peers.extend(&ip.octets());
-                peers.extend(&peer.port.to_be_bytes());
+                peers_ipv4.extend(&ip.octets());
+                peers_ipv4.extend(&peer.port.to_be_bytes());
             }
             IpAddr::V6(ip) => {
-                peers6.extend(&ip.octets());
-                peers6.extend(&peer.port.to_be_bytes());
+                peers_ipv6.extend(&ip.octets());
+                peers_ipv6.extend(&peer.port.to_be_bytes());
             }
         }
     }
@@ -573,15 +573,15 @@ pub async fn announce(
     response.extend(b"e12:min intervali");
     response.extend(tracker.config.announce_min.to_string().as_bytes());
     response.extend(b"e5:peers");
-    response.extend(peers.len().to_string().as_bytes());
+    response.extend(peers_ipv4.len().to_string().as_bytes());
     response.extend(b":");
-    response.extend(&peers);
+    response.extend(&peers_ipv4);
 
-    if !peers6.is_empty() {
+    if !peers_ipv6.is_empty() {
         response.extend(b"e6:peers6");
-        response.extend(peers6.len().to_string().as_bytes());
+        response.extend(peers_ipv6.len().to_string().as_bytes());
         response.extend(b":");
-        response.extend(peers6);
+        response.extend(peers_ipv6);
     }
 
     response.extend(b"e");
