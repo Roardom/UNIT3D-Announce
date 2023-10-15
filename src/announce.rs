@@ -454,7 +454,10 @@ pub async fn announce(
     let mut peers_ipv6: Vec<u8> = Vec::new();
 
     if queries.event != Event::Stopped && (torrent.leechers != 0 || queries.left != 0) {
-        let mut peers: Vec<(&peer::Index, &Peer)> = Vec::new();
+        let mut peers: Vec<(&peer::Index, &Peer)> = Vec::with_capacity(std::cmp::min(
+            queries.numwant,
+            torrent.seeders as usize + torrent.leechers as usize,
+        ));
 
         // Don't return peers with the same user id or those that are marked as inactive
         let valid_peers = torrent
