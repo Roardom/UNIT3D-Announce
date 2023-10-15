@@ -312,7 +312,7 @@ pub async fn announce(
 
     if queries.event == Event::Stopped {
         // Try and remove the peer
-        let removed_peer = torrent.peers.write().await.remove(&tracker::peer::Index {
+        let removed_peer = torrent.peers.remove(&tracker::peer::Index {
             user_id: user.id,
             peer_id: queries.peer_id,
         });
@@ -344,7 +344,7 @@ pub async fn announce(
         }
     } else {
         // Insert the peer into the in-memory db
-        let old_peer = torrent.peers.write().await.insert(
+        let old_peer = torrent.peers.insert(
             tracker::peer::Index {
                 user_id: user.id,
                 peer_id: queries.peer_id,
@@ -518,10 +518,10 @@ pub async fn announce(
 
     if queries.event != Event::Stopped && (torrent.leechers != 0 || queries.left != 0) {
         let mut peers: Vec<(&peer::Index, &Peer)> = Vec::new();
-        let peers_guard = torrent.peers.read().await;
 
         // Don't return peers with the same user id or those that are marked as inactive
-        let valid_peers = peers_guard
+        let valid_peers = torrent
+            .peers
             .iter()
             .filter(|(_index, peer)| peer.user_id != user.id && peer.is_active);
 

@@ -7,7 +7,6 @@ use axum::http::StatusCode;
 use indexmap::IndexMap;
 use serde::Deserialize;
 use sqlx::MySqlPool;
-use tokio::sync::RwLock;
 
 use crate::tracker::peer;
 
@@ -92,13 +91,13 @@ impl Map {
 
         torrents.iter().for_each(|torrent| {
             // Default values if torrent doesn't exist
-            let mut peer_map = peer::Map::new();
+            let mut peers = peer::Map::new();
             let mut seeders = 0;
             let mut leechers = 0;
 
             // Overwrite default values if peers exists
             if let Some(peer_group) = grouped_peers.get(&torrent.id) {
-                peer_map.extend(peer_group.peers.iter());
+                peers.extend(peer_group.peers.iter());
                 seeders = peer_group.num_seeders;
                 leechers = peer_group.num_leechers;
             }
@@ -115,7 +114,7 @@ impl Map {
                     download_factor: torrent.download_factor,
                     upload_factor: torrent.upload_factor,
                     is_deleted: torrent.is_deleted,
-                    peers: Arc::new(RwLock::new(peer_map)),
+                    peers,
                 },
             );
         });
@@ -200,12 +199,12 @@ pub struct DBImportTorrent {
     pub is_deleted: bool,
 }
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct Torrent {
     pub id: u32,
     pub status: Status,
     pub is_deleted: bool,
-    pub peers: Arc<RwLock<peer::Map>>,
+    pub peers: peer::Map,
     pub seeders: u32,
     pub leechers: u32,
     pub times_completed: u32,

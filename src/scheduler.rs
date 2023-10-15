@@ -66,47 +66,43 @@ pub async fn reap(tracker: &Arc<Tracker>) {
     let ttl = Duration::seconds(tracker.config.inactive_peer_ttl.try_into().unwrap());
     let inactive_cutoff = Utc::now().checked_sub_signed(ttl).unwrap();
 
-    for (_index, mut torrent) in tracker.torrents.write().await.iter_mut() {
+    for (_index, torrent) in tracker.torrents.write().await.iter_mut() {
         let mut num_inactivated_seeders: u32 = 0;
         let mut num_inactivated_leechers: u32 = 0;
 
-        for (index, mut peer) in torrent.peers.write().await.iter_mut() {
-            match peer.updated_at {
-                // If a peer is marked as inactive and it has not announced for
-                // more than inactive_peer_ttl, then it is permanently deleted.
-                // It is also permanently deleted if it was updated less than
-                // two flushes ago and was marked as inactive (meaning the user
-                // send a `stopped` event).
-                updated_at
-                    if (updated_at < inactive_cutoff || two_flushes_ago < updated_at)
-                        && !peer.is_active =>
-                {
-                    torrent.peers.write().await.remove(index);
+        // If a peer is marked as inactive and it has not announced for
+        // more than inactive_peer_ttl, then it is permanently deleted.
+        // It is also permanently deleted if it was updated less than
+        // two flushes ago and was marked as inactive (meaning the user
+        // send a `stopped` event).
+        torrent.peers.retain(|_index, peer| {
+            (inactive_cutoff <= peer.updated_at && peer.updated_at <= two_flushes_ago)
+                || peer.is_active
+        });
+
+        for (_index, peer) in torrent.peers.iter_mut() {
+            // Peers get marked as inactive if not announced for more than
+            // active_peer_ttl seconds. User peer count and torrent peer
+            // count are updated to reflect.
+            if peer.updated_at < active_cutoff && peer.is_active {
+                peer.is_active = false;
+                tracker
+                    .users
+                    .write()
+                    .await
+                    .entry(peer.user_id)
+                    .and_modify(|user| {
+                        if peer.is_seeder {
+                            user.num_seeding = user.num_seeding.saturating_sub(1);
+                        } else {
+                            user.num_leeching = user.num_leeching.saturating_sub(1);
+                        }
+                    });
+                match peer.is_seeder {
+                    true => num_inactivated_seeders += 1,
+                    false => num_inactivated_leechers += 1,
                 }
-                // Peers get marked as inactive if not announced for more than
-                // active_peer_ttl seconds. User peer count and torrent peer
-                // count are updated to reflect.
-                updated_at if updated_at < active_cutoff && peer.is_active => {
-                    peer.is_active = false;
-                    tracker
-                        .users
-                        .write()
-                        .await
-                        .entry(peer.user_id)
-                        .and_modify(|user| {
-                            if peer.is_seeder {
-                                user.num_seeding = user.num_seeding.saturating_sub(1);
-                            } else {
-                                user.num_leeching = user.num_leeching.saturating_sub(1);
-                            }
-                        });
-                    match peer.is_seeder {
-                        true => num_inactivated_seeders += 1,
-                        false => num_inactivated_leechers += 1,
-                    }
-                }
-                _ => (),
-            };
+            }
         }
 
         // Update peer count of torrents and users
