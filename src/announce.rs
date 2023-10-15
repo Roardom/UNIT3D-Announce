@@ -511,51 +511,59 @@ pub async fn announce(
         credited_downloaded_delta,
     );
 
-    let mut peers: Vec<(&peer::Index, &Peer)> = Vec::new();
+    // Generate peer lists to return to client
 
-    // Don't return peers with the same user id or those that are marked as inactive
-    let peers_guard = torrent.peers.read().await;
-    let valid_peers = peers_guard
-        .iter()
-        .filter(|(_index, peer)| peer.user_id != user.id && peer.is_active);
+    let mut peers_ipv4: Vec<u8> = Vec::new();
+    let mut peers_ipv6: Vec<u8> = Vec::new();
 
-    // Make sure leech peerlists are filled with seeds
-    if queries.left > 0 && torrent.seeders > 0 {
-        peers.extend(
-            valid_peers
-                .clone()
-                .filter(|(_index, peer)| peer.is_seeder)
-                .choose_multiple(&mut SmallRng::from_entropy(), queries.numwant),
-        );
-    }
-    // Otherwise only send leeches until the numwant is reached
-    if torrent.leechers > 0 {
-        peers.extend(
-            valid_peers
-                .clone()
-                .filter(|(_index, peer)| !peer.is_seeder)
-                .choose_multiple(
-                    &mut SmallRng::from_entropy(),
-                    queries.numwant.saturating_sub(peers.len()),
-                ),
-        );
-    }
+    if queries.event != Event::Stopped && (torrent.leechers != 0 || queries.left != 0) {
+        let mut peers: Vec<(&peer::Index, &Peer)> = Vec::new();
+        let peers_guard = torrent.peers.read().await;
 
-    let mut peers_ipv4: Vec<u8> = vec![];
-    let mut peers_ipv6: Vec<u8> = vec![];
+        // Don't return peers with the same user id or those that are marked as inactive
+        let valid_peers = peers_guard
+            .iter()
+            .filter(|(_index, peer)| peer.user_id != user.id && peer.is_active);
 
-    for (_index, peer) in peers.iter() {
-        match peer.ip_address {
-            IpAddr::V4(ip) => {
-                peers_ipv4.extend(&ip.octets());
-                peers_ipv4.extend(&peer.port.to_be_bytes());
-            }
-            IpAddr::V6(ip) => {
-                peers_ipv6.extend(&ip.octets());
-                peers_ipv6.extend(&peer.port.to_be_bytes());
+        // Make sure leech peer lists are filled with seeds
+        if queries.left > 0 && torrent.seeders > 0 && queries.numwant > peers.len() {
+            peers.extend(
+                valid_peers
+                    .clone()
+                    .filter(|(_index, peer)| peer.is_seeder)
+                    .choose_multiple(&mut SmallRng::from_entropy(), queries.numwant),
+            );
+        }
+
+        // Otherwise only send leeches until the numwant is reached
+        if torrent.leechers > 0 && queries.numwant > peers.len() {
+            peers.extend(
+                valid_peers
+                    .filter(|(_index, peer)| !peer.is_seeder)
+                    .choose_multiple(
+                        &mut SmallRng::from_entropy(),
+                        queries.numwant.saturating_sub(peers.len()),
+                    ),
+            );
+        }
+
+        // Split peers into ipv4 and ipv6 variants and serialize their socket
+        // to bytes according to the bittorrent spec
+        for (_index, peer) in peers.iter() {
+            match peer.ip_address {
+                IpAddr::V4(ip) => {
+                    peers_ipv4.extend(&ip.octets());
+                    peers_ipv4.extend(&peer.port.to_be_bytes());
+                }
+                IpAddr::V6(ip) => {
+                    peers_ipv6.extend(&ip.octets());
+                    peers_ipv6.extend(&peer.port.to_be_bytes());
+                }
             }
         }
     }
+
+    // Generate bencoded response to return to client
 
     let interval = SmallRng::from_entropy()
         .gen_range(tracker.config.announce_min..=tracker.config.announce_max);
