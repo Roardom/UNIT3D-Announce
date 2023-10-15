@@ -257,6 +257,14 @@ pub async fn announce(
         return Err(NotAClient);
     }
 
+    // Validate port
+    // Some clients send port 0 on the stopped event
+    if tracker.port_blacklist.read().await.contains(&queries.port)
+        && queries.event != Event::Stopped
+    {
+        return Err(BlacklistedPort);
+    }
+
     let passkey: Passkey = Passkey::from_str(&passkey).or(Err(InvalidPasskey))?;
 
     // Validate passkey
@@ -268,14 +276,6 @@ pub async fn announce(
     // Validate user
     if !user.can_download && queries.left != 0 {
         return Err(DownloadPrivilegesRevoked);
-    }
-
-    // Validate port
-    // Some clients send port 0 on the stopped event
-    if tracker.port_blacklist.read().await.contains(&queries.port)
-        && queries.event != Event::Stopped
-    {
-        return Err(BlacklistedPort);
     }
 
     // Validate torrent
