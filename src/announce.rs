@@ -443,41 +443,6 @@ pub async fn announce(
         }
     }
 
-    let download_factor = if tracker
-        .personal_freeleeches
-        .read()
-        .await
-        .contains(&PersonalFreeleech { user_id })
-        || tracker
-            .freeleech_tokens
-            .read()
-            .await
-            .contains(&FreeleechToken {
-                user_id,
-                torrent_id: torrent.id,
-            }) {
-        0
-    } else {
-        std::cmp::min(
-            tracker.config.download_factor,
-            std::cmp::min(user.download_factor, torrent.download_factor),
-        )
-    };
-
-    let upload_factor = std::cmp::max(
-        tracker.config.upload_factor,
-        std::cmp::max(user.upload_factor, torrent.upload_factor),
-    );
-
-    let credited_uploaded_delta = upload_factor as u64 * uploaded_delta / 100;
-    let credited_downloaded_delta = download_factor as u64 * downloaded_delta / 100;
-
-    let completed_at = if queries.event == Event::Completed {
-        Some(Utc::now())
-    } else {
-        None
-    };
-
     torrent.seeders = torrent.seeders.saturating_add_signed(seeder_delta);
     torrent.leechers = torrent.leechers.saturating_add_signed(leecher_delta);
 
@@ -563,6 +528,43 @@ pub async fn announce(
     }
 
     response.extend(b"e");
+
+    let upload_factor = std::cmp::max(
+        tracker.config.upload_factor,
+        std::cmp::max(user.upload_factor, torrent.upload_factor),
+    );
+
+    let download_factor = std::cmp::min(
+        tracker.config.download_factor,
+        std::cmp::min(user.download_factor, torrent.download_factor),
+    );
+
+    let download_factor = if tracker
+        .personal_freeleeches
+        .read()
+        .await
+        .contains(&PersonalFreeleech { user_id })
+        || tracker
+            .freeleech_tokens
+            .read()
+            .await
+            .contains(&FreeleechToken {
+                user_id,
+                torrent_id: torrent.id,
+            }) {
+        0
+    } else {
+        download_factor
+    };
+
+    let credited_uploaded_delta = upload_factor as u64 * uploaded_delta / 100;
+    let credited_downloaded_delta = download_factor as u64 * downloaded_delta / 100;
+
+    let completed_at = if queries.event == Event::Completed {
+        Some(Utc::now())
+    } else {
+        None
+    };
 
     if seeder_delta != 0 || leecher_delta != 0 {
         tracker
