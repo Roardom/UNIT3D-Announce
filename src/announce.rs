@@ -471,63 +471,6 @@ pub async fn announce(
     torrent.seeders = torrent.seeders.saturating_add_signed(seeder_delta);
     torrent.leechers = torrent.leechers.saturating_add_signed(leecher_delta);
 
-    if seeder_delta != 0 || leecher_delta != 0 {
-        tracker
-            .users
-            .write()
-            .await
-            .entry(user.id)
-            .and_modify(|user| {
-                user.num_seeding = user.num_seeding.saturating_add_signed(seeder_delta);
-                user.num_leeching = user.num_leeching.saturating_add_signed(leecher_delta);
-            });
-    }
-
-    tracker.peer_updates.write().await.upsert(
-        queries.peer_id,
-        client_ip,
-        queries.port,
-        CompactString::from(user_agent),
-        queries.uploaded,
-        queries.downloaded,
-        queries.event != Event::Stopped,
-        queries.left == 0,
-        queries.left,
-        torrent.id,
-        user.id,
-    );
-
-    tracker.history_updates.write().await.upsert(
-        user.id,
-        torrent.id,
-        CompactString::from(user_agent),
-        credited_uploaded_delta,
-        uploaded_delta,
-        queries.uploaded,
-        credited_downloaded_delta,
-        downloaded_delta,
-        queries.downloaded,
-        queries.left == 0,
-        queries.event != Event::Stopped,
-        user.is_immune,
-        completed_at,
-    );
-
-    tracker.user_updates.write().await.upsert(
-        user.id,
-        credited_uploaded_delta,
-        credited_downloaded_delta,
-    );
-
-    if seeder_delta != 0 || leecher_delta != 0 || times_completed_delta != 0 {
-        tracker.torrent_updates.write().await.upsert(
-            torrent_id,
-            seeder_delta,
-            leecher_delta,
-            times_completed_delta,
-        );
-    }
-
     // Generate peer lists to return to client
 
     let mut peers_ipv4: Vec<u8> = Vec::new();
@@ -610,6 +553,63 @@ pub async fn announce(
     }
 
     response.extend(b"e");
+
+    if seeder_delta != 0 || leecher_delta != 0 {
+        tracker
+            .users
+            .write()
+            .await
+            .entry(user.id)
+            .and_modify(|user| {
+                user.num_seeding = user.num_seeding.saturating_add_signed(seeder_delta);
+                user.num_leeching = user.num_leeching.saturating_add_signed(leecher_delta);
+            });
+    }
+
+    tracker.peer_updates.write().await.upsert(
+        queries.peer_id,
+        client_ip,
+        queries.port,
+        CompactString::from(user_agent),
+        queries.uploaded,
+        queries.downloaded,
+        queries.event != Event::Stopped,
+        queries.left == 0,
+        queries.left,
+        torrent.id,
+        user.id,
+    );
+
+    tracker.history_updates.write().await.upsert(
+        user.id,
+        torrent.id,
+        CompactString::from(user_agent),
+        credited_uploaded_delta,
+        uploaded_delta,
+        queries.uploaded,
+        credited_downloaded_delta,
+        downloaded_delta,
+        queries.downloaded,
+        queries.left == 0,
+        queries.event != Event::Stopped,
+        user.is_immune,
+        completed_at,
+    );
+
+    tracker.user_updates.write().await.upsert(
+        user.id,
+        credited_uploaded_delta,
+        credited_downloaded_delta,
+    );
+
+    if seeder_delta != 0 || leecher_delta != 0 || times_completed_delta != 0 {
+        tracker.torrent_updates.write().await.upsert(
+            torrent_id,
+            seeder_delta,
+            leecher_delta,
+            times_completed_delta,
+        );
+    }
 
     Ok(response)
 }
