@@ -16,9 +16,9 @@ pub struct Index {
 
 pub struct TorrentUpdate {
     pub torrent_id: u32,
-    pub seeders: u32,
-    pub leechers: u32,
-    pub times_completed: u32,
+    pub seeder_delta: i32,
+    pub leecher_delta: i32,
+    pub times_completed_delta: u32,
 }
 
 impl Queue {
@@ -26,16 +26,29 @@ impl Queue {
         Queue(IndexMap::new())
     }
 
-    pub fn upsert(&mut self, torrent_id: u32, seeders: u32, leechers: u32, times_completed: u32) {
-        self.insert(
-            Index { torrent_id },
-            TorrentUpdate {
+    pub fn upsert(
+        &mut self,
+        torrent_id: u32,
+        seeder_delta: i32,
+        leecher_delta: i32,
+        times_completed_delta: u32,
+    ) {
+        self.entry(Index { torrent_id })
+            .and_modify(|torrent_update| {
+                torrent_update.seeder_delta =
+                    torrent_update.seeder_delta.saturating_add(seeder_delta);
+                torrent_update.leecher_delta =
+                    torrent_update.leecher_delta.saturating_add(leecher_delta);
+                torrent_update.times_completed_delta = torrent_update
+                    .times_completed_delta
+                    .saturating_add(times_completed_delta);
+            })
+            .or_insert(TorrentUpdate {
                 torrent_id,
-                seeders,
-                leechers,
-                times_completed,
-            },
-        );
+                seeder_delta,
+                leecher_delta,
+                times_completed_delta,
+            });
     }
 
     /// Flushes torrent updates to the mysql db
@@ -89,9 +102,9 @@ impl Queue {
                     .push_bind("")
                     .push_bind(0)
                     .push_bind(0)
-                    .push_bind(torrent_update.seeders)
-                    .push_bind(torrent_update.leechers)
-                    .push_bind(torrent_update.times_completed)
+                    .push_bind(torrent_update.seeder_delta)
+                    .push_bind(torrent_update.leecher_delta)
+                    .push_bind(torrent_update.times_completed_delta)
                     .push_bind(1)
                     .push_bind(now)
                     .push_bind(now)
@@ -102,9 +115,9 @@ impl Queue {
             .push(
                 r#"
                     ON DUPLICATE KEY UPDATE
-                        seeders = VALUES(seeders),
-                        leechers = VALUES(leechers),
-                        times_completed = VALUES(times_completed),
+                        seeders = seeders + VALUES(seeders),
+                        leechers = leechers + VALUES(leechers),
+                        times_completed = times_completed + VALUES(times_completed),
                         updated_at = VALUES(updated_at)
                 "#,
             );
@@ -124,9 +137,9 @@ impl Queue {
                 for (_index, torrent_update) in torrent_updates.iter() {
                     self.upsert(
                         torrent_update.torrent_id,
-                        torrent_update.seeders,
-                        torrent_update.leechers,
-                        torrent_update.times_completed,
+                        torrent_update.seeder_delta,
+                        torrent_update.leecher_delta,
+                        torrent_update.times_completed_delta,
                     );
                 }
             }

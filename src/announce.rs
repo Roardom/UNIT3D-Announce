@@ -309,6 +309,9 @@ pub async fn announce(
     // Change of upload/download compared to previous announce
     let uploaded_delta;
     let downloaded_delta;
+    let seeder_delta;
+    let leecher_delta;
+    let times_completed_delta;
 
     if queries.event == Event::Stopped {
         // Try and remove the peer
@@ -325,23 +328,21 @@ pub async fn announce(
 
             if peer.is_active {
                 if peer.is_seeder {
-                    user.num_seeding = user.num_seeding.saturating_sub(1);
-                    torrent.seeders = torrent.seeders.saturating_sub(1);
+                    seeder_delta = -1;
+                    leecher_delta = 0;
                 } else {
-                    user.num_leeching = user.num_leeching.saturating_sub(1);
-                    torrent.leechers = torrent.leechers.saturating_sub(1);
+                    seeder_delta = 0;
+                    leecher_delta = -1;
                 }
-                // Schedule a torrent update in the mysql db
-                tracker.torrent_updates.write().await.upsert(
-                    torrent.id,
-                    torrent.seeders,
-                    torrent.leechers,
-                    torrent.times_completed,
-                );
+            } else {
+                seeder_delta = 0;
+                leecher_delta = 0;
             }
         } else {
             return Err(StoppedPeerDoesntExist);
         }
+
+        times_completed_delta = 0;
     } else {
         // Insert the peer into the in-memory db
         let old_peer = torrent.peers.insert(
@@ -364,44 +365,44 @@ pub async fn announce(
 
         // Update the user and torrent seeding/leeching counts in the
         // in-memory db
-        let update_peer_counts: bool;
         match old_peer {
             Some(old_peer) => {
                 if queries.left == 0 && !old_peer.is_seeder {
                     // leech has turned into a seed
-                    user.num_seeding += 1;
-                    torrent.seeders += 1;
-                    torrent.times_completed += 1;
+                    seeder_delta = 1;
+                    times_completed_delta = 1;
 
                     if old_peer.is_active {
-                        user.num_leeching = user.num_leeching.saturating_sub(1);
-                        torrent.leechers = torrent.leechers.saturating_sub(1);
+                        leecher_delta = -1;
+                    } else {
+                        leecher_delta = 0;
                     }
-                    update_peer_counts = true;
                 } else if queries.left > 0 && old_peer.is_seeder {
                     // seed has turned into a leech
-                    user.num_leeching += 1;
-                    torrent.leechers += 1;
+                    leecher_delta = 1;
+                    times_completed_delta = 0;
 
                     if old_peer.is_active {
-                        user.num_seeding = user.num_seeding.saturating_sub(1);
-                        torrent.seeders = torrent.seeders.saturating_sub(1);
-                    }
-                    update_peer_counts = true;
-                } else {
-                    if old_peer.is_active {
-                        update_peer_counts = false;
+                        seeder_delta = -1;
                     } else {
-                        update_peer_counts = true;
+                        seeder_delta = 0;
+                    }
+                } else {
+                    times_completed_delta = 0;
+
+                    if !old_peer.is_active {
                         if queries.left == 0 {
                             // seeder is reactivated
-                            user.num_seeding += 1;
-                            torrent.seeders += 1;
+                            seeder_delta = 1;
+                            leecher_delta = 0;
                         } else {
                             // leecher is reactivated
-                            user.num_leeching += 1;
-                            torrent.leechers += 1;
+                            seeder_delta = 0;
+                            leecher_delta = 1;
                         }
+                    } else {
+                        seeder_delta = 0;
+                        leecher_delta = 0;
                     }
                 }
 
@@ -412,31 +413,23 @@ pub async fn announce(
             }
             None => {
                 // new peer is inserted
-                update_peer_counts = true;
                 if queries.left == 0 {
                     // new seeder is inserted
-                    user.num_seeding += 1;
-                    torrent.seeders += 1;
+                    leecher_delta = 0;
+                    seeder_delta = 1;
                 } else {
                     // new leecher is inserted
-                    user.num_leeching += 1;
-                    torrent.leechers += 1;
+                    seeder_delta = 0;
+                    leecher_delta = 1;
                 }
+
+                times_completed_delta = 0;
 
                 // Calculate change in upload and download compared to previous
                 // announce
                 uploaded_delta = queries.uploaded;
                 downloaded_delta = queries.downloaded;
             }
-        }
-        if update_peer_counts {
-            // Schedule a torrent update in the mysql db
-            tracker.torrent_updates.write().await.upsert(
-                torrent.id,
-                torrent.seeders,
-                torrent.leechers,
-                torrent.times_completed,
-            );
         }
     }
 
@@ -475,6 +468,21 @@ pub async fn announce(
         None
     };
 
+    torrent.seeders = torrent.seeders.saturating_add_signed(seeder_delta);
+    torrent.leechers = torrent.leechers.saturating_add_signed(leecher_delta);
+
+    if seeder_delta != 0 || leecher_delta != 0 {
+        tracker
+            .users
+            .write()
+            .await
+            .entry(user.id)
+            .and_modify(|user| {
+                user.num_seeding = user.num_seeding.saturating_add_signed(seeder_delta);
+                user.num_leeching = user.num_leeching.saturating_add_signed(leecher_delta);
+            });
+    }
+
     tracker.peer_updates.write().await.upsert(
         queries.peer_id,
         client_ip,
@@ -510,6 +518,15 @@ pub async fn announce(
         credited_uploaded_delta,
         credited_downloaded_delta,
     );
+
+    if seeder_delta != 0 || leecher_delta != 0 || times_completed_delta != 0 {
+        tracker.torrent_updates.write().await.upsert(
+            torrent_id,
+            seeder_delta,
+            leecher_delta,
+            times_completed_delta,
+        );
+    }
 
     // Generate peer lists to return to client
 

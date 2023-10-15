@@ -67,8 +67,8 @@ pub async fn reap(tracker: &Arc<Tracker>) {
     let inactive_cutoff = Utc::now().checked_sub_signed(ttl).unwrap();
 
     for (_index, torrent) in tracker.torrents.write().await.iter_mut() {
-        let mut num_inactivated_seeders: u32 = 0;
-        let mut num_inactivated_leechers: u32 = 0;
+        let mut seeder_delta: i32 = 0;
+        let mut leecher_delta: i32 = 0;
 
         // If a peer is marked as inactive and it has not announced for
         // more than inactive_peer_ttl, then it is permanently deleted.
@@ -99,21 +99,22 @@ pub async fn reap(tracker: &Arc<Tracker>) {
                         }
                     });
                 match peer.is_seeder {
-                    true => num_inactivated_seeders += 1,
-                    false => num_inactivated_leechers += 1,
+                    true => seeder_delta -= 1,
+                    false => leecher_delta -= 1,
                 }
             }
         }
 
         // Update peer count of torrents and users
-        if num_inactivated_seeders > 0 || num_inactivated_leechers > 0 {
-            torrent.seeders = torrent.seeders.saturating_sub(num_inactivated_seeders);
-            torrent.leechers = torrent.leechers.saturating_sub(num_inactivated_leechers);
+        if seeder_delta != 0 || leecher_delta != 0 {
+            torrent.seeders = torrent.seeders.saturating_add_signed(seeder_delta);
+            torrent.leechers = torrent.leechers.saturating_add_signed(leecher_delta);
+
             tracker.torrent_updates.write().await.upsert(
                 torrent.id,
-                torrent.seeders,
-                torrent.leechers,
-                torrent.times_completed,
+                seeder_delta,
+                leecher_delta,
+                0,
             );
         }
     }
