@@ -86,21 +86,62 @@ impl Queue {
         });
     }
 
+    /// Determine the max amount of history records that can be inserted at
+    /// once
+    const fn history_limit() -> usize {
+        /// Max amount of bindings in a mysql query
+        const BIND_LIMIT: usize = 65535;
+
+        /// Number of columns being updated in the history table
+        const HISTORY_COLUMN_COUNT: usize = 16;
+
+        /// 1 extra binding is used to insert the TTL
+        const EXTRA_BINDING_COUNT: usize = 1;
+
+        (BIND_LIMIT - EXTRA_BINDING_COUNT) / HISTORY_COLUMN_COUNT
+    }
+
+    /// Take a portion of the history updates small enough to be inserted into
+    /// the database.
+    pub fn take_batch(&mut self) -> Queue {
+        let len = self.len();
+
+        Queue(self.split_off(len - min(Queue::history_limit(), len)))
+    }
+
+    /// Merge a history update batch into this history update batch
+    pub fn upsert_batch(&mut self, batch: Queue) -> () {
+        for history_update in batch.values() {
+            self.upsert(
+                history_update.user_id,
+                history_update.torrent_id,
+                history_update.user_agent.to_owned(),
+                history_update.credited_uploaded_delta,
+                history_update.uploaded_delta,
+                history_update.uploaded,
+                history_update.credited_downloaded_delta,
+                history_update.downloaded_delta,
+                history_update.downloaded,
+                history_update.is_seeder,
+                history_update.is_active,
+                history_update.is_immune,
+                history_update.completed_at,
+            );
+        }
+    }
+
     /// Flushes history updates to the mysql db
-    pub async fn flush_to_db(&mut self, db: &MySqlPool, seedtime_ttl: u64) {
+    ///
+    /// **Warning**: this function does not make sure that the query isn't too long
+    /// or doesn't use too many bindings
+    pub async fn flush_to_db(&self, db: &MySqlPool, seedtime_ttl: u64) -> Result<u64, sqlx::Error> {
         let len = self.len();
 
         if len == 0 {
-            return;
+            return Ok(0);
         }
 
-        const BIND_LIMIT: usize = 65535;
-        const NUM_HISTORY_COLUMNS: usize = 16;
-        const HISTORY_LIMIT: usize = (BIND_LIMIT / NUM_HISTORY_COLUMNS) - 1;
-
         let now = Utc::now();
-
-        let history_updates = self.split_off(len - min(HISTORY_LIMIT, len));
 
         let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
             r#"INSERT INTO
@@ -128,7 +169,7 @@ impl Queue {
         // Mysql 8.0.20 deprecates use of VALUES() so will have to update it eventually to use aliases instead
         query_builder
             // .push_values(history_updates., |mut bind, (index, history_update)| {
-            .push_values(&history_updates, |mut bind, (_index, history_update)| {
+            .push_values(self.values(), |mut bind, history_update| {
                 bind.push_bind(history_update.user_id)
                     .push_bind(history_update.torrent_id)
                     .push_bind(history_update.user_agent.as_str())
@@ -182,30 +223,7 @@ impl Queue {
             .await
             .map(|result| result.rows_affected());
 
-        match result {
-            Ok(_) => (),
-            Err(e) => {
-                println!("History update failed: {}", e);
-
-                for (_index, history_update) in history_updates.iter() {
-                    self.upsert(
-                        history_update.user_id,
-                        history_update.torrent_id,
-                        history_update.user_agent.to_owned(),
-                        history_update.credited_uploaded_delta,
-                        history_update.uploaded_delta,
-                        history_update.uploaded,
-                        history_update.credited_downloaded_delta,
-                        history_update.downloaded_delta,
-                        history_update.downloaded,
-                        history_update.is_seeder,
-                        history_update.is_active,
-                        history_update.is_immune,
-                        history_update.completed_at,
-                    );
-                }
-            }
-        }
+        return result;
     }
 }
 

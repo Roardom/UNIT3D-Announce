@@ -28,15 +28,7 @@ pub async fn handle(tracker: &Arc<Tracker>) {
 
 /// Send queued updates to mysql database
 pub async fn flush(tracker: &Arc<Tracker>) {
-    tracker
-        .history_updates
-        .write()
-        .await
-        .flush_to_db(
-            &tracker.pool,
-            tracker.config.active_peer_ttl + tracker.config.peer_expiry_interval,
-        )
-        .await;
+    flush_history_updates(&tracker).await;
     tracker
         .peer_updates
         .write()
@@ -55,6 +47,29 @@ pub async fn flush(tracker: &Arc<Tracker>) {
         .await
         .flush_to_db(&tracker.pool)
         .await;
+}
+
+/// Send history updates to mysql database
+async fn flush_history_updates(tracker: &Arc<Tracker>) {
+    let history_update_batch = tracker.history_updates.write().await.take_batch();
+    let result = history_update_batch
+        .flush_to_db(
+            &tracker.pool,
+            tracker.config.active_peer_ttl + tracker.config.peer_expiry_interval,
+        )
+        .await;
+
+    match result {
+        Ok(_) => (),
+        Err(e) => {
+            println!("History update failed: {}", e);
+            tracker
+                .history_updates
+                .write()
+                .await
+                .upsert_batch(history_update_batch);
+        }
+    }
 }
 
 /// Remove peers that have not announced for some time
