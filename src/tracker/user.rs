@@ -32,34 +32,20 @@ impl Map {
             r#"
                 SELECT
                     users.id as `id: u32`,
+                    users.group_id as `group_id: i32`,
                     users.passkey as `passkey: Passkey`,
                     users.can_download as `can_download: bool`,
-                    groups.download_slots as `download_slots: u32`,
-                    groups.is_immune as `is_immune: bool`,
-                    CAST(COALESCE(SUM(peers.seeder = 1), 0) AS UNSIGNED) as `num_seeding: u32`,
-                    CAST(COALESCE(SUM(peers.seeder = 0), 0) AS UNSIGNED) as `num_leeching: u32`,
-                    IF(groups.is_freeleech, 0, 100) as `download_factor: u8`,
-                    IF(groups.is_double_upload, 200, 100) as `upload_factor: u8`
+                    CAST(COALESCE(SUM(peers.seeder = 1 AND peers.active = 1), 0) AS UNSIGNED) as `num_seeding: u32`,
+                    CAST(COALESCE(SUM(peers.seeder = 0 AND peers.active = 1), 0) AS UNSIGNED) as `num_leeching: u32`
                 FROM
                     users
-                INNER JOIN
-                    `groups`
-                ON
-                    users.group_id = `groups`.id
-                    AND groups.slug NOT IN ('banned', 'validating', 'disabled')
-                    AND users.deleted_at IS NULL
                 LEFT JOIN
                     peers
                 ON
                     users.id = peers.user_id
+                    AND users.deleted_at IS NULL
                 GROUP BY
-                    users.id,
-                    users.passkey,
-                    users.can_download,
-                    groups.download_slots,
-                    groups.is_immune,
-                    groups.is_freeleech,
-                    groups.is_double_upload
+                    users.id
             "#
         )
         .fetch_all(db)
@@ -78,6 +64,7 @@ impl Map {
         State(tracker): State<Arc<Tracker>>,
         Json(user): Json<APIInsertUser>,
     ) -> StatusCode {
+        println!("Received user: {}", user.id);
         if let Ok(passkey) = Passkey::from_str(&user.passkey) {
             println!("Inserting user with id {}.", user.id);
 
@@ -85,14 +72,11 @@ impl Map {
                 user.id,
                 User {
                     id: user.id,
+                    group_id: user.group_id,
                     passkey,
                     can_download: user.can_download,
-                    download_slots: user.download_slots,
-                    is_immune: user.is_immune,
                     num_seeding: user.num_seeding,
                     num_leeching: user.num_leeching,
-                    download_factor: user.download_factor,
-                    upload_factor: user.upload_factor,
                 },
             );
 
@@ -138,27 +122,21 @@ impl DerefMut for Map {
 #[derive(Clone, Deserialize, Hash)]
 pub struct User {
     pub id: u32,
+    pub group_id: i32,
     pub passkey: Passkey,
     pub can_download: bool,
-    pub download_slots: Option<u32>,
-    pub is_immune: bool,
     pub num_seeding: u32,
     pub num_leeching: u32,
-    pub download_factor: u8,
-    pub upload_factor: u8,
 }
 
 #[derive(Clone, Deserialize, Hash)]
 pub struct APIInsertUser {
     pub id: u32,
+    pub group_id: i32,
     pub passkey: String,
     pub can_download: bool,
-    pub download_slots: Option<u32>,
-    pub is_immune: bool,
     pub num_seeding: u32,
     pub num_leeching: u32,
-    pub download_factor: u8,
-    pub upload_factor: u8,
 }
 
 #[derive(Clone, Deserialize, Hash)]

@@ -19,13 +19,14 @@ use std::{
 
 use crate::error::AnnounceError::{
     self, AbnormalAccess, BlacklistedClient, BlacklistedPort, DownloadPrivilegesRevoked,
-    DownloadSlotLimitReached, InfoHashNotFound, InternalTrackerError, InvalidCompact,
-    InvalidDownloaded, InvalidInfoHash, InvalidLeft, InvalidNumwant, InvalidPasskey, InvalidPeerId,
-    InvalidPort, InvalidQueryStringKey, InvalidQueryStringValue, InvalidUploaded, InvalidUserAgent,
-    MissingDownloaded, MissingInfoHash, MissingLeft, MissingPeerId, MissingPort, MissingUploaded,
-    NotAClient, PasskeyNotFound, StoppedPeerDoesntExist, TorrentIsDeleted,
-    TorrentIsPendingModeration, TorrentIsPostponed, TorrentIsRejected, TorrentNotFound,
-    TorrentUnknownModerationStatus, UnsupportedEvent, UserAgentTooLong, UserNotFound,
+    DownloadSlotLimitReached, GroupBanned, GroupDisabled, GroupNotFound, GroupValidating,
+    InfoHashNotFound, InternalTrackerError, InvalidCompact, InvalidDownloaded, InvalidInfoHash,
+    InvalidLeft, InvalidNumwant, InvalidPasskey, InvalidPeerId, InvalidPort, InvalidQueryStringKey,
+    InvalidQueryStringValue, InvalidUploaded, InvalidUserAgent, MissingDownloaded, MissingInfoHash,
+    MissingLeft, MissingPeerId, MissingPort, MissingUploaded, NotAClient, PasskeyNotFound,
+    StoppedPeerDoesntExist, TorrentIsDeleted, TorrentIsPendingModeration, TorrentIsPostponed,
+    TorrentIsRejected, TorrentNotFound, TorrentUnknownModerationStatus, UnsupportedEvent,
+    UserAgentTooLong, UserNotFound,
 };
 
 use crate::tracker::{
@@ -309,8 +310,23 @@ pub async fn announce(
         _ => return Err(TorrentUnknownModerationStatus),
     }
 
+    let group = tracker
+        .groups
+        .read()
+        .await
+        .get(&user.group_id)
+        .ok_or(GroupNotFound)?
+        .clone();
+
+    match group.slug.as_str() {
+        "banned" => return Err(GroupBanned),
+        "validating" => return Err(GroupValidating),
+        "disabled" => return Err(GroupDisabled),
+        _ => (),
+    }
+
     // Make sure user isn't leeching more torrents than their group allows
-    if queries.left > 0 && matches!(user.download_slots, Some(slots) if slots <= user.num_leeching)
+    if queries.left > 0 && matches!(group.download_slots, Some(slots) if slots <= user.num_leeching)
     {
         return Err(DownloadSlotLimitReached);
     }
@@ -533,12 +549,12 @@ pub async fn announce(
 
     let upload_factor = std::cmp::max(
         tracker.config.upload_factor,
-        std::cmp::max(user.upload_factor, torrent.upload_factor),
+        std::cmp::max(group.upload_factor, torrent.upload_factor),
     );
 
     let download_factor = std::cmp::min(
         tracker.config.download_factor,
-        std::cmp::min(user.download_factor, torrent.download_factor),
+        std::cmp::min(group.download_factor, torrent.download_factor),
     );
 
     // Has to be dropped before any `await` calls.
@@ -609,7 +625,7 @@ pub async fn announce(
         queries.downloaded,
         queries.left == 0,
         queries.event != Event::Stopped,
-        user.is_immune,
+        group.is_immune,
         completed_at,
     );
 

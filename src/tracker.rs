@@ -1,6 +1,7 @@
 pub mod blacklisted_agent;
 pub mod blacklisted_port;
 pub mod freeleech_token;
+pub mod group;
 pub mod peer;
 pub mod personal_freeleech;
 pub mod torrent;
@@ -27,6 +28,7 @@ pub struct Tracker {
     pub agent_blacklist: RwLock<blacklisted_agent::Set>,
     pub config: config::Config,
     pub freeleech_tokens: RwLock<freeleech_token::Set>,
+    pub groups: RwLock<group::Map>,
     pub history_updates: RwLock<history_update::Queue>,
     pub infohash2id: RwLock<torrent::infohash2id::Map>,
     pub passkey2id: RwLock<user::passkey2id::Map>,
@@ -108,12 +110,17 @@ impl Tracker {
             personal_freeleeches.len()
         );
 
+        println!("Loading from database into memory: groups...");
+        let groups = group::Map::from_db(&pool).await?;
+        println!("\x1B[1F\x1B[2KLoaded {:?} groups", groups.len());
+
         let stats = Stats::default();
 
         Ok(Arc::new(Tracker {
             agent_blacklist: RwLock::new(agent_blacklist),
             config,
             freeleech_tokens: RwLock::new(freeleech_tokens),
+            groups: RwLock::new(groups),
             history_updates: RwLock::new(history_update::Queue::new()),
             infohash2id: RwLock::new(infohash2id),
             passkey2id: RwLock::new(passkey2id),

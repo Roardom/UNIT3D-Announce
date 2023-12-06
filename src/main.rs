@@ -55,6 +55,10 @@ async fn main() -> Result<()> {
                             put(tracker::user::Map::upsert).delete(tracker::user::Map::destroy),
                         )
                         .route(
+                            "/groups",
+                            put(tracker::group::Map::upsert).delete(tracker::group::Map::destroy),
+                        )
+                        .route(
                             "/blacklisted-agents",
                             put(tracker::blacklisted_agent::Set::upsert)
                                 .delete(tracker::blacklisted_agent::Set::destroy),

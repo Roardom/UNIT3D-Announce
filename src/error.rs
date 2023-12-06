@@ -81,6 +81,14 @@ pub enum AnnounceError {
     DownloadSlotLimitReached,
     #[error("Stopped peer doesn't exist.")]
     StoppedPeerDoesntExist,
+    #[error("Group not found.")]
+    GroupNotFound,
+    #[error("Your account is not enabled. (Current: Banned).")]
+    GroupBanned,
+    #[error("Your account is not enabled. (Current: Validating).")]
+    GroupValidating,
+    #[error("Your account is not enabled. (Current: Disabled).")]
+    GroupDisabled,
 }
 
 impl IntoResponse for AnnounceError {
