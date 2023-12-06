@@ -110,7 +110,7 @@ impl Queue {
     }
 
     /// Merge a history update batch into this history update batch
-    pub fn upsert_batch(&mut self, batch: Queue) -> () {
+    pub fn upsert_batch(&mut self, batch: Queue) {
         for history_update in batch.values() {
             self.upsert(
                 history_update.user_id,
@@ -216,14 +216,12 @@ impl Queue {
                 "#,
             );
 
-        let result = query_builder
+        query_builder
             .build()
             .persistent(false)
             .execute(db)
             .await
-            .map(|result| result.rows_affected());
-
-        return result;
+            .map(|result| result.rows_affected())
     }
 }
 

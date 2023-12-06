@@ -268,13 +268,12 @@ pub async fn announce(
     let passkey: Passkey = Passkey::from_str(&passkey).or(Err(InvalidPasskey))?;
 
     // Validate passkey
-    let user_id = tracker
+    let user_id = *tracker
         .passkey2id
         .read()
         .await
         .get(&passkey)
-        .ok_or(PasskeyNotFound)?
-        .clone();
+        .ok_or(PasskeyNotFound)?;
     let user = tracker
         .users
         .read()
@@ -289,13 +288,12 @@ pub async fn announce(
     }
 
     // Validate torrent
-    let torrent_id = tracker
+    let torrent_id = *tracker
         .infohash2id
         .read()
         .await
         .get(&queries.info_hash)
-        .ok_or(InfoHashNotFound)?
-        .clone();
+        .ok_or(InfoHashNotFound)?;
     let mut torrent_guard = tracker.torrents.write().await;
     let torrent = torrent_guard.get_mut(&torrent_id).ok_or(TorrentNotFound)?;
 

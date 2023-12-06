@@ -146,7 +146,7 @@ async fn connect_to_database() -> sqlx::Pool<sqlx::MySql> {
 
     // Configure connection options
     let options = if let Ok(socket) = socket {
-        MySqlConnectOptions::new().socket(&socket)
+        MySqlConnectOptions::new().socket(socket)
     } else {
         MySqlConnectOptions::new()
             .port(port)
@@ -159,13 +159,13 @@ async fn connect_to_database() -> sqlx::Pool<sqlx::MySql> {
     .collation("utf8mb4_unicode_ci");
 
     let options = if let Ok(ssl_ca) = ssl_ca {
-        options.ssl_ca(&ssl_ca)
+        options.ssl_ca(ssl_ca)
     } else {
         options
     };
 
     // Get pool of database connections.
-    let pool = MySqlPoolOptions::new()
+    MySqlPoolOptions::new()
         .min_connections(0)
         .max_connections(10)
         .max_lifetime(Duration::from_secs(30 * 60))
@@ -173,7 +173,5 @@ async fn connect_to_database() -> sqlx::Pool<sqlx::MySql> {
         .acquire_timeout(Duration::from_secs(30))
         .connect_with(options)
         .await
-        .expect("Could not connect to the database using the values in .env file. Aborting.");
-
-    pool
+        .expect("Could not connect to the database using the values in .env file. Aborting.")
 }

@@ -97,7 +97,7 @@ impl Queue {
     }
 
     /// Merge a peer update batch into this peer update batch
-    pub fn upsert_batch(&mut self, batch: Queue) -> () {
+    pub fn upsert_batch(&mut self, batch: Queue) {
         for peer_update in batch.values() {
             self.upsert(
                 peer_update.peer_id,
@@ -192,14 +192,12 @@ impl Queue {
             "#,
             );
 
-        let result = query_builder
+        query_builder
             .build()
             .persistent(false)
             .execute(db)
             .await
-            .map(|result| result.rows_affected());
-
-        return result;
+            .map(|result| result.rows_affected())
     }
 }
 

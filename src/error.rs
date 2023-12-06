@@ -90,7 +90,7 @@ impl IntoResponse for AnnounceError {
             format!(
                 "d14:failure reason{}:{}8:intervali5400e12:min intervali5400ee",
                 self.to_string().chars().count(),
-                self.to_string(),
+                self,
             ),
         )
             .into_response()

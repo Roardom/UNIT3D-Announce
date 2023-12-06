@@ -28,10 +28,10 @@ pub async fn handle(tracker: &Arc<Tracker>) {
 
 /// Send queued updates to mysql database
 pub async fn flush(tracker: &Arc<Tracker>) {
-    flush_history_updates(&tracker).await;
-    flush_peer_updates(&tracker).await;
-    flush_torrent_updates(&tracker).await;
-    flush_user_updates(&tracker).await;
+    flush_history_updates(tracker).await;
+    flush_peer_updates(tracker).await;
+    flush_torrent_updates(tracker).await;
+    flush_user_updates(tracker).await;
 }
 
 /// Send history updates to mysql database

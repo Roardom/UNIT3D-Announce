@@ -59,7 +59,7 @@ impl Queue {
     }
 
     /// Merge a torrent update batch into this torrent update batch
-    pub fn upsert_batch(&mut self, batch: Queue) -> () {
+    pub fn upsert_batch(&mut self, batch: Queue) {
         for user_update in batch.values() {
             self.upsert(
                 user_update.user_id,
@@ -116,14 +116,12 @@ impl Queue {
                 "#,
             );
 
-        let result = query_builder
+        query_builder
             .build()
             .persistent(false)
             .execute(db)
             .await
-            .map(|result| result.rows_affected());
-
-        return result;
+            .map(|result| result.rows_affected())
     }
 }
 

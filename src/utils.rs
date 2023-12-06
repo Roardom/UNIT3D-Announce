@@ -34,9 +34,9 @@ pub async fn urlencoded_to_bytes(input: &str) -> Result<[u8; 20]> {
 #[inline(always)]
 pub fn hex_decode(chars: [u8; 2]) -> Result<u8> {
     Ok(match chars[0] {
-        b'0'..=b'9' => chars[0] - b'0' << 4,
-        b'a'..=b'f' => chars[0] - b'a' + 0xA << 4,
-        b'A'..=b'F' => chars[0] - b'A' + 0xA << 4,
+        b'0'..=b'9' => (chars[0] - b'0') << 4,
+        b'a'..=b'f' => (chars[0] - b'a' + 0xA) << 4,
+        b'A'..=b'F' => (chars[0] - b'A' + 0xA) << 4,
         _ => bail!("Invalid URL encoding."),
     } + match chars[1] {
         b'0'..=b'9' => chars[1] - b'0',
