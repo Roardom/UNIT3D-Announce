@@ -104,8 +104,8 @@ impl Queue {
                     .push_bind("")
                     .push_bind("")
                     .push_bind(0)
-                    .push_bind(0)
-                    .push_bind(0)
+                    .push_bind(user_update.uploaded_delta)
+                    .push_bind(user_update.downloaded_delta)
                     .push_bind("");
             })
             .push(
