@@ -51,19 +51,45 @@ impl Queue {
             });
     }
 
+    /// Determine the max amount of torrent records that can be inserted at
+    /// once
+    const fn torrent_limit() -> usize {
+        /// Max amount of bindings in a mysql query
+        const BIND_LIMIT: usize = 65535;
+
+        /// Number of columns being updated in the torrent table
+        const TORRENT_COLUMN_COUNT: usize = 17;
+
+        BIND_LIMIT / TORRENT_COLUMN_COUNT
+    }
+
+    /// Take a portion of the torrent updates small enough to be inserted into
+    /// the database.
+    pub fn take_batch(&mut self) -> Queue {
+        let len = self.len();
+
+        Queue(self.split_off(len - min(Queue::torrent_limit(), len)))
+    }
+
+    /// Merge a torrent update batch into this torrent update batch
+    pub fn upsert_batch(&mut self, batch: Queue) -> () {
+        for torrent_update in batch.values() {
+            self.upsert(
+                torrent_update.torrent_id,
+                torrent_update.seeder_delta,
+                torrent_update.leecher_delta,
+                torrent_update.times_completed_delta,
+            );
+        }
+    }
+
     /// Flushes torrent updates to the mysql db
-    pub async fn flush_to_db(&mut self, db: &MySqlPool) {
+    pub async fn flush_to_db(&self, db: &MySqlPool) -> Result<u64, sqlx::Error> {
         let len = self.len();
 
         if len == 0 {
-            return;
+            return Ok(0);
         }
-
-        const BIND_LIMIT: usize = 65535;
-        const NUM_TORRENT_COLUMNS: usize = 17;
-        const TORRENT_LIMIT: usize = BIND_LIMIT / NUM_TORRENT_COLUMNS;
-
-        let torrent_updates = self.split_off(len - min(TORRENT_LIMIT, len));
 
         let now = Utc::now();
 
@@ -94,7 +120,7 @@ impl Queue {
         );
 
         query_builder
-            .push_values(&torrent_updates, |mut bind, (_index, torrent_update)| {
+            .push_values(self.values(), |mut bind, torrent_update| {
                 bind.push_bind(torrent_update.torrent_id)
                     .push_bind("")
                     .push_bind("")
@@ -129,21 +155,7 @@ impl Queue {
             .await
             .map(|result| result.rows_affected());
 
-        match result {
-            Ok(_) => (),
-            Err(e) => {
-                println!("Torrent update failed: {}", e);
-
-                for (_index, torrent_update) in torrent_updates.iter() {
-                    self.upsert(
-                        torrent_update.torrent_id,
-                        torrent_update.seeder_delta,
-                        torrent_update.leecher_delta,
-                        torrent_update.times_completed_delta,
-                    );
-                }
-            }
-        }
+        return result;
     }
 }
 
