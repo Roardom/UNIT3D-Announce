@@ -301,13 +301,12 @@ pub async fn announce(
         return Err(TorrentIsDeleted);
     }
 
-    if torrent.status != tracker::torrent::Status::Approved {
-        match torrent.status {
-            tracker::torrent::Status::Pending => return Err(TorrentIsPendingModeration),
-            tracker::torrent::Status::Rejected => return Err(TorrentIsRejected),
-            tracker::torrent::Status::Postponed => return Err(TorrentIsPostponed),
-            _ => return Err(TorrentUnknownModerationStatus),
-        }
+    match torrent.status {
+        tracker::torrent::Status::Approved => (),
+        tracker::torrent::Status::Pending => return Err(TorrentIsPendingModeration),
+        tracker::torrent::Status::Rejected => return Err(TorrentIsRejected),
+        tracker::torrent::Status::Postponed => return Err(TorrentIsPostponed),
+        _ => return Err(TorrentUnknownModerationStatus),
     }
 
     // Make sure user isn't leeching more torrents than their group allows
