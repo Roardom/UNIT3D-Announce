@@ -31,12 +31,7 @@ pub async fn flush(tracker: &Arc<Tracker>) {
     flush_history_updates(&tracker).await;
     flush_peer_updates(&tracker).await;
     flush_torrent_updates(&tracker).await;
-    tracker
-        .user_updates
-        .write()
-        .await
-        .flush_to_db(&tracker.pool)
-        .await;
+    flush_user_updates(&tracker).await;
 }
 
 /// Send history updates to mysql database
@@ -94,6 +89,24 @@ async fn flush_torrent_updates(tracker: &Arc<Tracker>) {
                 .write()
                 .await
                 .upsert_batch(torrent_update_batch);
+        }
+    }
+}
+
+/// Send user updates to mysql database
+async fn flush_user_updates(tracker: &Arc<Tracker>) {
+    let user_update_batch = tracker.user_updates.write().await.take_batch();
+    let result = user_update_batch.flush_to_db(&tracker.pool).await;
+
+    match result {
+        Ok(_) => (),
+        Err(e) => {
+            println!("User update failed: {}", e);
+            tracker
+                .user_updates
+                .write()
+                .await
+                .upsert_batch(user_update_batch);
         }
     }
 }

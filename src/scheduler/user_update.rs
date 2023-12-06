@@ -38,19 +38,44 @@ impl Queue {
         );
     }
 
+    /// Determine the max amount of user records that can be inserted at
+    /// once
+    const fn user_limit() -> usize {
+        /// Max amount of bindings in a mysql query
+        const BIND_LIMIT: usize = 65535;
+
+        /// Number of columns being updated in the user table
+        const USER_COLUMN_COUNT: usize = 9;
+
+        BIND_LIMIT / USER_COLUMN_COUNT
+    }
+
+    /// Take a portion of the user updates small enough to be inserted into
+    /// the database.
+    pub fn take_batch(&mut self) -> Queue {
+        let len = self.len();
+
+        Queue(self.split_off(len - min(Queue::user_limit(), len)))
+    }
+
+    /// Merge a torrent update batch into this torrent update batch
+    pub fn upsert_batch(&mut self, batch: Queue) -> () {
+        for user_update in batch.values() {
+            self.upsert(
+                user_update.user_id,
+                user_update.uploaded_delta,
+                user_update.downloaded_delta,
+            );
+        }
+    }
+
     /// Flushes user updates to the mysql db
-    pub async fn flush_to_db(&mut self, db: &MySqlPool) {
+    pub async fn flush_to_db(&self, db: &MySqlPool) -> Result<u64, sqlx::Error> {
         let len = self.len();
 
         if len == 0 {
-            return;
+            return Ok(0);
         }
-
-        const BIND_LIMIT: usize = 65535;
-        const NUM_USER_COLUMNS: usize = 9;
-        const USER_LIMIT: usize = BIND_LIMIT / NUM_USER_COLUMNS;
-
-        let user_updates = self.split_off(len - min(USER_LIMIT, len));
 
         // Trailing space required before the push values function
         // Leading space required after the push values function
@@ -72,7 +97,7 @@ impl Queue {
         );
 
         query_builder
-            .push_values(&user_updates, |mut bind, (_index, user_update)| {
+            .push_values(self.values(), |mut bind, user_update| {
                 bind.push_bind(user_update.user_id)
                     .push_bind("")
                     .push_bind("")
@@ -98,20 +123,7 @@ impl Queue {
             .await
             .map(|result| result.rows_affected());
 
-        match result {
-            Ok(_) => (),
-            Err(e) => {
-                println!("User update failed: {}", e);
-
-                for (_index, user_update) in user_updates.iter() {
-                    self.upsert(
-                        user_update.user_id,
-                        user_update.uploaded_delta,
-                        user_update.downloaded_delta,
-                    );
-                }
-            }
-        }
+        return result;
     }
 }
 
