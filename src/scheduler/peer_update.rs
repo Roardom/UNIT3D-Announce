@@ -76,19 +76,52 @@ impl Queue {
         );
     }
 
+    /// Determine the max amount of peer records that can be inserted at
+    /// once
+    const fn peer_limit() -> usize {
+        /// Max amount of bindings in a mysql query
+        const BIND_LIMIT: usize = 65535;
+
+        /// Number of columns being updated in the peer table
+        const PEER_COLUMN_COUNT: usize = 12;
+
+        BIND_LIMIT / PEER_COLUMN_COUNT
+    }
+
+    /// Take a portion of the peer updates small enough to be inserted into
+    /// the database.
+    pub fn take_batch(&mut self) -> Queue {
+        let len = self.len();
+
+        Queue(self.split_off(len - min(Queue::peer_limit(), len)))
+    }
+
+    /// Merge a peer update batch into this peer update batch
+    pub fn upsert_batch(&mut self, batch: Queue) -> () {
+        for peer_update in batch.values() {
+            self.upsert(
+                peer_update.peer_id,
+                peer_update.ip,
+                peer_update.port,
+                peer_update.agent.to_owned(),
+                peer_update.uploaded,
+                peer_update.downloaded,
+                peer_update.is_active,
+                peer_update.is_seeder,
+                peer_update.left,
+                peer_update.torrent_id,
+                peer_update.user_id,
+            );
+        }
+    }
+
     /// Flushes peer updates to the mysql db
-    pub async fn flush_to_db(&mut self, db: &MySqlPool) {
+    pub async fn flush_to_db(&self, db: &MySqlPool) -> Result<u64, sqlx::Error> {
         let len = self.len();
 
         if len == 0 {
-            return;
+            return Ok(0);
         }
-
-        const BIND_LIMIT: usize = 65535;
-        const NUM_PEER_COLUMNS: usize = 12;
-        const PEER_LIMIT: usize = BIND_LIMIT / NUM_PEER_COLUMNS;
-
-        let peer_updates = self.split_off(len - min(PEER_LIMIT, len));
 
         let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
             r#"
@@ -112,7 +145,7 @@ impl Queue {
         );
 
         query_builder
-            .push_values(&peer_updates, |mut bind, (_index, peer_update)| {
+            .push_values(self.values(), |mut bind, peer_update| {
                 match peer_update.ip {
                     IpAddr::V4(ip) => bind
                         .push_bind(peer_update.peer_id.to_vec())
@@ -166,28 +199,7 @@ impl Queue {
             .await
             .map(|result| result.rows_affected());
 
-        match result {
-            Ok(_) => (),
-            Err(e) => {
-                println!("Peer update failed: {}", e);
-
-                for (_index, peer_update) in peer_updates.iter() {
-                    self.upsert(
-                        peer_update.peer_id,
-                        peer_update.ip,
-                        peer_update.port,
-                        peer_update.agent.to_owned(),
-                        peer_update.uploaded,
-                        peer_update.downloaded,
-                        peer_update.is_active,
-                        peer_update.is_seeder,
-                        peer_update.left,
-                        peer_update.torrent_id,
-                        peer_update.user_id,
-                    );
-                }
-            }
-        }
+        return result;
     }
 }
 
