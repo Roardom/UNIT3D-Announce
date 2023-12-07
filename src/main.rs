@@ -1,8 +1,5 @@
 use anyhow::Result;
-use axum::{
-    routing::{get, put},
-    Router,
-};
+use axum::Router;
 use std::net::SocketAddr;
 use tokio::signal;
 
@@ -16,6 +13,7 @@ static GLOBAL: Jemalloc = Jemalloc;
 mod announce;
 mod config;
 mod error;
+mod routes;
 mod scheduler;
 mod stats;
 mod tracker;
@@ -38,45 +36,7 @@ async fn main() -> Result<()> {
 
     // Create router.
     let app = Router::new()
-        .nest(
-            "/announce",
-            Router::new()
-                .route("/:passkey", get(announce::announce))
-                .nest(
-                    &("/".to_string() + &tracker.config.apikey),
-                    Router::new()
-                        .route(
-                            "/torrents",
-                            put(tracker::torrent::Map::upsert)
-                                .delete(tracker::torrent::Map::destroy),
-                        )
-                        .route("/torrents/:id", get(tracker::torrent::Map::show))
-                        .route(
-                            "/users",
-                            put(tracker::user::Map::upsert).delete(tracker::user::Map::destroy),
-                        )
-                        .route("/users/:id", get(tracker::user::Map::show))
-                        .route(
-                            "/groups",
-                            put(tracker::group::Map::upsert).delete(tracker::group::Map::destroy),
-                        )
-                        .route(
-                            "/blacklisted-agents",
-                            put(tracker::blacklisted_agent::Set::upsert)
-                                .delete(tracker::blacklisted_agent::Set::destroy),
-                        )
-                        .route(
-                            "/freeleech-tokens",
-                            put(tracker::freeleech_token::Set::upsert)
-                                .delete(tracker::freeleech_token::Set::destroy),
-                        )
-                        .route(
-                            "/personal-freeleech",
-                            put(tracker::personal_freeleech::Set::upsert)
-                                .delete(tracker::personal_freeleech::Set::destroy),
-                        ),
-                ),
-        )
+        .merge(routes::routes(&tracker.config.apikey))
         .with_state(tracker.clone());
 
     // Listening socket address.
