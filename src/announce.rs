@@ -9,7 +9,7 @@ use axum::{
 };
 use compact_str::CompactString;
 use peer::Peer;
-use rand::{rngs::SmallRng, seq::IteratorRandom, Rng, SeedableRng};
+use rand::{rngs::SmallRng, seq::SliceRandom, Rng, SeedableRng};
 use sqlx::types::chrono::Utc;
 use std::{
     net::{IpAddr, SocketAddr},
@@ -235,7 +235,7 @@ pub async fn announce(
     }
 
     // Block user agent strings on the blacklist
-    if tracker.agent_blacklist.read().await.contains(&Agent {
+    if tracker.agent_blacklist.contains(&Agent {
         name: user_agent.to_string(),
     }) {
         return Err(BlacklistedClient);
@@ -260,9 +260,7 @@ pub async fn announce(
 
     // Validate port
     // Some clients send port 0 on the stopped event
-    if tracker.port_blacklist.read().await.contains(&queries.port)
-        && queries.event != Event::Stopped
-    {
+    if tracker.port_blacklist.contains(&queries.port) && queries.event != Event::Stopped {
         return Err(BlacklistedPort);
     }
 
@@ -271,16 +269,14 @@ pub async fn announce(
     // Validate passkey
     let user_id = *tracker
         .passkey2id
-        .read()
-        .await
         .get(&passkey)
-        .ok_or(PasskeyNotFound)?;
+        .ok_or(PasskeyNotFound)?
+        .get();
     let user = tracker
         .users
-        .read()
-        .await
         .get(&user_id)
         .ok_or(UserNotFound)?
+        .get()
         .clone();
 
     // Validate user
@@ -290,10 +286,9 @@ pub async fn announce(
 
     let group = tracker
         .groups
-        .read()
-        .await
         .get(&user.group_id)
         .ok_or(GroupNotFound)?
+        .get()
         .clone();
 
     match group.slug.as_str() {
@@ -312,12 +307,11 @@ pub async fn announce(
     // Validate torrent
     let torrent_id = *tracker
         .infohash2id
-        .read()
-        .await
         .get(&queries.info_hash)
-        .ok_or(InfoHashNotFound)?;
-    let mut torrent_guard = tracker.torrents.write().await;
-    let torrent = torrent_guard.get_mut(&torrent_id).ok_or(TorrentNotFound)?;
+        .ok_or(InfoHashNotFound)?
+        .get();
+    let mut torrent_guard = tracker.torrents.get(&torrent_id).ok_or(TorrentNotFound)?;
+    let torrent = torrent_guard.get_mut();
 
     if torrent.is_deleted {
         return Err(TorrentIsDeleted);
@@ -340,12 +334,12 @@ pub async fn announce(
 
     if queries.event == Event::Stopped {
         // Try and remove the peer
-        let removed_peer = torrent.peers.remove(&tracker::peer::Index {
+        let removed_peer_opt = torrent.peers.remove(&tracker::peer::Index {
             user_id,
             peer_id: queries.peer_id,
         });
         // Check if peer was removed
-        if let Some(peer) = removed_peer {
+        if let Some((_index, peer)) = removed_peer_opt {
             // Calculate change in upload and download compared to previous
             // announce
             uploaded_delta = queries.uploaded.saturating_sub(peer.uploaded);
@@ -370,12 +364,28 @@ pub async fn announce(
         times_completed_delta = 0;
     } else {
         // Insert the peer into the in-memory db
-        let old_peer = torrent.peers.insert(
-            tracker::peer::Index {
+        let mut old_peer = None;
+
+        torrent
+            .peers
+            .entry(tracker::peer::Index {
                 user_id,
                 peer_id: queries.peer_id,
-            },
-            tracker::Peer {
+            })
+            .and_modify(|peer| {
+                old_peer = Some(peer.clone());
+
+                peer.ip_address = client_ip;
+                peer.user_id = user_id;
+                peer.torrent_id = torrent_id;
+                peer.port = queries.port;
+                peer.is_seeder = queries.left == 0;
+                peer.is_active = true;
+                peer.updated_at = Utc::now();
+                peer.uploaded = queries.uploaded;
+                peer.downloaded = queries.downloaded;
+            })
+            .or_insert(tracker::Peer {
                 ip_address: client_ip,
                 user_id,
                 torrent_id,
@@ -385,8 +395,7 @@ pub async fn announce(
                 updated_at: Utc::now(),
                 uploaded: queries.uploaded,
                 downloaded: queries.downloaded,
-            },
-        );
+            });
 
         // Update the user and torrent seeding/leeching counts in the
         // in-memory db
@@ -442,8 +451,10 @@ pub async fn announce(
                 // Make sure user is only allowed N peers per torrent.
                 let mut peer_count = 0;
 
-                for &peer in torrent.peers.values() {
-                    if peer.user_id == user_id {
+                let mut peer_entry_opt = torrent.peers.first_entry();
+
+                while let Some(peer_entry) = peer_entry_opt {
+                    if peer_entry.get().user_id == user_id {
                         peer_count += 1;
 
                         if peer_count >= tracker.config.max_peers_per_torrent_per_user {
@@ -455,6 +466,8 @@ pub async fn announce(
                             return Err(PeersPerTorrentPerUserLimit);
                         }
                     }
+
+                    peer_entry_opt = peer_entry.next();
                 }
 
                 if queries.left == 0 {
@@ -486,42 +499,26 @@ pub async fn announce(
     let mut peers_ipv6: Vec<u8> = Vec::new();
 
     if queries.event != Event::Stopped && (torrent.leechers != 0 || queries.left != 0) {
-        let mut peers: Vec<(&peer::Index, &Peer)> = Vec::with_capacity(std::cmp::min(
-            queries.numwant,
-            torrent.seeders as usize + torrent.leechers as usize,
-        ));
+        let mut peers: Vec<Peer> = Vec::with_capacity(torrent.peers.len());
 
         // Don't return peers with the same user id or those that are marked as inactive
-        let valid_peers = torrent
-            .peers
-            .iter()
-            .filter(|(_index, peer)| peer.user_id != user_id && peer.is_active);
-
         // Make sure leech peer lists are filled with seeds
-        if queries.left > 0 && torrent.seeders > 0 && queries.numwant > peers.len() {
-            peers.extend(
-                valid_peers
-                    .clone()
-                    .filter(|(_index, peer)| peer.is_seeder)
-                    .choose_multiple(&mut SmallRng::from_entropy(), queries.numwant),
-            );
-        }
-
         // Otherwise only send leeches until the numwant is reached
-        if torrent.leechers > 0 && queries.numwant > peers.len() {
-            peers.extend(
-                valid_peers
-                    .filter(|(_index, peer)| !peer.is_seeder)
-                    .choose_multiple(
-                        &mut SmallRng::from_entropy(),
-                        queries.numwant.saturating_sub(peers.len()),
-                    ),
-            );
-        }
+        torrent.peers.scan(|_index, peer| {
+            if peers.len() < queries.numwant && peer.user_id != user_id && peer.is_active {
+                if (queries.left > 0 && torrent.seeders > 0 && peer.is_seeder)
+                    || (torrent.leechers > 0 && !peer.is_seeder)
+                {
+                    peers.push(peer.clone());
+                }
+            }
+        });
+
+        let peers = peers.choose_multiple(&mut SmallRng::from_entropy(), queries.numwant);
 
         // Split peers into ipv4 and ipv6 variants and serialize their socket
         // to bytes according to the bittorrent spec
-        for (_index, peer) in peers.iter() {
+        for peer in peers {
             match peer.ip_address {
                 IpAddr::V4(ip) => {
                     peers_ipv4.extend(&ip.octets());
@@ -581,17 +578,11 @@ pub async fn announce(
 
     let download_factor = if tracker
         .personal_freeleeches
-        .read()
-        .await
         .contains(&PersonalFreeleech { user_id })
-        || tracker
-            .freeleech_tokens
-            .read()
-            .await
-            .contains(&FreeleechToken {
-                user_id,
-                torrent_id,
-            }) {
+        || tracker.freeleech_tokens.contains(&FreeleechToken {
+            user_id,
+            torrent_id,
+        }) {
         0
     } else {
         download_factor
@@ -607,18 +598,13 @@ pub async fn announce(
     };
 
     if seeder_delta != 0 || leecher_delta != 0 {
-        tracker
-            .users
-            .write()
-            .await
-            .entry(user_id)
-            .and_modify(|user| {
-                user.num_seeding = user.num_seeding.saturating_add_signed(seeder_delta);
-                user.num_leeching = user.num_leeching.saturating_add_signed(leecher_delta);
-            });
+        let _ = tracker.users.entry(user_id).and_modify(|user| {
+            user.num_seeding = user.num_seeding.saturating_add_signed(seeder_delta);
+            user.num_leeching = user.num_leeching.saturating_add_signed(leecher_delta);
+        });
     }
 
-    tracker.peer_updates.write().await.upsert(
+    tracker.peer_updates.write().upsert(
         queries.peer_id,
         client_ip,
         queries.port,
@@ -632,7 +618,7 @@ pub async fn announce(
         user_id,
     );
 
-    tracker.history_updates.write().await.upsert(
+    tracker.history_updates.write().upsert(
         user_id,
         torrent_id,
         CompactString::from(user_agent),
@@ -649,7 +635,7 @@ pub async fn announce(
     );
 
     if credited_uploaded_delta != 0 || credited_downloaded_delta != 0 {
-        tracker.user_updates.write().await.upsert(
+        tracker.user_updates.write().upsert(
             user_id,
             credited_uploaded_delta,
             credited_downloaded_delta,
@@ -657,7 +643,7 @@ pub async fn announce(
     }
 
     if seeder_delta != 0 || leecher_delta != 0 || times_completed_delta != 0 {
-        tracker.torrent_updates.write().await.upsert(
+        tracker.torrent_updates.write().upsert(
             torrent_id,
             seeder_delta,
             leecher_delta,

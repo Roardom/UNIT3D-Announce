@@ -1,9 +1,10 @@
 use std::ops::DerefMut;
 use std::{ops::Deref, sync::Arc};
 
+use ahash::RandomState;
 use axum::extract::State;
 use axum::Json;
-use indexmap::IndexSet;
+use scc::HashIndex;
 use serde::Deserialize;
 use sqlx::MySqlPool;
 
@@ -11,11 +12,11 @@ use anyhow::{Context, Result};
 
 use crate::tracker::Tracker;
 
-pub struct Set(pub IndexSet<Agent>);
+pub struct Set(pub HashIndex<Agent, (), RandomState>);
 
 impl Set {
     pub fn new() -> Set {
-        Set(IndexSet::new())
+        Set(HashIndex::with_hasher(RandomState::new()))
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Set> {
@@ -32,10 +33,10 @@ impl Set {
         .await
         .context("Failed loading blacklisted clients.")?;
 
-        let mut agent_set = Set::new();
+        let agent_set = Set::new();
 
         for agent in agents {
-            agent_set.insert(agent);
+            agent_set.entry(agent).or_insert(());
         }
 
         Ok(agent_set)
@@ -44,18 +45,18 @@ impl Set {
     pub async fn upsert(State(tracker): State<Arc<Tracker>>, Json(agent): Json<Agent>) {
         println!("Inserting agent with name {}.", agent.name);
 
-        tracker.agent_blacklist.write().await.insert(agent);
+        tracker.agent_blacklist.entry(agent).or_insert(());
     }
 
     pub async fn destroy(State(tracker): State<Arc<Tracker>>, Json(agent): Json<Agent>) {
         println!("Removing agent with name {}.", agent.name);
 
-        tracker.agent_blacklist.write().await.remove(&agent);
+        tracker.agent_blacklist.remove(&agent);
     }
 }
 
 impl Deref for Set {
-    type Target = IndexSet<Agent>;
+    type Target = HashIndex<Agent, (), RandomState>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -68,7 +69,7 @@ impl DerefMut for Set {
     }
 }
 
-#[derive(Eq, Deserialize, Hash, PartialEq)]
+#[derive(Clone, Eq, Deserialize, Hash, PartialEq)]
 pub struct Agent {
     pub name: String,
 }

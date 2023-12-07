@@ -36,7 +36,7 @@ pub async fn flush(tracker: &Arc<Tracker>) {
 
 /// Send history updates to mysql database
 async fn flush_history_updates(tracker: &Arc<Tracker>) {
-    let history_update_batch = tracker.history_updates.write().await.take_batch();
+    let history_update_batch = tracker.history_updates.write().take_batch();
     let result = history_update_batch
         .flush_to_db(
             &tracker.pool,
@@ -51,7 +51,6 @@ async fn flush_history_updates(tracker: &Arc<Tracker>) {
             tracker
                 .history_updates
                 .write()
-                .await
                 .upsert_batch(history_update_batch);
         }
     }
@@ -59,25 +58,21 @@ async fn flush_history_updates(tracker: &Arc<Tracker>) {
 
 /// Send peer updates to mysql database
 async fn flush_peer_updates(tracker: &Arc<Tracker>) {
-    let peer_update_batch = tracker.peer_updates.write().await.take_batch();
+    let peer_update_batch = tracker.peer_updates.write().take_batch();
     let result = peer_update_batch.flush_to_db(&tracker.pool).await;
 
     match result {
         Ok(_) => (),
         Err(e) => {
             println!("Peer update failed: {}", e);
-            tracker
-                .peer_updates
-                .write()
-                .await
-                .upsert_batch(peer_update_batch);
+            tracker.peer_updates.write().upsert_batch(peer_update_batch);
         }
     }
 }
 
 /// Send torrent updates to mysql database
 async fn flush_torrent_updates(tracker: &Arc<Tracker>) {
-    let torrent_update_batch = tracker.torrent_updates.write().await.take_batch();
+    let torrent_update_batch = tracker.torrent_updates.write().take_batch();
     let result = torrent_update_batch.flush_to_db(&tracker.pool).await;
 
     match result {
@@ -87,7 +82,6 @@ async fn flush_torrent_updates(tracker: &Arc<Tracker>) {
             tracker
                 .torrent_updates
                 .write()
-                .await
                 .upsert_batch(torrent_update_batch);
         }
     }
@@ -95,18 +89,14 @@ async fn flush_torrent_updates(tracker: &Arc<Tracker>) {
 
 /// Send user updates to mysql database
 async fn flush_user_updates(tracker: &Arc<Tracker>) {
-    let user_update_batch = tracker.user_updates.write().await.take_batch();
+    let user_update_batch = tracker.user_updates.write().take_batch();
     let result = user_update_batch.flush_to_db(&tracker.pool).await;
 
     match result {
         Ok(_) => (),
         Err(e) => {
             println!("User update failed: {}", e);
-            tracker
-                .user_updates
-                .write()
-                .await
-                .upsert_batch(user_update_batch);
+            tracker.user_updates.write().upsert_batch(user_update_batch);
         }
     }
 }
@@ -120,7 +110,11 @@ pub async fn reap(tracker: &Arc<Tracker>) {
     let ttl = Duration::seconds(tracker.config.inactive_peer_ttl.try_into().unwrap());
     let inactive_cutoff = Utc::now().checked_sub_signed(ttl).unwrap();
 
-    for (_index, torrent) in tracker.torrents.write().await.iter_mut() {
+    let mut torrent_entry_opt = tracker.torrents.first_entry();
+
+    while let Some(mut torrent_entry) = torrent_entry_opt {
+        let torrent = torrent_entry.get_mut();
+
         let mut seeder_delta: i32 = 0;
         let mut leecher_delta: i32 = 0;
 
@@ -134,42 +128,45 @@ pub async fn reap(tracker: &Arc<Tracker>) {
                 || peer.is_active
         });
 
-        for (_index, peer) in torrent.peers.iter_mut() {
+        let mut peer_entry_opt = torrent.peers.first_entry();
+
+        while let Some(mut peer_entry) = peer_entry_opt {
+            let peer = peer_entry.get_mut();
+
             // Peers get marked as inactive if not announced for more than
             // active_peer_ttl seconds. User peer count and torrent peer
             // count are updated to reflect.
             if peer.updated_at < active_cutoff && peer.is_active {
                 peer.is_active = false;
-                tracker
-                    .users
-                    .write()
-                    .await
-                    .entry(peer.user_id)
-                    .and_modify(|user| {
-                        if peer.is_seeder {
-                            user.num_seeding = user.num_seeding.saturating_sub(1);
-                        } else {
-                            user.num_leeching = user.num_leeching.saturating_sub(1);
-                        }
-                    });
+                let _ = tracker.users.entry(peer.user_id).and_modify(|user| {
+                    if peer.is_seeder {
+                        user.num_seeding = user.num_seeding.saturating_sub(1);
+                    } else {
+                        user.num_leeching = user.num_leeching.saturating_sub(1);
+                    }
+                });
                 match peer.is_seeder {
                     true => seeder_delta -= 1,
                     false => leecher_delta -= 1,
                 }
             }
+
+            peer_entry_opt = peer_entry.next();
         }
+
+        drop(peer_entry_opt);
 
         // Update peer count of torrents and users
         if seeder_delta != 0 || leecher_delta != 0 {
             torrent.seeders = torrent.seeders.saturating_add_signed(seeder_delta);
             torrent.leechers = torrent.leechers.saturating_add_signed(leecher_delta);
 
-            tracker.torrent_updates.write().await.upsert(
-                torrent.id,
-                seeder_delta,
-                leecher_delta,
-                0,
-            );
+            tracker
+                .torrent_updates
+                .write()
+                .upsert(torrent.id, seeder_delta, leecher_delta, 0);
         }
+
+        torrent_entry_opt = torrent_entry.next();
     }
 }

@@ -1,10 +1,11 @@
 use std::ops::DerefMut;
 use std::{ops::Deref, sync::Arc};
 
+use ahash::RandomState;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
-use indexmap::IndexMap;
+use scc::HashMap;
 use serde::Deserialize;
 use sqlx::MySqlPool;
 
@@ -12,11 +13,11 @@ use anyhow::{Context, Result};
 
 use crate::tracker::Tracker;
 
-pub struct Map(IndexMap<i32, Group>);
+pub struct Map(HashMap<i32, Group, RandomState>);
 
 impl Map {
     pub fn new() -> Map {
-        Map(IndexMap::new())
+        Map(HashMap::with_hasher(RandomState::new()))
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Map> {
@@ -38,10 +39,10 @@ impl Map {
         .await
         .context("Failed loading groups.")?;
 
-        let mut group_map = Map::new();
+        let group_map = Map::new();
 
         for group in groups {
-            group_map.insert(group.id, group);
+            group_map.entry(group.id).or_insert(group);
         }
 
         Ok(group_map)
@@ -49,21 +50,36 @@ impl Map {
 
     pub async fn upsert(
         State(tracker): State<Arc<Tracker>>,
-        Json(group): Json<APIInsertGroup>,
+        Json(insert_group): Json<APIInsertGroup>,
     ) -> StatusCode {
-        println!("Inserting group with id {}.", group.id);
+        println!("Inserting group with id {}.", insert_group.id);
 
-        tracker.groups.write().await.insert(
-            group.id,
-            Group {
-                id: group.id,
-                slug: group.slug,
-                download_slots: group.download_slots,
-                is_immune: group.is_immune,
-                download_factor: if group.is_freeleech { 0 } else { 100 },
-                upload_factor: if group.is_double_upload { 200 } else { 100 },
-            },
-        );
+        tracker
+            .groups
+            .entry(insert_group.id)
+            .and_modify(|group| {
+                group.slug = insert_group.slug.clone();
+                group.download_slots = insert_group.download_slots;
+                group.is_immune = insert_group.is_immune;
+                group.download_factor = if insert_group.is_freeleech { 0 } else { 100 };
+                group.upload_factor = if insert_group.is_double_upload {
+                    200
+                } else {
+                    100
+                };
+            })
+            .or_insert(Group {
+                id: insert_group.id,
+                slug: insert_group.slug,
+                download_slots: insert_group.download_slots,
+                is_immune: insert_group.is_immune,
+                download_factor: if insert_group.is_freeleech { 0 } else { 100 },
+                upload_factor: if insert_group.is_double_upload {
+                    200
+                } else {
+                    100
+                },
+            });
 
         return StatusCode::OK;
     }
@@ -74,14 +90,14 @@ impl Map {
     ) -> StatusCode {
         println!("Removing group with id {}.", group.id);
 
-        tracker.groups.write().await.remove(&group.id);
+        tracker.groups.remove(&group.id);
 
         return StatusCode::OK;
     }
 }
 
 impl Deref for Map {
-    type Target = IndexMap<i32, Group>;
+    type Target = HashMap<i32, Group, RandomState>;
 
     fn deref(&self) -> &Self::Target {
         &self.0

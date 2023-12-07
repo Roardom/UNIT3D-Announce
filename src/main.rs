@@ -59,10 +59,10 @@ async fn main() -> Result<()> {
     let mut flushes = 0;
 
     while flushes < max_flushes
-        && (tracker_clone2.history_updates.read().await.len() > 0
-            || tracker_clone2.peer_updates.read().await.len() > 0
-            || tracker_clone2.torrent_updates.read().await.len() > 0
-            || tracker_clone2.user_updates.read().await.len() > 0)
+        && (tracker_clone2.history_updates.read().len() > 0
+            || tracker_clone2.peer_updates.read().len() > 0
+            || tracker_clone2.torrent_updates.read().len() > 0
+            || tracker_clone2.user_updates.read().len() > 0)
     {
         scheduler::flush(&tracker_clone2.clone()).await;
         flushes += 1;

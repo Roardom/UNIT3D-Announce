@@ -2,8 +2,9 @@ use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
+use ahash::RandomState;
 use chrono::serde::ts_seconds;
-use indexmap::IndexMap;
+use scc::HashMap;
 use serde::{Serialize, Serializer};
 use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::MySqlPool;
@@ -14,7 +15,7 @@ pub mod peer_id;
 pub use peer_id::PeerId;
 
 #[derive(Clone, Serialize)]
-pub struct Map(IndexMap<Index, Peer>);
+pub struct Map(HashMap<Index, Peer, RandomState>);
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Index {
@@ -38,7 +39,7 @@ pub struct Peer {
 
 impl Map {
     pub fn new() -> Map {
-        Map(IndexMap::new())
+        Map(HashMap::with_hasher(RandomState::new()))
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Map> {
@@ -88,10 +89,10 @@ impl Map {
         .await
         .context("Failed loading peers.")?;
 
-        let mut peer_map = Map::new();
+        let peer_map = Map::new();
 
         for (index, peer) in peers {
-            peer_map.insert(index, peer);
+            peer_map.entry(index).or_insert(peer);
         }
 
         Ok(peer_map)
@@ -99,7 +100,7 @@ impl Map {
 }
 
 impl Deref for Map {
-    type Target = IndexMap<Index, Peer>;
+    type Target = HashMap<Index, Peer, RandomState>;
 
     fn deref(&self) -> &Self::Target {
         &self.0

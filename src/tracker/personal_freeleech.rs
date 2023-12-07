@@ -1,9 +1,10 @@
 use std::ops::DerefMut;
 use std::{ops::Deref, sync::Arc};
 
+use ahash::RandomState;
 use axum::extract::State;
 use axum::Json;
-use indexmap::IndexSet;
+use scc::HashIndex;
 use serde::Deserialize;
 use sqlx::MySqlPool;
 
@@ -11,11 +12,11 @@ use anyhow::{Context, Result};
 
 use crate::tracker::Tracker;
 
-pub struct Set(IndexSet<PersonalFreeleech>);
+pub struct Set(HashIndex<PersonalFreeleech, (), RandomState>);
 
 impl Set {
     pub fn new() -> Set {
-        Set(IndexSet::new())
+        Set(HashIndex::with_hasher(RandomState::new()))
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Set> {
@@ -32,10 +33,12 @@ impl Set {
         .await
         .context("Failed loading personal freeleeches.")?;
 
-        let mut personal_freeleech_set = Set::new();
+        let personal_freeleech_set = Set::new();
 
         for personal_freeleech in personal_freeleeches {
-            personal_freeleech_set.insert(personal_freeleech);
+            personal_freeleech_set
+                .entry(personal_freeleech)
+                .or_insert(());
         }
 
         Ok(personal_freeleech_set)
@@ -52,9 +55,8 @@ impl Set {
 
         tracker
             .personal_freeleeches
-            .write()
-            .await
-            .insert(personal_freeleech);
+            .entry(personal_freeleech)
+            .or_insert(());
     }
 
     pub async fn destroy(
@@ -66,16 +68,12 @@ impl Set {
             personal_freeleech.user_id
         );
 
-        tracker
-            .personal_freeleeches
-            .write()
-            .await
-            .remove(&personal_freeleech);
+        tracker.personal_freeleeches.remove(&personal_freeleech);
     }
 }
 
 impl Deref for Set {
-    type Target = IndexSet<PersonalFreeleech>;
+    type Target = HashIndex<PersonalFreeleech, (), RandomState>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -88,7 +86,7 @@ impl DerefMut for Set {
     }
 }
 
-#[derive(Eq, Deserialize, Hash, PartialEq)]
+#[derive(Clone, Eq, Deserialize, Hash, PartialEq)]
 pub struct PersonalFreeleech {
     pub user_id: u32,
 }

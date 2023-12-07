@@ -2,10 +2,11 @@ use std::ops::DerefMut;
 use std::str::FromStr;
 use std::{ops::Deref, sync::Arc};
 
+use ahash::RandomState;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
-use indexmap::IndexMap;
+use scc::HashMap;
 use serde::{Deserialize, Serialize};
 use sqlx::MySqlPool;
 
@@ -20,11 +21,11 @@ pub mod passkey2id;
 pub use passkey2id::Passkey2Id;
 
 #[derive(Serialize)]
-pub struct Map(IndexMap<u32, User>);
+pub struct Map(HashMap<u32, User, RandomState>);
 
 impl Map {
     pub fn new() -> Map {
-        Map(IndexMap::new())
+        Map(HashMap::with_hasher(RandomState::new()))
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Map> {
@@ -53,35 +54,51 @@ impl Map {
         .await
         .context("Failed loading users.")?;
 
-        let mut user_map = Map::new();
+        let user_map = Map::new();
 
         for user in users {
-            user_map.insert(user.id, user);
+            user_map.entry(user.id).or_insert(user);
         }
         Ok(user_map)
     }
 
     pub async fn upsert(
         State(tracker): State<Arc<Tracker>>,
-        Json(user): Json<APIInsertUser>,
+        Json(insert_user): Json<APIInsertUser>,
     ) -> StatusCode {
-        println!("Received user: {}", user.id);
-        if let Ok(passkey) = Passkey::from_str(&user.passkey) {
-            println!("Inserting user with id {}.", user.id);
+        println!("Received user: {}", insert_user.id);
+        if let Ok(passkey) = Passkey::from_str(&insert_user.passkey) {
+            println!("Inserting user with id {}.", insert_user.id);
 
-            tracker.users.write().await.insert(
-                user.id,
-                User {
-                    id: user.id,
-                    group_id: user.group_id,
+            tracker
+                .users
+                .entry(insert_user.id)
+                .and_modify(|user| {
+                    user.group_id = insert_user.group_id;
+                    user.passkey = passkey;
+                    user.can_download = insert_user.can_download;
+                    user.num_seeding = insert_user.num_seeding;
+                    user.num_leeching = insert_user.num_leeching;
+                })
+                .or_insert(User {
+                    id: insert_user.id,
+                    group_id: insert_user.group_id,
                     passkey,
-                    can_download: user.can_download,
-                    num_seeding: user.num_seeding,
-                    num_leeching: user.num_leeching,
-                },
-            );
+                    can_download: insert_user.can_download,
+                    num_seeding: insert_user.num_seeding,
+                    num_leeching: insert_user.num_leeching,
+                });
 
-            tracker.passkey2id.write().await.insert(passkey, user.id);
+            // Safe since the value being modified implements Copy.
+            unsafe {
+                tracker
+                    .passkey2id
+                    .entry(passkey)
+                    .and_modify(|id| {
+                        *id = insert_user.id;
+                    })
+                    .or_insert(insert_user.id);
+            }
 
             return StatusCode::OK;
         }
@@ -96,8 +113,8 @@ impl Map {
         if let Ok(passkey) = Passkey::from_str(&user.passkey) {
             println!("Removing user with id {}.", user.id);
 
-            tracker.users.write().await.remove(&user.id);
-            tracker.passkey2id.write().await.remove(&passkey);
+            tracker.users.remove(&user.id);
+            tracker.passkey2id.remove(&passkey);
 
             return StatusCode::OK;
         }
@@ -111,16 +128,14 @@ impl Map {
     ) -> Result<Json<User>, StatusCode> {
         tracker
             .users
-            .read()
-            .await
             .get(&id)
-            .map(|user| Json(user.clone()))
+            .map(|user| Json(user.get().clone()))
             .ok_or(StatusCode::NOT_FOUND)
     }
 }
 
 impl Deref for Map {
-    type Target = IndexMap<u32, User>;
+    type Target = HashMap<u32, User, RandomState>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
