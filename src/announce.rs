@@ -24,9 +24,9 @@ use crate::error::AnnounceError::{
     InvalidLeft, InvalidNumwant, InvalidPasskey, InvalidPeerId, InvalidPort, InvalidQueryStringKey,
     InvalidQueryStringValue, InvalidUploaded, InvalidUserAgent, MissingDownloaded, MissingInfoHash,
     MissingLeft, MissingPeerId, MissingPort, MissingUploaded, NotAClient, PasskeyNotFound,
-    StoppedPeerDoesntExist, TorrentIsDeleted, TorrentIsPendingModeration, TorrentIsPostponed,
-    TorrentIsRejected, TorrentNotFound, TorrentUnknownModerationStatus, UnsupportedEvent,
-    UserAgentTooLong, UserNotFound,
+    PeersPerTorrentPerUserLimit, StoppedPeerDoesntExist, TorrentIsDeleted,
+    TorrentIsPendingModeration, TorrentIsPostponed, TorrentIsRejected, TorrentNotFound,
+    TorrentUnknownModerationStatus, UnsupportedEvent, UserAgentTooLong, UserNotFound,
 };
 
 use crate::tracker::{
@@ -438,6 +438,25 @@ pub async fn announce(
             }
             None => {
                 // new peer is inserted
+
+                // Make sure user is only allowed N peers per torrent.
+                let mut peer_count = 0;
+
+                for &peer in torrent.peers.values() {
+                    if peer.user_id == user_id {
+                        peer_count += 1;
+
+                        if peer_count >= tracker.config.max_peers_per_torrent_per_user {
+                            torrent.peers.remove(&tracker::peer::Index {
+                                user_id,
+                                peer_id: queries.peer_id,
+                            });
+
+                            return Err(PeersPerTorrentPerUserLimit);
+                        }
+                    }
+                }
+
                 if queries.left == 0 {
                     // new seeder is inserted
                     leecher_delta = 0;

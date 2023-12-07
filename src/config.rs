@@ -46,6 +46,11 @@ pub struct Config {
     pub listening_ip_address: IpAddr,
     /// Port for the tracker to listen from to receive announces.
     pub listening_port: u16,
+    /// Max amount of active peers a user is allowed to have on a torrent.
+    /// Prevents abuse from malicious users causing the server to run out of ram,
+    /// as well as keeps the peer lists from being filled with too many clients
+    /// of a single user.
+    pub max_peers_per_torrent_per_user: u16,
 }
 
 impl Config {
@@ -110,6 +115,11 @@ impl Config {
             .parse()
             .context("LISTENING_PORT must be a number between 0 and 2^16 - 1")?;
 
+        let max_peers_per_torrent_per_user = env::var("MAX_PEERS_PER_TORRENT_PER_USER")
+            .context("MAX_PEERS_PER_TORRENT_PER_USER not found in .env file.")?
+            .parse()
+            .context("MAX_PEERS_PER_TORRENT_PER_USER must be a number between 0 and 2^16 - 1")?;
+
         let apikey = env::var("APIKEY").context("APIKEY not found in .env file.")?;
 
         if apikey.len() < 32 {
@@ -130,6 +140,7 @@ impl Config {
             apikey,
             listening_ip_address,
             listening_port,
+            max_peers_per_torrent_per_user,
         })
     }
 }
