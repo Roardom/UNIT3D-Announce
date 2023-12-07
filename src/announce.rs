@@ -288,6 +288,27 @@ pub async fn announce(
         return Err(DownloadPrivilegesRevoked);
     }
 
+    let group = tracker
+        .groups
+        .read()
+        .await
+        .get(&user.group_id)
+        .ok_or(GroupNotFound)?
+        .clone();
+
+    match group.slug.as_str() {
+        "banned" => return Err(GroupBanned),
+        "validating" => return Err(GroupValidating),
+        "disabled" => return Err(GroupDisabled),
+        _ => (),
+    }
+
+    // Make sure user isn't leeching more torrents than their group allows
+    if queries.left > 0 && matches!(group.download_slots, Some(slots) if slots <= user.num_leeching)
+    {
+        return Err(DownloadSlotLimitReached);
+    }
+
     // Validate torrent
     let torrent_id = *tracker
         .infohash2id
@@ -308,27 +329,6 @@ pub async fn announce(
         tracker::torrent::Status::Rejected => return Err(TorrentIsRejected),
         tracker::torrent::Status::Postponed => return Err(TorrentIsPostponed),
         _ => return Err(TorrentUnknownModerationStatus),
-    }
-
-    let group = tracker
-        .groups
-        .read()
-        .await
-        .get(&user.group_id)
-        .ok_or(GroupNotFound)?
-        .clone();
-
-    match group.slug.as_str() {
-        "banned" => return Err(GroupBanned),
-        "validating" => return Err(GroupValidating),
-        "disabled" => return Err(GroupDisabled),
-        _ => (),
-    }
-
-    // Make sure user isn't leeching more torrents than their group allows
-    if queries.left > 0 && matches!(group.download_slots, Some(slots) if slots <= user.num_leeching)
-    {
-        return Err(DownloadSlotLimitReached);
     }
 
     // Change of upload/download compared to previous announce
