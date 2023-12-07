@@ -20,7 +20,7 @@ use crate::scheduler::{history_update, peer_update, torrent_update, user_update}
 use crate::stats::Stats;
 
 use dotenvy::dotenv;
-use sqlx::mysql::{MySqlConnectOptions, MySqlPoolOptions};
+use sqlx::mysql::MySqlPoolOptions;
 use std::{env, sync::Arc, time::Duration};
 use tokio::sync::RwLock;
 
@@ -139,38 +139,6 @@ impl Tracker {
 
 /// Uses the values in the .env file to create a connection pool to the database
 async fn connect_to_database() -> sqlx::Pool<sqlx::MySql> {
-    // Extract .env file values
-    let port: u16 = env::var("DB_PORT")
-        .expect("Invalid DB_PORT in .env file. Aborting")
-        .parse()
-        .expect("DB_PORT in .env file is invalid.");
-    let host = env::var("DB_HOST").expect("DB_HOST not found in .env file. Aborting.");
-    let database = env::var("DB_DATABASE").expect("DB_DATABASE not found in .env file. Aborting.");
-    let username = env::var("DB_USERNAME").expect("DB_USERNAME not found in .env file. Aborting.");
-    let password = env::var("DB_PASSWORD").unwrap_or("".to_string());
-    let ssl_ca = env::var("MYSQL_ATTR_SSL_CA");
-    let socket = env::var("DB_SOCKET");
-
-    // Configure connection options
-    let options = if let Ok(socket) = socket {
-        MySqlConnectOptions::new().socket(socket)
-    } else {
-        MySqlConnectOptions::new()
-            .port(port)
-            .host(&host)
-            .database(&database)
-            .username(&username)
-            .password(&password)
-    }
-    .charset("utf8mb4")
-    .collation("utf8mb4_unicode_ci");
-
-    let options = if let Ok(ssl_ca) = ssl_ca {
-        options.ssl_ca(ssl_ca)
-    } else {
-        options
-    };
-
     // Get pool of database connections.
     MySqlPoolOptions::new()
         .min_connections(0)
@@ -178,7 +146,7 @@ async fn connect_to_database() -> sqlx::Pool<sqlx::MySql> {
         .max_lifetime(Duration::from_secs(30 * 60))
         .idle_timeout(Duration::from_secs(10 * 60))
         .acquire_timeout(Duration::from_secs(30))
-        .connect_with(options)
+        .connect(&env::var("DATABASE_URL").expect("DATABASE_URL not found in .env file. Aborting."))
         .await
-        .expect("Could not connect to the database using the values in .env file. Aborting.")
+        .expect("Could not connect to the database using the DATABASE_URL value in .env file. Aborting.")
 }
