@@ -1,8 +1,11 @@
+use std::fmt::Display;
+
+use serde::Serialize;
 use serde_repr::Deserialize_repr;
 use sqlx::{database::HasValueRef, Database, Decode};
 
 /// Torrent moderation status
-#[derive(Clone, Copy, Debug, Default, Deserialize_repr, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize_repr, Eq, PartialEq, Serialize)]
 #[repr(i16)]
 pub enum Status {
     /// A torrent with pending status is currently in moderation queue
@@ -52,5 +55,17 @@ where
         let value = <i16 as Decode<DB>>::decode(value)?;
 
         Ok(Status::from_i16(value))
+    }
+}
+
+impl Display for Status {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Pending => f.write_str("Pending"),
+            Self::Approved => f.write_str("Approved"),
+            Self::Rejected => f.write_str("Rejected"),
+            Self::Postponed => f.write_str("Postponed"),
+            Self::Unknown => f.write_str("Unknown"),
+        }
     }
 }

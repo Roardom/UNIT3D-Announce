@@ -2,11 +2,11 @@ use std::ops::DerefMut;
 use std::str::FromStr;
 use std::{ops::Deref, sync::Arc};
 
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
 use indexmap::IndexMap;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
@@ -19,6 +19,7 @@ pub use passkey::Passkey;
 pub mod passkey2id;
 pub use passkey2id::Passkey2Id;
 
+#[derive(Serialize)]
 pub struct Map(IndexMap<u32, User>);
 
 impl Map {
@@ -103,6 +104,19 @@ impl Map {
 
         StatusCode::BAD_REQUEST
     }
+
+    pub async fn show(
+        State(tracker): State<Arc<Tracker>>,
+        Path(id): Path<u32>,
+    ) -> Result<Json<User>, StatusCode> {
+        tracker
+            .users
+            .read()
+            .await
+            .get(&id)
+            .map(|user| Json(user.clone()))
+            .ok_or(StatusCode::NOT_FOUND)
+    }
 }
 
 impl Deref for Map {
@@ -119,7 +133,7 @@ impl DerefMut for Map {
     }
 }
 
-#[derive(Clone, Deserialize, Hash)]
+#[derive(Clone, Deserialize, Hash, Serialize)]
 pub struct User {
     pub id: u32,
     pub group_id: i32,

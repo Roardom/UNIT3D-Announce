@@ -2,10 +2,10 @@ use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
 
-use axum::extract::{Json, State};
+use axum::extract::{Json, Path, State};
 use axum::http::StatusCode;
 use indexmap::IndexMap;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sqlx::MySqlPool;
 
 use crate::tracker::peer;
@@ -173,6 +173,19 @@ impl Map {
 
         StatusCode::BAD_REQUEST
     }
+
+    pub async fn show(
+        State(tracker): State<Arc<Tracker>>,
+        Path(id): Path<u32>,
+    ) -> Result<Json<Torrent>, StatusCode> {
+        tracker
+            .torrents
+            .read()
+            .await
+            .get(&id)
+            .map(|torrent| Json(torrent.clone()))
+            .ok_or(StatusCode::NOT_FOUND)
+    }
 }
 
 impl Deref for Map {
@@ -199,7 +212,7 @@ pub struct DBImportTorrent {
     pub is_deleted: bool,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default, Serialize)]
 pub struct Torrent {
     pub id: u32,
     pub status: Status,

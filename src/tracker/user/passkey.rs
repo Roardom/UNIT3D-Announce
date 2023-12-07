@@ -1,6 +1,9 @@
-use std::str::FromStr;
+use std::{
+    fmt::{Debug, Display},
+    str::FromStr,
+};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize, Serializer};
 use sqlx::{database::HasValueRef, Database, Decode};
 
 use anyhow::bail;
@@ -37,5 +40,20 @@ where
         let array = [(); 32].map(|_| bytes.next().expect("Invalid passkey length."));
 
         Ok(Passkey(array))
+    }
+}
+
+impl Display for Passkey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&String::from_utf8_lossy(&self.0))
+    }
+}
+
+impl Serialize for Passkey {
+    fn serialize<S>(&self, serializer: S) -> std::prelude::v1::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
     }
 }

@@ -1,7 +1,10 @@
+use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
+use chrono::serde::ts_seconds;
 use indexmap::IndexMap;
+use serde::{Serialize, Serializer};
 use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::MySqlPool;
 
@@ -10,6 +13,7 @@ use anyhow::{Context, Result};
 pub mod peer_id;
 pub use peer_id::PeerId;
 
+#[derive(Clone, Serialize)]
 pub struct Map(IndexMap<Index, Peer>);
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -18,7 +22,7 @@ pub struct Index {
     pub peer_id: PeerId,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize)]
 pub struct Peer {
     pub ip_address: std::net::IpAddr,
     pub user_id: u32,
@@ -26,6 +30,7 @@ pub struct Peer {
     pub port: u16,
     pub is_seeder: bool,
     pub is_active: bool,
+    #[serde(with = "ts_seconds")]
     pub updated_at: DateTime<Utc>,
     pub uploaded: u64,
     pub downloaded: u64,
@@ -110,5 +115,20 @@ impl DerefMut for Map {
 impl Default for Map {
     fn default() -> Self {
         Map::new()
+    }
+}
+
+impl Display for Index {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}-{}", self.user_id, self.peer_id)
+    }
+}
+
+impl Serialize for Index {
+    fn serialize<S>(&self, serializer: S) -> std::prelude::v1::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
     }
 }

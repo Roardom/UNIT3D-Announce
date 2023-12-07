@@ -1,8 +1,14 @@
-use std::ops::Deref;
+use std::{
+    fmt::{Debug, Display},
+    ops::Deref,
+};
 
+use serde::{Serialize, Serializer};
 use sqlx::{database::HasValueRef, Database, Decode};
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+use crate::utils::hex_encode;
+
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct PeerId(pub [u8; 20]);
 
 impl Deref for PeerId {
@@ -43,5 +49,32 @@ where
                 Err(error)
             }
         }
+    }
+}
+
+impl Display for PeerId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut hex = [0u8; 40];
+
+        for i in 0..self.0.len() {
+            [hex[2 * i], hex[2 * i + 1]] = hex_encode(self.0[i]);
+        }
+
+        f.write_str(&String::from_utf8_lossy(&hex))
+    }
+}
+
+impl Debug for PeerId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.to_string())
+    }
+}
+
+impl Serialize for PeerId {
+    fn serialize<S>(&self, serializer: S) -> std::prelude::v1::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
     }
 }
