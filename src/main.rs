@@ -40,7 +40,10 @@ async fn main() -> Result<()> {
         .with_state(tracker.clone());
 
     // Listening socket address.
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3001));
+    let addr = SocketAddr::from((
+        tracker.config.listening_ip_address,
+        tracker.config.listening_port,
+    ));
 
     // Start handling announces.
     println!("UNIT3D Announce has started.");

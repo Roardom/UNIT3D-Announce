@@ -1,4 +1,4 @@
-use std::env;
+use std::{env, net::IpAddr};
 
 use anyhow::{bail, Context, Result};
 
@@ -42,6 +42,10 @@ pub struct Config {
     /// Site password used by UNIT3D to send api requests to the tracker.
     /// Must be at least 32 characters long and should be properly randomized.
     pub apikey: String,
+    /// IP address for the tracker to listen from to receive announces.
+    pub listening_ip_address: IpAddr,
+    /// Port for the tracker to listen from to receive announces.
+    pub listening_port: u16,
 }
 
 impl Config {
@@ -96,6 +100,16 @@ impl Config {
             .parse()
             .context("INACTIVE_PEER_TTL must be a number between 0 and 2^64 - 1")?;
 
+        let listening_ip_address = env::var("LISTENING_IP_ADDRESS")
+            .context("LISTENING_IP_ADDRESS not found in .env file.")?
+            .parse()
+            .context("LISTENING_IP_ADDRESS in .env file could not be parsed.")?;
+
+        let listening_port = env::var("LISTENING_PORT")
+            .context("LISTENING_PORT not found in .env file.")?
+            .parse()
+            .context("LISTENING_PORT must be a number between 0 and 2^16 - 1")?;
+
         let apikey = env::var("APIKEY").context("APIKEY not found in .env file.")?;
 
         if apikey.len() < 32 {
@@ -114,6 +128,8 @@ impl Config {
             active_peer_ttl,
             inactive_peer_ttl,
             apikey,
+            listening_ip_address,
+            listening_port,
         })
     }
 }

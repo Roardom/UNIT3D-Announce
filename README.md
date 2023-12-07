@@ -41,5 +41,5 @@ If you serve both UNIT3D and UNIT3D-Announce on the same domain, add the followi
     }
 ```
 
-- `aaa.bbb.ccc.ddd:eeee` is the IP address and port of UNIT3D-Announce. By default, UNIT3D-Announce is served on `0.0.0.0:3001`, but it will be configurable via environment variables in the future. Replace this value with your true listening socket.
+- `aaa.bbb.ccc.ddd:eeee` is the listening IP address and port of UNIT3D-Announce. Replace this value with your true listening socket configured in your .env file.
 - `fff.ggg.hhh.iii` is the IP address of the nginx proxy. You can add additional `set_real_ip_from jjj.kkk.lll.mmm;` lines for each additional proxy used so long as the proxy appends the proper values to the `X-Forwarded-For` header. Replace this with your proxy IP address.
