@@ -53,7 +53,6 @@ impl Set {
         tracker
             .personal_freeleeches
             .write()
-            .await
             .insert(personal_freeleech);
     }
 
@@ -69,7 +68,6 @@ impl Set {
         tracker
             .personal_freeleeches
             .write()
-            .await
             .remove(&personal_freeleech);
     }
 }

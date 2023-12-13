@@ -1883,6 +1883,7 @@ dependencies = [
  "dotenvy",
  "indexmap",
  "memchr",
+ "parking_lot",
  "rand",
  "serde",
  "serde_repr",

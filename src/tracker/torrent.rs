@@ -128,10 +128,10 @@ impl Map {
     ) -> StatusCode {
         if let Ok(info_hash) = InfoHash::from_str(&torrent.info_hash) {
             println!("Inserting torrent with id {}.", torrent.id);
-            let old_torrent = tracker.torrents.write().await.remove(&torrent.id);
+            let old_torrent = tracker.torrents.lock().remove(&torrent.id);
             let peers = old_torrent.unwrap_or_default().peers;
 
-            tracker.torrents.write().await.insert(
+            tracker.torrents.lock().insert(
                 torrent.id,
                 Torrent {
                     id: torrent.id,
@@ -146,11 +146,7 @@ impl Map {
                 },
             );
 
-            tracker
-                .infohash2id
-                .write()
-                .await
-                .insert(info_hash, torrent.id);
+            tracker.infohash2id.write().insert(info_hash, torrent.id);
 
             return StatusCode::OK;
         }
@@ -162,7 +158,7 @@ impl Map {
         State(tracker): State<Arc<Tracker>>,
         Json(torrent): Json<APIRemoveTorrent>,
     ) -> StatusCode {
-        let mut torrent_guard = tracker.torrents.write().await;
+        let mut torrent_guard = tracker.torrents.lock();
 
         if let Some(torrent) = torrent_guard.get_mut(&torrent.id) {
             println!("Removing torrent with id {}.", torrent.id);
@@ -180,8 +176,7 @@ impl Map {
     ) -> Result<Json<Torrent>, StatusCode> {
         tracker
             .torrents
-            .read()
-            .await
+            .lock()
             .get(&id)
             .map(|torrent| Json(torrent.clone()))
             .ok_or(StatusCode::NOT_FOUND)

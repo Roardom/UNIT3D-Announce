@@ -235,7 +235,7 @@ pub async fn announce(
     }
 
     // Block user agent strings on the blacklist
-    if tracker.agent_blacklist.read().await.contains(&Agent {
+    if tracker.agent_blacklist.read().contains(&Agent {
         name: user_agent.to_string(),
     }) {
         return Err(BlacklistedClient);
@@ -260,9 +260,7 @@ pub async fn announce(
 
     // Validate port
     // Some clients send port 0 on the stopped event
-    if tracker.port_blacklist.read().await.contains(&queries.port)
-        && queries.event != Event::Stopped
-    {
+    if tracker.port_blacklist.read().contains(&queries.port) && queries.event != Event::Stopped {
         return Err(BlacklistedPort);
     }
 
@@ -272,13 +270,11 @@ pub async fn announce(
     let user_id = *tracker
         .passkey2id
         .read()
-        .await
         .get(&passkey)
         .ok_or(PasskeyNotFound)?;
     let user = tracker
         .users
         .read()
-        .await
         .get(&user_id)
         .ok_or(UserNotFound)?
         .clone();
@@ -291,7 +287,6 @@ pub async fn announce(
     let group = tracker
         .groups
         .read()
-        .await
         .get(&user.group_id)
         .ok_or(GroupNotFound)?
         .clone();
@@ -313,10 +308,9 @@ pub async fn announce(
     let torrent_id = *tracker
         .infohash2id
         .read()
-        .await
         .get(&queries.info_hash)
         .ok_or(InfoHashNotFound)?;
-    let mut torrent_guard = tracker.torrents.write().await;
+    let mut torrent_guard = tracker.torrents.lock();
     let torrent = torrent_guard.get_mut(&torrent_id).ok_or(TorrentNotFound)?;
 
     if torrent.is_deleted {
@@ -582,16 +576,11 @@ pub async fn announce(
     let download_factor = if tracker
         .personal_freeleeches
         .read()
-        .await
         .contains(&PersonalFreeleech { user_id })
-        || tracker
-            .freeleech_tokens
-            .read()
-            .await
-            .contains(&FreeleechToken {
-                user_id,
-                torrent_id,
-            }) {
+        || tracker.freeleech_tokens.read().contains(&FreeleechToken {
+            user_id,
+            torrent_id,
+        }) {
         0
     } else {
         download_factor
@@ -607,18 +596,13 @@ pub async fn announce(
     };
 
     if seeder_delta != 0 || leecher_delta != 0 {
-        tracker
-            .users
-            .write()
-            .await
-            .entry(user_id)
-            .and_modify(|user| {
-                user.num_seeding = user.num_seeding.saturating_add_signed(seeder_delta);
-                user.num_leeching = user.num_leeching.saturating_add_signed(leecher_delta);
-            });
+        tracker.users.write().entry(user_id).and_modify(|user| {
+            user.num_seeding = user.num_seeding.saturating_add_signed(seeder_delta);
+            user.num_leeching = user.num_leeching.saturating_add_signed(leecher_delta);
+        });
     }
 
-    tracker.peer_updates.write().await.upsert(
+    tracker.peer_updates.lock().upsert(
         queries.peer_id,
         client_ip,
         queries.port,
@@ -632,7 +616,7 @@ pub async fn announce(
         user_id,
     );
 
-    tracker.history_updates.write().await.upsert(
+    tracker.history_updates.lock().upsert(
         user_id,
         torrent_id,
         CompactString::from(user_agent),
@@ -649,7 +633,7 @@ pub async fn announce(
     );
 
     if credited_uploaded_delta != 0 || credited_downloaded_delta != 0 {
-        tracker.user_updates.write().await.upsert(
+        tracker.user_updates.lock().upsert(
             user_id,
             credited_uploaded_delta,
             credited_downloaded_delta,
@@ -657,7 +641,7 @@ pub async fn announce(
     }
 
     if seeder_delta != 0 || leecher_delta != 0 || times_completed_delta != 0 {
-        tracker.torrent_updates.write().await.upsert(
+        tracker.torrent_updates.lock().upsert(
             torrent_id,
             seeder_delta,
             leecher_delta,

@@ -20,27 +20,27 @@ use crate::scheduler::{history_update, peer_update, torrent_update, user_update}
 use crate::stats::Stats;
 
 use dotenvy::dotenv;
+use parking_lot::{Mutex, RwLock};
 use sqlx::mysql::MySqlPoolOptions;
 use std::{env, sync::Arc, time::Duration};
-use tokio::sync::RwLock;
 
 pub struct Tracker {
     pub agent_blacklist: RwLock<blacklisted_agent::Set>,
     pub config: config::Config,
     pub freeleech_tokens: RwLock<freeleech_token::Set>,
     pub groups: RwLock<group::Map>,
-    pub history_updates: RwLock<history_update::Queue>,
+    pub history_updates: Mutex<history_update::Queue>,
     pub infohash2id: RwLock<torrent::infohash2id::Map>,
     pub passkey2id: RwLock<user::passkey2id::Map>,
-    pub peer_updates: RwLock<peer_update::Queue>,
+    pub peer_updates: Mutex<peer_update::Queue>,
     pub personal_freeleeches: RwLock<personal_freeleech::Set>,
     pub pool: MySqlPool,
     pub port_blacklist: RwLock<blacklisted_port::Set>,
     pub stats: Stats,
-    pub torrents: RwLock<torrent::Map>,
-    pub torrent_updates: RwLock<torrent_update::Queue>,
+    pub torrents: Mutex<torrent::Map>,
+    pub torrent_updates: Mutex<torrent_update::Queue>,
     pub users: RwLock<user::Map>,
-    pub user_updates: RwLock<user_update::Queue>,
+    pub user_updates: Mutex<user_update::Queue>,
 }
 
 impl Tracker {
@@ -121,18 +121,18 @@ impl Tracker {
             config,
             freeleech_tokens: RwLock::new(freeleech_tokens),
             groups: RwLock::new(groups),
-            history_updates: RwLock::new(history_update::Queue::new()),
+            history_updates: Mutex::new(history_update::Queue::new()),
             infohash2id: RwLock::new(infohash2id),
             passkey2id: RwLock::new(passkey2id),
-            peer_updates: RwLock::new(peer_update::Queue::new()),
+            peer_updates: Mutex::new(peer_update::Queue::new()),
             personal_freeleeches: RwLock::new(personal_freeleeches),
             pool,
             port_blacklist: RwLock::new(port_blacklist),
             stats,
-            torrents: RwLock::new(torrents),
-            torrent_updates: RwLock::new(torrent_update::Queue::new()),
+            torrents: Mutex::new(torrents),
+            torrent_updates: Mutex::new(torrent_update::Queue::new()),
             users: RwLock::new(users),
-            user_updates: RwLock::new(user_update::Queue::new()),
+            user_updates: Mutex::new(user_update::Queue::new()),
         }))
     }
 }

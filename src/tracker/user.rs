@@ -69,7 +69,7 @@ impl Map {
         if let Ok(passkey) = Passkey::from_str(&user.passkey) {
             println!("Inserting user with id {}.", user.id);
 
-            tracker.users.write().await.insert(
+            tracker.users.write().insert(
                 user.id,
                 User {
                     id: user.id,
@@ -81,7 +81,7 @@ impl Map {
                 },
             );
 
-            tracker.passkey2id.write().await.insert(passkey, user.id);
+            tracker.passkey2id.write().insert(passkey, user.id);
 
             return StatusCode::OK;
         }
@@ -96,8 +96,8 @@ impl Map {
         if let Ok(passkey) = Passkey::from_str(&user.passkey) {
             println!("Removing user with id {}.", user.id);
 
-            tracker.users.write().await.remove(&user.id);
-            tracker.passkey2id.write().await.remove(&passkey);
+            tracker.users.write().remove(&user.id);
+            tracker.passkey2id.write().remove(&passkey);
 
             return StatusCode::OK;
         }
@@ -112,7 +112,6 @@ impl Map {
         tracker
             .users
             .read()
-            .await
             .get(&id)
             .map(|user| Json(user.clone()))
             .ok_or(StatusCode::NOT_FOUND)
