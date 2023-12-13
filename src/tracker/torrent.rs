@@ -2,10 +2,9 @@ use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
 
-use ahash::RandomState;
 use axum::extract::{Json, Path, State};
 use axum::http::StatusCode;
-use scc::HashMap;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use sqlx::MySqlPool;
 
@@ -24,11 +23,11 @@ pub use status::Status;
 
 use crate::tracker::Tracker;
 
-pub struct Map(HashMap<u32, Torrent, RandomState>);
+pub struct Map(IndexMap<u32, Torrent>);
 
 impl Map {
     pub fn new() -> Map {
-        Map(HashMap::with_hasher(RandomState::new()))
+        Map(IndexMap::new())
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Map> {
@@ -42,19 +41,19 @@ impl Map {
             num_leechers: u32,
         }
 
-        let grouped_peers: HashMap<u32, GroupedPeer> = HashMap::new();
+        let mut grouped_peers: IndexMap<u32, GroupedPeer> = IndexMap::new();
 
-        peers.scan(|index, peer| {
+        peers.iter().for_each(|(index, peer)| {
             grouped_peers
                 .entry(peer.torrent_id)
                 .and_modify(|torrent| {
-                    torrent.peers.entry(*index).or_insert(*peer);
+                    torrent.peers.insert(*index, *peer);
                     torrent.num_seeders += (peer.is_active && peer.is_seeder) as u32;
                     torrent.num_leechers += (peer.is_active && !peer.is_seeder) as u32;
                 })
                 .or_insert_with(|| {
-                    let peers = peer::Map::new();
-                    peers.entry(*index).or_insert(*peer);
+                    let mut peers = peer::Map::new();
+                    peers.insert(*index, *peer);
 
                     GroupedPeer {
                         peers,
@@ -88,37 +87,36 @@ impl Map {
         .await
         .context("Failed loading torrents.")?;
 
-        let torrent_map = Map::new();
+        let mut torrent_map = Map::new();
 
         torrents.iter().for_each(|torrent| {
             // Default values if torrent doesn't exist
-            let peers = peer::Map::new();
+            let mut peers = peer::Map::new();
             let mut seeders = 0;
             let mut leechers = 0;
 
             // Overwrite default values if peers exists
             if let Some(peer_group) = grouped_peers.get(&torrent.id) {
-                let peer_group = peer_group.get();
-
-                peer_group.peers.scan(|index, peer| {
-                    peers.entry(*index).or_insert(*peer);
-                });
+                peers.extend(peer_group.peers.iter());
                 seeders = peer_group.num_seeders;
                 leechers = peer_group.num_leechers;
             }
 
             // Insert torrent with its peers
-            torrent_map.entry(torrent.id).or_insert(Torrent {
-                id: torrent.id,
-                status: torrent.status,
-                seeders,
-                leechers,
-                times_completed: torrent.times_completed,
-                download_factor: torrent.download_factor,
-                upload_factor: torrent.upload_factor,
-                is_deleted: torrent.is_deleted,
-                peers,
-            });
+            torrent_map.insert(
+                torrent.id,
+                Torrent {
+                    id: torrent.id,
+                    status: torrent.status,
+                    seeders,
+                    leechers,
+                    times_completed: torrent.times_completed,
+                    download_factor: torrent.download_factor,
+                    upload_factor: torrent.upload_factor,
+                    is_deleted: torrent.is_deleted,
+                    peers,
+                },
+            );
         });
 
         Ok(torrent_map)
@@ -126,49 +124,33 @@ impl Map {
 
     pub async fn upsert(
         State(tracker): State<Arc<Tracker>>,
-        Json(insert_torrent): Json<APIInsertTorrent>,
+        Json(torrent): Json<APIInsertTorrent>,
     ) -> StatusCode {
-        if let Ok(info_hash) = InfoHash::from_str(&insert_torrent.info_hash) {
-            println!("Inserting torrent with id {}.", insert_torrent.id);
-            let old_torrent = tracker.torrents.remove(&insert_torrent.id);
-            let peers = old_torrent.unwrap_or_default().1.peers;
+        if let Ok(info_hash) = InfoHash::from_str(&torrent.info_hash) {
+            println!("Inserting torrent with id {}.", torrent.id);
+            let old_torrent = tracker.torrents.write().await.remove(&torrent.id);
+            let peers = old_torrent.unwrap_or_default().peers;
+
+            tracker.torrents.write().await.insert(
+                torrent.id,
+                Torrent {
+                    id: torrent.id,
+                    status: torrent.status,
+                    is_deleted: torrent.is_deleted,
+                    seeders: torrent.seeders,
+                    leechers: torrent.leechers,
+                    times_completed: torrent.times_completed,
+                    download_factor: torrent.download_factor,
+                    upload_factor: torrent.upload_factor,
+                    peers,
+                },
+            );
 
             tracker
-                .torrents
-                .entry(insert_torrent.id)
-                .and_modify(|torrent| {
-                    torrent.id = insert_torrent.id;
-                    torrent.status = insert_torrent.status;
-                    torrent.is_deleted = insert_torrent.is_deleted;
-                    torrent.seeders = insert_torrent.seeders;
-                    torrent.leechers = insert_torrent.leechers;
-                    torrent.times_completed = insert_torrent.times_completed;
-                    torrent.download_factor = insert_torrent.download_factor;
-                    torrent.upload_factor = insert_torrent.upload_factor;
-                    torrent.peers = peers.clone();
-                })
-                .or_insert(Torrent {
-                    id: insert_torrent.id,
-                    status: insert_torrent.status,
-                    is_deleted: insert_torrent.is_deleted,
-                    seeders: insert_torrent.seeders,
-                    leechers: insert_torrent.leechers,
-                    times_completed: insert_torrent.times_completed,
-                    download_factor: insert_torrent.download_factor,
-                    upload_factor: insert_torrent.upload_factor,
-                    peers,
-                });
-
-            // Safe since the value being modified implements Copy.
-            unsafe {
-                tracker
-                    .infohash2id
-                    .entry(info_hash)
-                    .and_modify(|id| {
-                        *id = insert_torrent.id;
-                    })
-                    .or_insert(insert_torrent.id);
-            }
+                .infohash2id
+                .write()
+                .await
+                .insert(info_hash, torrent.id);
 
             return StatusCode::OK;
         }
@@ -180,12 +162,14 @@ impl Map {
         State(tracker): State<Arc<Tracker>>,
         Json(torrent): Json<APIRemoveTorrent>,
     ) -> StatusCode {
-        tracker.torrents.update(&torrent.id, |_index, torrent| {
+        let mut torrent_guard = tracker.torrents.write().await;
+
+        if let Some(torrent) = torrent_guard.get_mut(&torrent.id) {
             println!("Removing torrent with id {}.", torrent.id);
             torrent.is_deleted = true;
 
             return StatusCode::OK;
-        });
+        }
 
         StatusCode::BAD_REQUEST
     }
@@ -196,13 +180,16 @@ impl Map {
     ) -> Result<Json<Torrent>, StatusCode> {
         tracker
             .torrents
-            .read(&id, |_index, torrent| Json(torrent.clone()))
+            .read()
+            .await
+            .get(&id)
+            .map(|torrent| Json(torrent.clone()))
             .ok_or(StatusCode::NOT_FOUND)
     }
 }
 
 impl Deref for Map {
-    type Target = HashMap<u32, Torrent, RandomState>;
+    type Target = IndexMap<u32, Torrent>;
 
     fn deref(&self) -> &Self::Target {
         &self.0

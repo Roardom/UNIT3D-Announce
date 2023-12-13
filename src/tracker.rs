@@ -7,7 +7,6 @@ pub mod personal_freeleech;
 pub mod torrent;
 pub mod user;
 
-use parking_lot::RwLock;
 pub use peer::Peer;
 pub use torrent::Torrent;
 pub use user::User;
@@ -23,23 +22,24 @@ use crate::stats::Stats;
 use dotenvy::dotenv;
 use sqlx::mysql::MySqlPoolOptions;
 use std::{env, sync::Arc, time::Duration};
+use tokio::sync::RwLock;
 
 pub struct Tracker {
-    pub agent_blacklist: blacklisted_agent::Set,
+    pub agent_blacklist: RwLock<blacklisted_agent::Set>,
     pub config: config::Config,
-    pub freeleech_tokens: freeleech_token::Set,
-    pub groups: group::Map,
+    pub freeleech_tokens: RwLock<freeleech_token::Set>,
+    pub groups: RwLock<group::Map>,
     pub history_updates: RwLock<history_update::Queue>,
-    pub infohash2id: torrent::infohash2id::Map,
-    pub passkey2id: user::passkey2id::Map,
+    pub infohash2id: RwLock<torrent::infohash2id::Map>,
+    pub passkey2id: RwLock<user::passkey2id::Map>,
     pub peer_updates: RwLock<peer_update::Queue>,
-    pub personal_freeleeches: personal_freeleech::Set,
+    pub personal_freeleeches: RwLock<personal_freeleech::Set>,
     pub pool: MySqlPool,
-    pub port_blacklist: blacklisted_port::Set,
+    pub port_blacklist: RwLock<blacklisted_port::Set>,
     pub stats: Stats,
-    pub torrents: torrent::Map,
+    pub torrents: RwLock<torrent::Map>,
     pub torrent_updates: RwLock<torrent_update::Queue>,
-    pub users: user::Map,
+    pub users: RwLock<user::Map>,
     pub user_updates: RwLock<user_update::Queue>,
 }
 
@@ -117,21 +117,21 @@ impl Tracker {
         let stats = Stats::default();
 
         Ok(Arc::new(Tracker {
-            agent_blacklist,
+            agent_blacklist: RwLock::new(agent_blacklist),
             config,
-            freeleech_tokens: freeleech_tokens,
-            groups,
+            freeleech_tokens: RwLock::new(freeleech_tokens),
+            groups: RwLock::new(groups),
             history_updates: RwLock::new(history_update::Queue::new()),
-            infohash2id,
-            passkey2id,
+            infohash2id: RwLock::new(infohash2id),
+            passkey2id: RwLock::new(passkey2id),
             peer_updates: RwLock::new(peer_update::Queue::new()),
-            personal_freeleeches,
+            personal_freeleeches: RwLock::new(personal_freeleeches),
             pool,
-            port_blacklist,
+            port_blacklist: RwLock::new(port_blacklist),
             stats,
-            torrents,
+            torrents: RwLock::new(torrents),
             torrent_updates: RwLock::new(torrent_update::Queue::new()),
-            users,
+            users: RwLock::new(users),
             user_updates: RwLock::new(user_update::Queue::new()),
         }))
     }

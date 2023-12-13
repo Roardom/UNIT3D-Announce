@@ -1,10 +1,9 @@
 use std::ops::DerefMut;
 use std::{ops::Deref, sync::Arc};
 
-use ahash::RandomState;
 use axum::extract::State;
 use axum::Json;
-use scc::HashIndex;
+use indexmap::IndexSet;
 use serde::Deserialize;
 use sqlx::MySqlPool;
 
@@ -12,11 +11,11 @@ use anyhow::{Context, Result};
 
 use crate::tracker::Tracker;
 
-pub struct Set(HashIndex<FreeleechToken, (), RandomState>);
+pub struct Set(IndexSet<FreeleechToken>);
 
 impl Set {
     pub fn new() -> Set {
-        Set(HashIndex::with_hasher(RandomState::new()))
+        Set(IndexSet::new())
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Set> {
@@ -34,10 +33,10 @@ impl Set {
         .await
         .context("Failed loading freeleech tokens.")?;
 
-        let freeleech_token_set = Set::new();
+        let mut freeleech_token_set = Set::new();
 
         for freeleech_token in freeleech_tokens {
-            freeleech_token_set.entry(freeleech_token).or_insert(());
+            freeleech_token_set.insert(freeleech_token);
         }
 
         Ok(freeleech_token_set)
@@ -49,7 +48,7 @@ impl Set {
             token.user_id, token.torrent_id
         );
 
-        tracker.freeleech_tokens.entry(token).or_insert(());
+        tracker.freeleech_tokens.write().await.insert(token);
     }
 
     pub async fn destroy(State(tracker): State<Arc<Tracker>>, Json(token): Json<FreeleechToken>) {
@@ -58,12 +57,12 @@ impl Set {
             token.user_id, token.torrent_id
         );
 
-        tracker.freeleech_tokens.remove(&token);
+        tracker.freeleech_tokens.write().await.remove(&token);
     }
 }
 
 impl Deref for Set {
-    type Target = HashIndex<FreeleechToken, (), RandomState>;
+    type Target = IndexSet<FreeleechToken>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -76,7 +75,7 @@ impl DerefMut for Set {
     }
 }
 
-#[derive(Clone, Eq, Deserialize, Hash, PartialEq)]
+#[derive(Eq, Deserialize, Hash, PartialEq)]
 pub struct FreeleechToken {
     pub user_id: u32,
     pub torrent_id: u32,

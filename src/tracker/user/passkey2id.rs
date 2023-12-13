@@ -1,16 +1,15 @@
 use std::ops::{Deref, DerefMut};
 
 use super::Passkey;
-use ahash::RandomState;
-use scc::HashIndex;
+use indexmap::IndexMap;
 use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
 
-pub struct Map(HashIndex<Passkey, u32, RandomState>);
+pub struct Map(IndexMap<Passkey, u32>);
 
 impl Deref for Map {
-    type Target = HashIndex<Passkey, u32, RandomState>;
+    type Target = IndexMap<Passkey, u32>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -25,7 +24,7 @@ impl DerefMut for Map {
 
 impl Map {
     pub fn new() -> Map {
-        Map(HashIndex::with_hasher(RandomState::new()))
+        Map(IndexMap::new())
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Map> {
@@ -43,12 +42,10 @@ impl Map {
         .await
         .context("Failed loading user passkey to id mappings.")?;
 
-        let passkey2id_map = Map::new();
+        let mut passkey2id_map = Map::new();
 
         for passkey2id in passkey2ids {
-            passkey2id_map
-                .entry(passkey2id.passkey)
-                .or_insert(passkey2id.id);
+            passkey2id_map.insert(passkey2id.passkey, passkey2id.id);
         }
 
         Ok(passkey2id_map)
