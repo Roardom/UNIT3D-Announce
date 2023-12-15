@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
 
     // Create router.
     let app = Router::new()
-        .merge(routes::routes(&tracker.config.apikey))
+        .merge(routes::routes(tracker.clone()))
         .with_state(tracker.clone());
 
     // Listening socket address.

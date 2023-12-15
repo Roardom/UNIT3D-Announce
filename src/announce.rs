@@ -649,5 +649,7 @@ pub async fn announce(
         );
     }
 
+    tracker.stats.increment_announce_response();
+
     Ok(response)
 }
