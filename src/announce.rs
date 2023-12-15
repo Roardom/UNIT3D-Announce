@@ -7,6 +7,7 @@ use axum::{
         HeaderMap,
     },
 };
+use chrono::{DateTime, Duration};
 use compact_str::CompactString;
 use peer::Peer;
 use rand::{rngs::SmallRng, seq::IteratorRandom, Rng, SeedableRng};
@@ -331,6 +332,7 @@ pub async fn announce(
     let seeder_delta;
     let leecher_delta;
     let times_completed_delta;
+    let mut updated_at: Option<DateTime<Utc>> = None;
 
     if queries.event == Event::Stopped {
         // Try and remove the peer
@@ -429,6 +431,8 @@ pub async fn announce(
                 // announce
                 uploaded_delta = queries.uploaded.saturating_sub(old_peer.uploaded);
                 downloaded_delta = queries.downloaded.saturating_sub(old_peer.downloaded);
+
+                updated_at = Some(old_peer.updated_at);
             }
             None => {
                 // new peer is inserted
@@ -471,6 +475,7 @@ pub async fn announce(
         }
     }
 
+    // Has to be adjusted before the peer list is generated
     torrent.seeders = torrent.seeders.saturating_add_signed(seeder_delta);
     torrent.leechers = torrent.leechers.saturating_add_signed(leecher_delta);
 
@@ -479,7 +484,19 @@ pub async fn announce(
     let mut peers_ipv4: Vec<u8> = Vec::new();
     let mut peers_ipv6: Vec<u8> = Vec::new();
 
-    if queries.event != Event::Stopped && (torrent.leechers != 0 || queries.left != 0) {
+    // Only provide peer list if
+    // - it is not a stopped event,
+    // - there exist leechers (we have to remember to update the torrent leecher count before this check), and
+    // - the peer last announced more than announce_min seconds ago.
+    if queries.event != Event::Stopped
+        && torrent.leechers > 0
+        && (updated_at.is_none()
+            || updated_at.is_some_and(|updated_at| {
+                updated_at
+                    .checked_add_signed(Duration::seconds(tracker.config.announce_min.into()))
+                    .is_some_and(|blocked_until| blocked_until < Utc::now())
+            }))
+    {
         let mut peers: Vec<(&peer::Index, &Peer)> = Vec::with_capacity(std::cmp::min(
             queries.numwant,
             torrent.seeders as usize + torrent.leechers as usize,
