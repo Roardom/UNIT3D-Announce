@@ -32,6 +32,7 @@ pub struct PeerUpdate {
     pub torrent_id: u32,
     pub user_id: u32,
     pub updated_at: DateTime<Utc>,
+    pub connectable: bool,
 }
 
 impl Queue {
@@ -52,6 +53,7 @@ impl Queue {
         left: u64,
         torrent_id: u32,
         user_id: u32,
+        connectable: bool,
     ) {
         self.insert(
             Index {
@@ -72,6 +74,7 @@ impl Queue {
                 torrent_id,
                 user_id,
                 updated_at: Utc::now(),
+                connectable,
             },
         );
     }
@@ -83,7 +86,7 @@ impl Queue {
         const BIND_LIMIT: usize = 65535;
 
         /// Number of columns being updated in the peer table
-        const PEER_COLUMN_COUNT: usize = 12;
+        const PEER_COLUMN_COUNT: usize = 13;
 
         BIND_LIMIT / PEER_COLUMN_COUNT
     }
@@ -111,6 +114,7 @@ impl Queue {
                 peer_update.left,
                 peer_update.torrent_id,
                 peer_update.user_id,
+                peer_update.connectable,
             );
         }
     }
@@ -139,7 +143,8 @@ impl Queue {
                         created_at,
                         updated_at,
                         torrent_id,
-                        user_id
+                        user_id,
+                        connectable
                     )
             "#,
         );
@@ -160,7 +165,8 @@ impl Queue {
                         .push_bind(peer_update.updated_at)
                         .push_bind(peer_update.updated_at)
                         .push_bind(peer_update.torrent_id)
-                        .push_bind(peer_update.user_id),
+                        .push_bind(peer_update.user_id)
+                        .push_bind(peer_update.connectable),
                     IpAddr::V6(ip) => bind
                         .push_bind(peer_update.peer_id.to_vec())
                         .push_bind(ip.octets().to_vec())
@@ -174,7 +180,8 @@ impl Queue {
                         .push_bind(peer_update.updated_at)
                         .push_bind(peer_update.updated_at)
                         .push_bind(peer_update.torrent_id)
-                        .push_bind(peer_update.user_id),
+                        .push_bind(peer_update.user_id)
+                        .push_bind(peer_update.connectable),
                 };
             })
             .push(
@@ -188,7 +195,8 @@ impl Queue {
                     `left` = VALUES(`left`),
                     active = VALUES(active),
                     seeder = VALUES(seeder),
-                    updated_at = VALUES(updated_at)
+                    updated_at = VALUES(updated_at),
+                    connectable = VALUES(connectable)
             "#,
             );
 

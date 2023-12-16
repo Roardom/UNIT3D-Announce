@@ -1,5 +1,6 @@
 pub mod blacklisted_agent;
 pub mod blacklisted_port;
+pub mod connectable_port;
 pub mod freeleech_token;
 pub mod group;
 pub mod peer;
@@ -7,6 +8,7 @@ pub mod personal_freeleech;
 pub mod torrent;
 pub mod user;
 
+pub use connectable_port::ConnectablePort;
 pub use peer::Peer;
 pub use torrent::Torrent;
 pub use user::User;
@@ -27,6 +29,7 @@ use std::{env, sync::Arc, time::Duration};
 pub struct Tracker {
     pub agent_blacklist: RwLock<blacklisted_agent::Set>,
     pub config: config::Config,
+    pub connectable_ports: RwLock<connectable_port::Map>,
     pub freeleech_tokens: RwLock<freeleech_token::Set>,
     pub groups: RwLock<group::Map>,
     pub history_updates: Mutex<history_update::Queue>,
@@ -96,6 +99,13 @@ impl Tracker {
             passkey2id.len()
         );
 
+        println!("Loading from database into memory: connectable ports...");
+        let connectable_ports = connectable_port::Map::from_db(&pool).await?;
+        println!(
+            "\x1B[1F\x1B[2KLoaded {:?} connectable ports",
+            connectable_ports.len()
+        );
+
         println!("Loading from database into memory: freeleech tokens...");
         let freeleech_tokens = freeleech_token::Set::from_db(&pool).await?;
         println!(
@@ -119,6 +129,7 @@ impl Tracker {
         Ok(Arc::new(Tracker {
             agent_blacklist: RwLock::new(agent_blacklist),
             config,
+            connectable_ports: RwLock::new(connectable_ports),
             freeleech_tokens: RwLock::new(freeleech_tokens),
             groups: RwLock::new(groups),
             history_updates: Mutex::new(history_update::Queue::new()),

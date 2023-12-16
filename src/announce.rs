@@ -9,7 +9,6 @@ use axum::{
 };
 use chrono::{DateTime, Duration};
 use compact_str::CompactString;
-use peer::Peer;
 use rand::{rngs::SmallRng, seq::IteratorRandom, Rng, SeedableRng};
 use sqlx::types::chrono::Utc;
 use std::{
@@ -17,6 +16,7 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
+use tokio::net::TcpStream;
 
 use crate::error::AnnounceError::{
     self, AbnormalAccess, BlacklistedClient, BlacklistedPort, DownloadPrivilegesRevoked,
@@ -33,8 +33,9 @@ use crate::error::AnnounceError::{
 use crate::tracker::{
     self,
     blacklisted_agent::Agent,
+    connectable_port::ConnectablePort,
     freeleech_token::FreeleechToken,
-    peer::{self, PeerId},
+    peer::{self, Peer, PeerId},
     personal_freeleech::PersonalFreeleech,
     torrent::InfoHash,
     user::Passkey,
@@ -651,6 +652,8 @@ pub async fn announce(
         });
     }
 
+    let connectable = check_connectivity(&tracker, client_ip, queries.port).await;
+
     tracker.peer_updates.lock().upsert(
         queries.peer_id,
         client_ip,
@@ -663,6 +666,7 @@ pub async fn announce(
         queries.left,
         torrent_id,
         user_id,
+        connectable,
     );
 
     tracker.history_updates.lock().upsert(
@@ -701,4 +705,50 @@ pub async fn announce(
     tracker.stats.increment_announce_response();
 
     Ok(response)
+}
+
+async fn check_connectivity(tracker: &Arc<Tracker>, ip: IpAddr, port: u16) -> bool {
+    if tracker.config.is_connectivity_check_enabled {
+        let now = Utc::now();
+        let socket = SocketAddr::from((ip, port));
+        let connectable_port_opt = tracker.connectable_ports.read().get(&socket).cloned();
+
+        if let Some(connectable_port) = connectable_port_opt {
+            let ttl = Duration::seconds(tracker.config.connectivity_check_interval);
+
+            if let Some(cached_until) = connectable_port.updated_at.checked_add_signed(ttl) {
+                if cached_until > now {
+                    return connectable_port.connectable;
+                }
+            }
+        }
+
+        let connectable = tokio::spawn(async move {
+            tokio::time::timeout(
+                std::time::Duration::from_millis(500),
+                TcpStream::connect(socket),
+            )
+            .await
+            .is_ok_and(|connection_result| connection_result.is_ok())
+        })
+        .await
+        .unwrap_or(false);
+
+        tracker
+            .connectable_ports
+            .write()
+            .entry(socket)
+            .and_modify(|connectable_port| {
+                connectable_port.connectable = connectable;
+                connectable_port.updated_at = now;
+            })
+            .or_insert(ConnectablePort {
+                connectable,
+                updated_at: now,
+            });
+
+        return connectable;
+    }
+
+    false
 }

@@ -51,6 +51,12 @@ pub struct Config {
     /// as well as keeps the peer lists from being filled with too many clients
     /// of a single user.
     pub max_peers_per_torrent_per_user: u16,
+    /// Open a connection to the incoming peer announcing and record if their
+    /// socket accepts the connection.
+    pub is_connectivity_check_enabled: bool,
+    /// The minimum number of seconds a socket's connectivity status is cached for
+    /// before rechecking the peer's connectivity. Use `-1` for no caching.
+    pub connectivity_check_interval: i64,
 }
 
 impl Config {
@@ -120,6 +126,16 @@ impl Config {
             .parse()
             .context("MAX_PEERS_PER_TORRENT_PER_USER must be a number between 0 and 2^16 - 1")?;
 
+        let is_connectivity_check_enabled = env::var("IS_CONNECTIVITY_CHECK_ENABLED")
+            .context("IS_CONNECTIVITY_CHECK_ENABLED not found in .env file.")?
+            .parse()
+            .context("IS_CONNECTIVITY_CHECK_ENABLED must be either `true` or `false`")?;
+
+        let connectivity_check_interval = env::var("CONNECTIVITY_CHECK_INTERVAL")
+            .context("CONNECTIVITY_CHECK_INTERVAL not found in .env file.")?
+            .parse()
+            .context("CONNECTIVITY_CHECK_INTERVAL must be a number between -(2^63) and 2^63 - 1")?;
+
         let apikey = env::var("APIKEY").context("APIKEY not found in .env file.")?;
 
         if apikey.len() < 32 {
@@ -141,6 +157,8 @@ impl Config {
             listening_ip_address,
             listening_port,
             max_peers_per_torrent_per_user,
+            is_connectivity_check_enabled,
+            connectivity_check_interval,
         })
     }
 }
