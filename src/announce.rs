@@ -311,284 +311,316 @@ pub async fn announce(
         .read()
         .get(&queries.info_hash)
         .ok_or(InfoHashNotFound)?;
-    let mut torrent_guard = tracker.torrents.lock();
-    let torrent = torrent_guard.get_mut(&torrent_id).ok_or(TorrentNotFound)?;
 
-    if torrent.is_deleted {
-        return Err(TorrentIsDeleted);
-    }
+    let (
+        upload_factor,
+        download_factor,
+        uploaded_delta,
+        downloaded_delta,
+        seeder_delta,
+        leecher_delta,
+        times_completed_delta,
+        response,
+    ) = {
+        let mut torrent_guard = tracker.torrents.lock();
+        let torrent = torrent_guard.get_mut(&torrent_id).ok_or(TorrentNotFound)?;
 
-    match torrent.status {
-        tracker::torrent::Status::Approved => (),
-        tracker::torrent::Status::Pending => return Err(TorrentIsPendingModeration),
-        tracker::torrent::Status::Rejected => return Err(TorrentIsRejected),
-        tracker::torrent::Status::Postponed => return Err(TorrentIsPostponed),
-        _ => return Err(TorrentUnknownModerationStatus),
-    }
-
-    // Change of upload/download compared to previous announce
-    let uploaded_delta;
-    let downloaded_delta;
-    let seeder_delta;
-    let leecher_delta;
-    let times_completed_delta;
-    let mut updated_at: Option<DateTime<Utc>> = None;
-
-    if queries.event == Event::Stopped {
-        // Try and remove the peer
-        let removed_peer = torrent.peers.remove(&tracker::peer::Index {
-            user_id,
-            peer_id: queries.peer_id,
-        });
-        // Check if peer was removed
-        if let Some(peer) = removed_peer {
-            // Calculate change in upload and download compared to previous
-            // announce
-            uploaded_delta = queries.uploaded.saturating_sub(peer.uploaded);
-            downloaded_delta = queries.downloaded.saturating_sub(peer.downloaded);
-
-            if peer.is_active {
-                if peer.is_seeder {
-                    seeder_delta = -1;
-                    leecher_delta = 0;
-                } else {
-                    seeder_delta = 0;
-                    leecher_delta = -1;
-                }
-            } else {
-                seeder_delta = 0;
-                leecher_delta = 0;
-            }
-        } else {
-            return Err(StoppedPeerDoesntExist);
+        if torrent.is_deleted {
+            return Err(TorrentIsDeleted);
         }
 
-        times_completed_delta = 0;
-    } else {
-        // Insert the peer into the in-memory db
-        let old_peer = torrent.peers.insert(
-            tracker::peer::Index {
+        match torrent.status {
+            tracker::torrent::Status::Approved => (),
+            tracker::torrent::Status::Pending => return Err(TorrentIsPendingModeration),
+            tracker::torrent::Status::Rejected => return Err(TorrentIsRejected),
+            tracker::torrent::Status::Postponed => return Err(TorrentIsPostponed),
+            _ => return Err(TorrentUnknownModerationStatus),
+        }
+
+        // Change of upload/download compared to previous announce
+        let uploaded_delta;
+        let downloaded_delta;
+        let seeder_delta;
+        let leecher_delta;
+        let times_completed_delta;
+        let mut updated_at: Option<DateTime<Utc>> = None;
+
+        if queries.event == Event::Stopped {
+            // Try and remove the peer
+            let removed_peer = torrent.peers.remove(&tracker::peer::Index {
                 user_id,
                 peer_id: queries.peer_id,
-            },
-            tracker::Peer {
-                ip_address: client_ip,
-                user_id,
-                torrent_id,
-                port: queries.port,
-                is_seeder: queries.left == 0,
-                is_active: true,
-                updated_at: Utc::now(),
-                uploaded: queries.uploaded,
-                downloaded: queries.downloaded,
-            },
+            });
+            // Check if peer was removed
+            if let Some(peer) = removed_peer {
+                // Calculate change in upload and download compared to previous
+                // announce
+                uploaded_delta = queries.uploaded.saturating_sub(peer.uploaded);
+                downloaded_delta = queries.downloaded.saturating_sub(peer.downloaded);
+
+                if peer.is_active {
+                    if peer.is_seeder {
+                        seeder_delta = -1;
+                        leecher_delta = 0;
+                    } else {
+                        seeder_delta = 0;
+                        leecher_delta = -1;
+                    }
+                } else {
+                    seeder_delta = 0;
+                    leecher_delta = 0;
+                }
+            } else {
+                return Err(StoppedPeerDoesntExist);
+            }
+
+            times_completed_delta = 0;
+        } else {
+            // Insert the peer into the in-memory db
+            let old_peer = torrent.peers.insert(
+                tracker::peer::Index {
+                    user_id,
+                    peer_id: queries.peer_id,
+                },
+                tracker::Peer {
+                    ip_address: client_ip,
+                    user_id,
+                    torrent_id,
+                    port: queries.port,
+                    is_seeder: queries.left == 0,
+                    is_active: true,
+                    updated_at: Utc::now(),
+                    uploaded: queries.uploaded,
+                    downloaded: queries.downloaded,
+                },
+            );
+
+            // Update the user and torrent seeding/leeching counts in the
+            // in-memory db
+            match old_peer {
+                Some(old_peer) => {
+                    if queries.left == 0 && !old_peer.is_seeder {
+                        // leech has turned into a seed
+                        seeder_delta = 1;
+                        times_completed_delta = 1;
+
+                        if old_peer.is_active {
+                            leecher_delta = -1;
+                        } else {
+                            leecher_delta = 0;
+                        }
+                    } else if queries.left > 0 && old_peer.is_seeder {
+                        // seed has turned into a leech
+                        leecher_delta = 1;
+                        times_completed_delta = 0;
+
+                        if old_peer.is_active {
+                            seeder_delta = -1;
+                        } else {
+                            seeder_delta = 0;
+                        }
+                    } else {
+                        times_completed_delta = 0;
+
+                        if !old_peer.is_active {
+                            if queries.left == 0 {
+                                // seeder is reactivated
+                                seeder_delta = 1;
+                                leecher_delta = 0;
+                            } else {
+                                // leecher is reactivated
+                                seeder_delta = 0;
+                                leecher_delta = 1;
+                            }
+                        } else {
+                            seeder_delta = 0;
+                            leecher_delta = 0;
+                        }
+                    }
+
+                    // Calculate change in upload and download compared to previous
+                    // announce
+                    uploaded_delta = queries.uploaded.saturating_sub(old_peer.uploaded);
+                    downloaded_delta = queries.downloaded.saturating_sub(old_peer.downloaded);
+
+                    updated_at = Some(old_peer.updated_at);
+                }
+                None => {
+                    // new peer is inserted
+
+                    // Make sure user is only allowed N peers per torrent.
+                    let mut peer_count = 0;
+
+                    for &peer in torrent.peers.values() {
+                        if peer.user_id == user_id {
+                            peer_count += 1;
+
+                            if peer_count >= tracker.config.max_peers_per_torrent_per_user {
+                                torrent.peers.remove(&tracker::peer::Index {
+                                    user_id,
+                                    peer_id: queries.peer_id,
+                                });
+
+                                return Err(PeersPerTorrentPerUserLimit);
+                            }
+                        }
+                    }
+
+                    if queries.left == 0 {
+                        // new seeder is inserted
+                        leecher_delta = 0;
+                        seeder_delta = 1;
+                    } else {
+                        // new leecher is inserted
+                        seeder_delta = 0;
+                        leecher_delta = 1;
+                    }
+
+                    times_completed_delta = 0;
+
+                    // Calculate change in upload and download compared to previous
+                    // announce
+                    uploaded_delta = queries.uploaded;
+                    downloaded_delta = queries.downloaded;
+                }
+            }
+        }
+
+        // Has to be adjusted before the peer list is generated
+        torrent.seeders = torrent.seeders.saturating_add_signed(seeder_delta);
+        torrent.leechers = torrent.leechers.saturating_add_signed(leecher_delta);
+
+        // Generate peer lists to return to client
+
+        let mut peers_ipv4: Vec<u8> = Vec::new();
+        let mut peers_ipv6: Vec<u8> = Vec::new();
+
+        // Only provide peer list if
+        // - it is not a stopped event,
+        // - there exist leechers (we have to remember to update the torrent leecher count before this check), and
+        // - the peer last announced more than announce_min seconds ago.
+        if queries.event != Event::Stopped
+            && torrent.leechers > 0
+            && (updated_at.is_none()
+                || updated_at.is_some_and(|updated_at| {
+                    updated_at
+                        .checked_add_signed(Duration::seconds(tracker.config.announce_min.into()))
+                        .is_some_and(|blocked_until| blocked_until < Utc::now())
+                }))
+        {
+            let mut peers: Vec<(&peer::Index, &Peer)> = Vec::with_capacity(std::cmp::min(
+                queries.numwant,
+                torrent.seeders as usize + torrent.leechers as usize,
+            ));
+
+            // Don't return peers with the same user id or those that are marked as inactive
+            let valid_peers = torrent
+                .peers
+                .iter()
+                .filter(|(_index, peer)| peer.user_id != user_id && peer.is_active);
+
+            // Make sure leech peer lists are filled with seeds
+            if queries.left > 0 && torrent.seeders > 0 && queries.numwant > peers.len() {
+                peers.extend(
+                    valid_peers
+                        .clone()
+                        .filter(|(_index, peer)| peer.is_seeder)
+                        .choose_multiple(&mut SmallRng::from_entropy(), queries.numwant),
+                );
+            }
+
+            // Otherwise only send leeches until the numwant is reached
+            if torrent.leechers > 0 && queries.numwant > peers.len() {
+                peers.extend(
+                    valid_peers
+                        .filter(|(_index, peer)| !peer.is_seeder)
+                        .choose_multiple(
+                            &mut SmallRng::from_entropy(),
+                            queries.numwant.saturating_sub(peers.len()),
+                        ),
+                );
+            }
+
+            // Split peers into ipv4 and ipv6 variants and serialize their socket
+            // to bytes according to the bittorrent spec
+            for (_index, peer) in peers.iter() {
+                match peer.ip_address {
+                    IpAddr::V4(ip) => {
+                        peers_ipv4.extend(&ip.octets());
+                        peers_ipv4.extend(&peer.port.to_be_bytes());
+                    }
+                    IpAddr::V6(ip) => {
+                        peers_ipv6.extend(&ip.octets());
+                        peers_ipv6.extend(&peer.port.to_be_bytes());
+                    }
+                }
+            }
+        }
+
+        // Generate bencoded response to return to client
+
+        let interval = SmallRng::from_entropy()
+            .gen_range(tracker.config.announce_min..=tracker.config.announce_max);
+
+        // Write out bencoded response (keys must be sorted to be within spec)
+        let mut response: Vec<u8> = vec![];
+        response.extend(b"d8:completei");
+        response.extend(torrent.seeders.to_string().as_bytes());
+        response.extend(b"e10:downloadedi");
+        response.extend(torrent.times_completed.to_string().as_bytes());
+        response.extend(b"e10:incompletei");
+        response.extend(torrent.leechers.to_string().as_bytes());
+        response.extend(b"e8:intervali");
+        response.extend(interval.to_string().as_bytes());
+        response.extend(b"e12:min intervali");
+        response.extend(tracker.config.announce_min.to_string().as_bytes());
+        response.extend(b"e5:peers");
+        response.extend(peers_ipv4.len().to_string().as_bytes());
+        response.extend(b":");
+        response.extend(&peers_ipv4);
+
+        if !peers_ipv6.is_empty() {
+            response.extend(b"e6:peers6");
+            response.extend(peers_ipv6.len().to_string().as_bytes());
+            response.extend(b":");
+            response.extend(peers_ipv6);
+        }
+
+        response.extend(b"e");
+
+        let upload_factor = std::cmp::max(
+            tracker.config.upload_factor,
+            std::cmp::max(group.upload_factor, torrent.upload_factor),
         );
 
-        // Update the user and torrent seeding/leeching counts in the
-        // in-memory db
-        match old_peer {
-            Some(old_peer) => {
-                if queries.left == 0 && !old_peer.is_seeder {
-                    // leech has turned into a seed
-                    seeder_delta = 1;
-                    times_completed_delta = 1;
+        let download_factor = std::cmp::min(
+            tracker.config.download_factor,
+            std::cmp::min(group.download_factor, torrent.download_factor),
+        );
 
-                    if old_peer.is_active {
-                        leecher_delta = -1;
-                    } else {
-                        leecher_delta = 0;
-                    }
-                } else if queries.left > 0 && old_peer.is_seeder {
-                    // seed has turned into a leech
-                    leecher_delta = 1;
-                    times_completed_delta = 0;
+        // Has to be dropped before any `await` calls.
+        //
+        // Unfortunately, `Drop` currently doesn't work in rust with borrowed values
+        // so we have to use a giant scope instead.
+        //
+        // See:
+        // - https://github.com/rust-lang/rust/issues/57478
+        // - https://stackoverflow.com/questions/73519148/why-does-send-value-that-is-dropd-before-await-mean-the-future-is-send
+        // - https://github.com/rust-lang/rust/issues/101135
+        //    - Once this issue is fixed, we can remove the scope and rely solely on `Drop`.
+        drop(torrent_guard);
 
-                    if old_peer.is_active {
-                        seeder_delta = -1;
-                    } else {
-                        seeder_delta = 0;
-                    }
-                } else {
-                    times_completed_delta = 0;
-
-                    if !old_peer.is_active {
-                        if queries.left == 0 {
-                            // seeder is reactivated
-                            seeder_delta = 1;
-                            leecher_delta = 0;
-                        } else {
-                            // leecher is reactivated
-                            seeder_delta = 0;
-                            leecher_delta = 1;
-                        }
-                    } else {
-                        seeder_delta = 0;
-                        leecher_delta = 0;
-                    }
-                }
-
-                // Calculate change in upload and download compared to previous
-                // announce
-                uploaded_delta = queries.uploaded.saturating_sub(old_peer.uploaded);
-                downloaded_delta = queries.downloaded.saturating_sub(old_peer.downloaded);
-
-                updated_at = Some(old_peer.updated_at);
-            }
-            None => {
-                // new peer is inserted
-
-                // Make sure user is only allowed N peers per torrent.
-                let mut peer_count = 0;
-
-                for &peer in torrent.peers.values() {
-                    if peer.user_id == user_id {
-                        peer_count += 1;
-
-                        if peer_count >= tracker.config.max_peers_per_torrent_per_user {
-                            torrent.peers.remove(&tracker::peer::Index {
-                                user_id,
-                                peer_id: queries.peer_id,
-                            });
-
-                            return Err(PeersPerTorrentPerUserLimit);
-                        }
-                    }
-                }
-
-                if queries.left == 0 {
-                    // new seeder is inserted
-                    leecher_delta = 0;
-                    seeder_delta = 1;
-                } else {
-                    // new leecher is inserted
-                    seeder_delta = 0;
-                    leecher_delta = 1;
-                }
-
-                times_completed_delta = 0;
-
-                // Calculate change in upload and download compared to previous
-                // announce
-                uploaded_delta = queries.uploaded;
-                downloaded_delta = queries.downloaded;
-            }
-        }
-    }
-
-    // Has to be adjusted before the peer list is generated
-    torrent.seeders = torrent.seeders.saturating_add_signed(seeder_delta);
-    torrent.leechers = torrent.leechers.saturating_add_signed(leecher_delta);
-
-    // Generate peer lists to return to client
-
-    let mut peers_ipv4: Vec<u8> = Vec::new();
-    let mut peers_ipv6: Vec<u8> = Vec::new();
-
-    // Only provide peer list if
-    // - it is not a stopped event,
-    // - there exist leechers (we have to remember to update the torrent leecher count before this check), and
-    // - the peer last announced more than announce_min seconds ago.
-    if queries.event != Event::Stopped
-        && torrent.leechers > 0
-        && (updated_at.is_none()
-            || updated_at.is_some_and(|updated_at| {
-                updated_at
-                    .checked_add_signed(Duration::seconds(tracker.config.announce_min.into()))
-                    .is_some_and(|blocked_until| blocked_until < Utc::now())
-            }))
-    {
-        let mut peers: Vec<(&peer::Index, &Peer)> = Vec::with_capacity(std::cmp::min(
-            queries.numwant,
-            torrent.seeders as usize + torrent.leechers as usize,
-        ));
-
-        // Don't return peers with the same user id or those that are marked as inactive
-        let valid_peers = torrent
-            .peers
-            .iter()
-            .filter(|(_index, peer)| peer.user_id != user_id && peer.is_active);
-
-        // Make sure leech peer lists are filled with seeds
-        if queries.left > 0 && torrent.seeders > 0 && queries.numwant > peers.len() {
-            peers.extend(
-                valid_peers
-                    .clone()
-                    .filter(|(_index, peer)| peer.is_seeder)
-                    .choose_multiple(&mut SmallRng::from_entropy(), queries.numwant),
-            );
-        }
-
-        // Otherwise only send leeches until the numwant is reached
-        if torrent.leechers > 0 && queries.numwant > peers.len() {
-            peers.extend(
-                valid_peers
-                    .filter(|(_index, peer)| !peer.is_seeder)
-                    .choose_multiple(
-                        &mut SmallRng::from_entropy(),
-                        queries.numwant.saturating_sub(peers.len()),
-                    ),
-            );
-        }
-
-        // Split peers into ipv4 and ipv6 variants and serialize their socket
-        // to bytes according to the bittorrent spec
-        for (_index, peer) in peers.iter() {
-            match peer.ip_address {
-                IpAddr::V4(ip) => {
-                    peers_ipv4.extend(&ip.octets());
-                    peers_ipv4.extend(&peer.port.to_be_bytes());
-                }
-                IpAddr::V6(ip) => {
-                    peers_ipv6.extend(&ip.octets());
-                    peers_ipv6.extend(&peer.port.to_be_bytes());
-                }
-            }
-        }
-    }
-
-    // Generate bencoded response to return to client
-
-    let interval = SmallRng::from_entropy()
-        .gen_range(tracker.config.announce_min..=tracker.config.announce_max);
-
-    // Write out bencoded response (keys must be sorted to be within spec)
-    let mut response: Vec<u8> = vec![];
-    response.extend(b"d8:completei");
-    response.extend(torrent.seeders.to_string().as_bytes());
-    response.extend(b"e10:downloadedi");
-    response.extend(torrent.times_completed.to_string().as_bytes());
-    response.extend(b"e10:incompletei");
-    response.extend(torrent.leechers.to_string().as_bytes());
-    response.extend(b"e8:intervali");
-    response.extend(interval.to_string().as_bytes());
-    response.extend(b"e12:min intervali");
-    response.extend(tracker.config.announce_min.to_string().as_bytes());
-    response.extend(b"e5:peers");
-    response.extend(peers_ipv4.len().to_string().as_bytes());
-    response.extend(b":");
-    response.extend(&peers_ipv4);
-
-    if !peers_ipv6.is_empty() {
-        response.extend(b"e6:peers6");
-        response.extend(peers_ipv6.len().to_string().as_bytes());
-        response.extend(b":");
-        response.extend(peers_ipv6);
-    }
-
-    response.extend(b"e");
-
-    let upload_factor = std::cmp::max(
-        tracker.config.upload_factor,
-        std::cmp::max(group.upload_factor, torrent.upload_factor),
-    );
-
-    let download_factor = std::cmp::min(
-        tracker.config.download_factor,
-        std::cmp::min(group.download_factor, torrent.download_factor),
-    );
-
-    // Has to be dropped before any `await` calls.
-    drop(torrent_guard);
+        (
+            upload_factor,
+            download_factor,
+            uploaded_delta,
+            downloaded_delta,
+            seeder_delta,
+            leecher_delta,
+            times_completed_delta,
+            response,
+        )
+    };
 
     let download_factor = if tracker
         .personal_freeleeches
