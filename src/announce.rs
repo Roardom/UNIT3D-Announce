@@ -408,12 +408,16 @@ pub async fn announce(
             _ => (),
         }
 
-        // Make sure user isn't leeching more torrents than their group allows
+        // Make sure user isn't leeching more torrents than their group allows unless they are a lifetime user
         let has_hit_download_slot_limit = if queries.left > 0 {
-            if let Some(slots) = group.download_slots {
-                user.num_leeching >= slots
+            if user.is_lifetime {
+                user.num_leeching >= 200
             } else {
-                false
+                if let Some(slots) = group.download_slots {
+                    user.num_leeching >= slots
+                } else {
+                    false
+                }
             }
         } else {
             false
@@ -834,7 +838,7 @@ pub async fn announce(
         user_agent: String::from(user_agent),
         is_active: queries.event != Event::Stopped,
         is_seeder: queries.left == 0,
-        is_immune: group.is_immune,
+        is_immune: group.is_immune || user.is_donor,
         uploaded: queries.uploaded,
         downloaded: queries.downloaded,
         uploaded_delta,
