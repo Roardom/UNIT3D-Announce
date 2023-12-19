@@ -834,7 +834,7 @@ pub async fn announce(
         user_agent: String::from(user_agent),
         is_active: queries.event != Event::Stopped,
         is_seeder: queries.left == 0,
-        is_immune: group.is_immune,
+        is_immune: group.is_immune || user.is_donor,
         uploaded: queries.uploaded,
         downloaded: queries.downloaded,
         uploaded_delta,

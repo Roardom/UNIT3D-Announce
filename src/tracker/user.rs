@@ -38,7 +38,9 @@ impl Map {
                     users.passkey as `passkey: Passkey`,
                     users.can_download as `can_download: bool`,
                     CAST(COALESCE(SUM(peers.seeder = 1 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED) as `num_seeding!: u32`,
-                    CAST(COALESCE(SUM(peers.seeder = 0 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED) as `num_leeching!: u32`
+                    CAST(COALESCE(SUM(peers.seeder = 0 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED) as `num_leeching!: u32`,
+                    users.is_donor as `is_donor: bool`,
+                    users.is_lifetime as `is_lifetime: bool`
                 FROM
                     users
                 LEFT JOIN
@@ -69,6 +71,8 @@ impl Map {
                     num_leeching: user.num_leeching,
                     receive_seed_list_rates: config.user_receive_seed_list_rate_limits.clone(),
                     receive_leech_list_rates: config.user_receive_leech_list_rate_limits.clone(),
+                    is_donor: user.is_donor,
+                    is_lifetime: user.is_lifetime,
                 },
             );
         }
@@ -101,6 +105,8 @@ impl Map {
                     can_download: user.can_download,
                     num_seeding: user.num_seeding,
                     num_leeching: user.num_leeching,
+                    is_donor: user.is_donor,
+                    is_lifetime: user.is_lifetime,
                     receive_seed_list_rates,
                     receive_leech_list_rates,
                 },
@@ -165,6 +171,8 @@ pub struct DBImportUser {
     pub can_download: bool,
     pub num_seeding: u32,
     pub num_leeching: u32,
+    pub is_donor: bool,
+    pub is_lifetime: bool,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -175,6 +183,8 @@ pub struct User {
     pub can_download: bool,
     pub num_seeding: u32,
     pub num_leeching: u32,
+    pub is_donor: bool,
+    pub is_lifetime: bool,
     pub receive_seed_list_rates: RateCollection,
     pub receive_leech_list_rates: RateCollection,
 }
@@ -187,6 +197,8 @@ pub struct APIInsertUser {
     pub can_download: bool,
     pub num_seeding: u32,
     pub num_leeching: u32,
+    pub is_donor: bool,
+    pub is_lifetime: bool,
 }
 
 #[derive(Clone, Deserialize, Hash)]
