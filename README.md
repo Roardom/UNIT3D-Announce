@@ -34,15 +34,20 @@ $ cargo build --release
 # Go into UNIT3D's base directory
 $ cd /var/www/html
 
-# Add the required environment variables to the .env file:
+# Add the required environment variables to UNIT3D'S .env file:
 # (`TRACKER_HOST`, `TRACKER_PORT`, and `TRACKER_KEY`)
+# These values should match their respective values in UNIT3D-Announce's .env file:
+# (`LISTENING_IP_ADDRESS`, `LISTENING_PORT`, and `API_KEY`)
 $ nano .env
 
 # Enable the external tracker in UNIT3D's config
 $ nano config/announce.php
 
+# Go back into UNIT3D-Announce's directory
+$ cd tracker/UNIT3D-Announce
+
 # Run the tracker
-$ tracker/UNIT3D-Announce/target/release/unit3d-announce
+$ target/release/unit3d-announce
 ```
 
 ## Reverse proxy
