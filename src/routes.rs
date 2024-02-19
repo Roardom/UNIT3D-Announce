@@ -50,6 +50,11 @@ pub fn routes(state: Arc<Tracker>) -> Router<Arc<Tracker>> {
                             put(tracker::personal_freeleech::Set::upsert)
                                 .delete(tracker::personal_freeleech::Set::destroy),
                         )
+                        .route(
+                            "/featured-torrents",
+                            put(tracker::featured_torrent::Set::upsert)
+                                .delete(tracker::featured_torrent::Set::destroy),
+                        )
                         .route("/stats", get(crate::stats::show)),
                 ),
         )

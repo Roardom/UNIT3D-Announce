@@ -1,6 +1,7 @@
 pub mod blacklisted_agent;
 pub mod blacklisted_port;
 pub mod connectable_port;
+pub mod featured_torrent;
 pub mod freeleech_token;
 pub mod group;
 pub mod peer;
@@ -9,6 +10,7 @@ pub mod torrent;
 pub mod user;
 
 pub use connectable_port::ConnectablePort;
+pub use featured_torrent::FeaturedTorrent;
 pub use peer::Peer;
 pub use torrent::Torrent;
 pub use user::User;
@@ -30,6 +32,7 @@ pub struct Tracker {
     pub agent_blacklist: RwLock<blacklisted_agent::Set>,
     pub config: config::Config,
     pub connectable_ports: RwLock<connectable_port::Map>,
+    pub featured_torrents: RwLock<featured_torrent::Set>,
     pub freeleech_tokens: RwLock<freeleech_token::Set>,
     pub groups: RwLock<group::Map>,
     pub history_updates: Mutex<history_update::Queue>,
@@ -120,6 +123,13 @@ impl Tracker {
             personal_freeleeches.len()
         );
 
+        println!("Loading from database into memory: featured_torrents...");
+        let featured_torrents = featured_torrent::Set::from_db(&pool).await?;
+        println!(
+            "\x1B[1F\x1B[2KLoaded {:?} featured torrents",
+            featured_torrents.len()
+        );
+
         println!("Loading from database into memory: groups...");
         let groups = group::Map::from_db(&pool).await?;
         println!("\x1B[1F\x1B[2KLoaded {:?} groups", groups.len());
@@ -131,6 +141,7 @@ impl Tracker {
             config,
             connectable_ports: RwLock::new(connectable_ports),
             freeleech_tokens: RwLock::new(freeleech_tokens),
+            featured_torrents: RwLock::new(featured_torrents),
             groups: RwLock::new(groups),
             history_updates: Mutex::new(history_update::Queue::new()),
             infohash2id: RwLock::new(infohash2id),

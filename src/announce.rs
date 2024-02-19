@@ -33,6 +33,7 @@ use crate::error::AnnounceError::{
 use crate::tracker::{
     self,
     connectable_port::ConnectablePort,
+    featured_torrent::FeaturedTorrent,
     freeleech_token::FreeleechToken,
     peer::{self, Peer, PeerId},
     personal_freeleech::PersonalFreeleech,
@@ -629,10 +630,25 @@ pub async fn announce(
         || tracker.freeleech_tokens.read().contains(&FreeleechToken {
             user_id,
             torrent_id,
-        }) {
+        })
+        || tracker
+            .featured_torrents
+            .read()
+            .contains(&FeaturedTorrent { torrent_id })
+    {
         0
     } else {
         download_factor
+    };
+
+    let upload_factor = if tracker
+        .featured_torrents
+        .read()
+        .contains(&FeaturedTorrent { torrent_id })
+    {
+        200
+    } else {
+        upload_factor
     };
 
     let credited_uploaded_delta = upload_factor as u64 * uploaded_delta / 100;

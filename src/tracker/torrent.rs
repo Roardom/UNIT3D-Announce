@@ -72,15 +72,11 @@ impl Map {
                     torrents.id as `id: u32`,
                     torrents.status as `status: Status`,
                     torrents.times_completed as `times_completed: u32`,
-                    LEAST(100 - torrents.free, IF(featured_torrents.torrent_id IS NULL, 100, 0)) as `download_factor: u8`,
-                    IF(featured_torrents.torrent_id IS NULL, 100, 200) as `upload_factor: u8`,
+                    100 - LEAST(torrents.free, 100) as `download_factor: u8`,
+                    IF(doubleup, 200, 100) as `upload_factor: u8`,
                     0 as `is_deleted: bool`
                 FROM
                     torrents
-                LEFT JOIN
-                    featured_torrents
-                ON
-                    torrents.id = featured_torrents.torrent_id
             "#
         )
         .fetch_all(db)
