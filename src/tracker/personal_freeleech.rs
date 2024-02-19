@@ -25,7 +25,7 @@ impl Set {
                 SELECT
                     user_id as `user_id: u32`
                 FROM
-                    personal_freeleech
+                    personal_freeleeches
             "#
         )
         .fetch_all(db)
