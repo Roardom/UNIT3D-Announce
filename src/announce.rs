@@ -32,7 +32,6 @@ use crate::error::AnnounceError::{
 
 use crate::tracker::{
     self,
-    blacklisted_agent::Agent,
     connectable_port::ConnectablePort,
     freeleech_token::FreeleechToken,
     peer::{self, Peer, PeerId},
@@ -237,10 +236,10 @@ pub async fn announce(
     }
 
     // Block user agent strings on the blacklist
-    if tracker.agent_blacklist.read().contains(&Agent {
-        name: user_agent.to_string(),
-    }) {
-        return Err(BlacklistedClient);
+    for client in tracker.agent_blacklist.read().iter() {
+        if queries.peer_id.starts_with(&client.peer_id_prefix) {
+            return Err(BlacklistedClient);
+        }
     }
 
     // Block user agent strings on the regex blacklist
