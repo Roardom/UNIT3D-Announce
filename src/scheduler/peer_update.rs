@@ -28,6 +28,7 @@ pub struct PeerUpdate {
     pub downloaded: u64,
     pub is_active: bool,
     pub is_seeder: bool,
+    pub is_visible: bool,
     pub left: u64,
     pub torrent_id: u32,
     pub user_id: u32,
@@ -50,6 +51,7 @@ impl Queue {
         downloaded: u64,
         is_active: bool,
         is_seeder: bool,
+        is_visible: bool,
         left: u64,
         torrent_id: u32,
         user_id: u32,
@@ -70,6 +72,7 @@ impl Queue {
                 downloaded,
                 is_active,
                 is_seeder,
+                is_visible,
                 left,
                 torrent_id,
                 user_id,
@@ -86,7 +89,7 @@ impl Queue {
         const BIND_LIMIT: usize = 65535;
 
         /// Number of columns being updated in the peer table
-        const PEER_COLUMN_COUNT: usize = 13;
+        const PEER_COLUMN_COUNT: usize = 14;
 
         BIND_LIMIT / PEER_COLUMN_COUNT
     }
@@ -111,6 +114,7 @@ impl Queue {
                 peer_update.downloaded,
                 peer_update.is_active,
                 peer_update.is_seeder,
+                peer_update.is_visible,
                 peer_update.left,
                 peer_update.torrent_id,
                 peer_update.user_id,
@@ -140,6 +144,7 @@ impl Queue {
                         `left`,
                         active,
                         seeder,
+                        visible,
                         created_at,
                         updated_at,
                         torrent_id,
@@ -162,6 +167,7 @@ impl Queue {
                         .push_bind(peer_update.left)
                         .push_bind(peer_update.is_active)
                         .push_bind(peer_update.is_seeder)
+                        .push_bind(peer_update.is_visible)
                         .push_bind(peer_update.updated_at)
                         .push_bind(peer_update.updated_at)
                         .push_bind(peer_update.torrent_id)
@@ -177,6 +183,7 @@ impl Queue {
                         .push_bind(peer_update.left)
                         .push_bind(peer_update.is_active)
                         .push_bind(peer_update.is_seeder)
+                        .push_bind(peer_update.is_visible)
                         .push_bind(peer_update.updated_at)
                         .push_bind(peer_update.updated_at)
                         .push_bind(peer_update.torrent_id)
@@ -195,6 +202,7 @@ impl Queue {
                     `left` = VALUES(`left`),
                     active = VALUES(active),
                     seeder = VALUES(seeder),
+                    visible = VALUES(visible),
                     updated_at = VALUES(updated_at),
                     connectable = VALUES(connectable)
             "#,

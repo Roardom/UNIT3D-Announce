@@ -30,6 +30,7 @@ pub struct Peer {
     pub port: u16,
     pub is_seeder: bool,
     pub is_active: bool,
+    pub is_visible: bool,
     #[serde(with = "ts_seconds")]
     pub updated_at: DateTime<Utc>,
     pub uploaded: u64,
@@ -51,6 +52,7 @@ impl Map {
                     peers.port as `port: u16`,
                     peers.seeder as `is_seeder: bool`,
                     peers.active as `is_active: bool`,
+                    peers.visible as `is_visible: bool`,
                     peers.updated_at as `updated_at: DateTime<Utc>`,
                     peers.uploaded as `uploaded: u64`,
                     peers.downloaded as `downloaded: u64`,
@@ -76,6 +78,7 @@ impl Map {
                     port: row.port,
                     is_seeder: row.is_seeder,
                     is_active: row.is_active,
+                    is_visible: row.is_visible,
                     updated_at: row
                         .updated_at
                         .expect("Peer with a null updated_at found in database."),

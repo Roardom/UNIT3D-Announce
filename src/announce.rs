@@ -301,10 +301,8 @@ pub async fn announce(
     }
 
     // Make sure user isn't leeching more torrents than their group allows
-    if queries.left > 0 && matches!(group.download_slots, Some(slots) if slots <= user.num_leeching)
-    {
-        return Err(DownloadSlotLimitReached);
-    }
+    let has_hit_download_slot_limit = queries.left > 0
+        && matches!(group.download_slots, Some(slots) if slots <= user.num_leeching);
 
     // Validate torrent
     let torrent_id = *tracker
@@ -390,6 +388,7 @@ pub async fn announce(
                     port: queries.port,
                     is_seeder: queries.left == 0,
                     is_active: true,
+                    is_visible: !has_hit_download_slot_limit,
                     updated_at: Utc::now(),
                     uploaded: queries.uploaded,
                     downloaded: queries.downloaded,
@@ -498,10 +497,12 @@ pub async fn announce(
 
         // Only provide peer list if
         // - it is not a stopped event,
-        // - there exist leechers (we have to remember to update the torrent leecher count before this check), and
+        // - there exist leechers (we have to remember to update the torrent leecher count before this check)
+        // - the user still has remaining open download slots, and
         // - the peer last announced more than announce_min seconds ago.
         if queries.event != Event::Stopped
             && torrent.leechers > 0
+            && !has_hit_download_slot_limit
             && (updated_at.is_none()
                 || updated_at.is_some_and(|updated_at| {
                     updated_at
@@ -515,10 +516,9 @@ pub async fn announce(
             ));
 
             // Don't return peers with the same user id or those that are marked as inactive
-            let valid_peers = torrent
-                .peers
-                .iter()
-                .filter(|(_index, peer)| peer.user_id != user_id && peer.is_active);
+            let valid_peers = torrent.peers.iter().filter(|(_index, peer)| {
+                peer.user_id != user_id && peer.is_active && peer.is_visible
+            });
 
             // Make sure leech peer lists are filled with seeds
             if queries.left > 0 && torrent.seeders > 0 && queries.numwant > peers.len() {
@@ -678,6 +678,7 @@ pub async fn announce(
         queries.downloaded,
         queries.event != Event::Stopped,
         queries.left == 0,
+        !has_hit_download_slot_limit,
         queries.left,
         torrent_id,
         user_id,
