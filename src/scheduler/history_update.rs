@@ -4,7 +4,6 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use compact_str::CompactString;
 use indexmap::IndexMap;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
@@ -19,7 +18,7 @@ pub struct Index {
 pub struct HistoryUpdate {
     pub user_id: u32,
     pub torrent_id: u32,
-    pub user_agent: CompactString,
+    pub user_agent: String,
     pub is_active: bool,
     pub is_seeder: bool,
     pub is_immune: bool,
@@ -41,7 +40,7 @@ impl Queue {
         &mut self,
         user_id: u32,
         torrent_id: u32,
-        user_agent: CompactString,
+        user_agent: String,
         credited_uploaded_delta: u64,
         uploaded_delta: u64,
         uploaded: u64,

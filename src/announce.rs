@@ -8,7 +8,6 @@ use axum::{
     },
 };
 use chrono::{DateTime, Duration};
-use compact_str::CompactString;
 use rand::{rngs::SmallRng, seq::IteratorRandom, Rng, SeedableRng};
 use sqlx::types::chrono::Utc;
 use std::{
@@ -673,7 +672,7 @@ pub async fn announce(
         queries.peer_id,
         client_ip,
         queries.port,
-        CompactString::from(user_agent),
+        String::from(user_agent),
         queries.uploaded,
         queries.downloaded,
         queries.event != Event::Stopped,
@@ -688,7 +687,7 @@ pub async fn announce(
     tracker.history_updates.lock().upsert(
         user_id,
         torrent_id,
-        CompactString::from(user_agent),
+        String::from(user_agent),
         credited_uploaded_delta,
         uploaded_delta,
         queries.uploaded,

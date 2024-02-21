@@ -6,7 +6,6 @@ use std::{
 
 use crate::tracker::peer::PeerId;
 use chrono::{DateTime, Utc};
-use compact_str::CompactString;
 use indexmap::IndexMap;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
@@ -23,7 +22,7 @@ pub struct PeerUpdate {
     pub peer_id: PeerId,
     pub ip: std::net::IpAddr,
     pub port: u16,
-    pub agent: CompactString,
+    pub agent: String,
     pub uploaded: u64,
     pub downloaded: u64,
     pub is_active: bool,
@@ -46,7 +45,7 @@ impl Queue {
         peer_id: PeerId,
         ip: IpAddr,
         port: u16,
-        agent: CompactString,
+        agent: String,
         uploaded: u64,
         downloaded: u64,
         is_active: bool,
