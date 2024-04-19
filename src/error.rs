@@ -77,8 +77,6 @@ pub enum AnnounceError {
     TorrentIsPostponed,
     #[error("Torrent not approved.")]
     TorrentUnknownModerationStatus,
-    #[error("Your download slot limit is reached.")]
-    DownloadSlotLimitReached,
     #[error("Stopped peer doesn't exist.")]
     StoppedPeerDoesntExist,
     #[error("Group not found.")]

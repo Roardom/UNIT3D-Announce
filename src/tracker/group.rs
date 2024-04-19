@@ -65,7 +65,7 @@ impl Map {
             },
         );
 
-        return StatusCode::OK;
+        StatusCode::OK
     }
 
     pub async fn destroy(
@@ -74,9 +74,9 @@ impl Map {
     ) -> StatusCode {
         println!("Removing group with id {}.", group.id);
 
-        tracker.groups.write().remove(&group.id);
+        tracker.groups.write().swap_remove(&group.id);
 
-        return StatusCode::OK;
+        StatusCode::OK
     }
 }
 

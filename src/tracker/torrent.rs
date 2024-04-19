@@ -16,7 +16,6 @@ pub mod infohash;
 pub use infohash::InfoHash;
 
 pub mod infohash2id;
-pub use infohash2id::InfoHash2Id;
 
 pub mod status;
 pub use status::Status;
@@ -124,7 +123,7 @@ impl Map {
     ) -> StatusCode {
         if let Ok(info_hash) = InfoHash::from_str(&torrent.info_hash) {
             println!("Inserting torrent with id {}.", torrent.id);
-            let old_torrent = tracker.torrents.lock().remove(&torrent.id);
+            let old_torrent = tracker.torrents.lock().swap_remove(&torrent.id);
             let peers = old_torrent.unwrap_or_default().peers;
 
             tracker.torrents.lock().insert(

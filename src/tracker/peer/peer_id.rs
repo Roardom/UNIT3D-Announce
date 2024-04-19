@@ -42,13 +42,7 @@ where
     ) -> Result<PeerId, Box<dyn std::error::Error + 'static + Send + Sync>> {
         let value = <&[u8] as Decode<DB>>::decode(value)?;
 
-        match value.try_into() {
-            Ok(peer_id) => Ok(peer_id),
-            Err(e) => {
-                let error: Box<dyn std::error::Error + Send + Sync> = Box::new(e);
-                Err(error)
-            }
-        }
+        Ok(value.into())
     }
 }
 

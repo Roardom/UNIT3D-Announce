@@ -9,11 +9,7 @@ pub mod personal_freeleech;
 pub mod torrent;
 pub mod user;
 
-pub use connectable_port::ConnectablePort;
-pub use featured_torrent::FeaturedTorrent;
 pub use peer::Peer;
-pub use torrent::Torrent;
-pub use user::User;
 
 use sqlx::MySqlPool;
 

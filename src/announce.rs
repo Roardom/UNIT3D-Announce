@@ -19,9 +19,9 @@ use tokio::net::TcpStream;
 
 use crate::error::AnnounceError::{
     self, AbnormalAccess, BlacklistedClient, BlacklistedPort, DownloadPrivilegesRevoked,
-    DownloadSlotLimitReached, GroupBanned, GroupDisabled, GroupNotFound, GroupValidating,
-    InfoHashNotFound, InternalTrackerError, InvalidCompact, InvalidDownloaded, InvalidInfoHash,
-    InvalidLeft, InvalidNumwant, InvalidPasskey, InvalidPeerId, InvalidPort, InvalidQueryStringKey,
+    GroupBanned, GroupDisabled, GroupNotFound, GroupValidating, InfoHashNotFound,
+    InternalTrackerError, InvalidCompact, InvalidDownloaded, InvalidInfoHash, InvalidLeft,
+    InvalidNumwant, InvalidPasskey, InvalidPeerId, InvalidPort, InvalidQueryStringKey,
     InvalidQueryStringValue, InvalidUploaded, InvalidUserAgent, MissingDownloaded, MissingInfoHash,
     MissingLeft, MissingPeerId, MissingPort, MissingUploaded, NotAClient, PasskeyNotFound,
     PeersPerTorrentPerUserLimit, StoppedPeerDoesntExist, TorrentIsDeleted,
@@ -345,7 +345,7 @@ pub async fn announce(
 
         if queries.event == Event::Stopped {
             // Try and remove the peer
-            let removed_peer = torrent.peers.remove(&tracker::peer::Index {
+            let removed_peer = torrent.peers.swap_remove(&tracker::peer::Index {
                 user_id,
                 peer_id: queries.peer_id,
             });
@@ -455,7 +455,7 @@ pub async fn announce(
                             peer_count += 1;
 
                             if peer_count >= tracker.config.max_peers_per_torrent_per_user {
-                                torrent.peers.remove(&tracker::peer::Index {
+                                torrent.peers.swap_remove(&tracker::peer::Index {
                                     user_id,
                                     peer_id: queries.peer_id,
                                 });

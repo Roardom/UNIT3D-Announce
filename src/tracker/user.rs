@@ -17,7 +17,6 @@ pub mod passkey;
 pub use passkey::Passkey;
 
 pub mod passkey2id;
-pub use passkey2id::Passkey2Id;
 
 #[derive(Serialize)]
 pub struct Map(IndexMap<u32, User>);
@@ -97,8 +96,8 @@ impl Map {
         if let Ok(passkey) = Passkey::from_str(&user.passkey) {
             println!("Removing user with id {}.", user.id);
 
-            tracker.users.write().remove(&user.id);
-            tracker.passkey2id.write().remove(&passkey);
+            tracker.users.write().swap_remove(&user.id);
+            tracker.passkey2id.write().swap_remove(&passkey);
 
             return StatusCode::OK;
         }

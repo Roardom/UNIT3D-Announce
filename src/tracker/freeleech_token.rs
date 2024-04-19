@@ -57,7 +57,7 @@ impl Set {
             token.user_id, token.torrent_id
         );
 
-        tracker.freeleech_tokens.write().remove(&token);
+        tracker.freeleech_tokens.write().swap_remove(&token);
     }
 }
 

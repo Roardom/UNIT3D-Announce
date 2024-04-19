@@ -56,7 +56,7 @@ impl Set {
             agent.peer_id_prefix
         );
 
-        tracker.agent_blacklist.write().remove(&agent);
+        tracker.agent_blacklist.write().swap_remove(&agent);
     }
 }
 

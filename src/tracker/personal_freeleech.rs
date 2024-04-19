@@ -68,7 +68,7 @@ impl Set {
         tracker
             .personal_freeleeches
             .write()
-            .remove(&personal_freeleech);
+            .swap_remove(&personal_freeleech);
     }
 }
 

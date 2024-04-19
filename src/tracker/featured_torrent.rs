@@ -56,7 +56,7 @@ impl Set {
             token.torrent_id
         );
 
-        tracker.featured_torrents.write().remove(&token);
+        tracker.featured_torrents.write().swap_remove(&token);
     }
 }
 
