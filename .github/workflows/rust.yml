@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Setup Rust
-    - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+      run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
     - name: Build
       run: cargo build --verbose
     - name: Run tests
