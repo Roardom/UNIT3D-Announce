@@ -36,6 +36,8 @@ impl Map {
                     users.passkey as `passkey: Passkey`
                 FROM
                     users
+                WHERE
+                    users.deleted_at IS NULL
             "#
         )
         .fetch_all(db)

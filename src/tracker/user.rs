@@ -44,7 +44,8 @@ impl Map {
                     peers
                 ON
                     users.id = peers.user_id
-                    AND users.deleted_at IS NULL
+                WHERE
+                    users.deleted_at IS NULL
                 GROUP BY
                     users.id
             "#
