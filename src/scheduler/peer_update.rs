@@ -88,7 +88,7 @@ impl Queue {
         const BIND_LIMIT: usize = 65535;
 
         /// Number of columns being updated in the peer table
-        const PEER_COLUMN_COUNT: usize = 14;
+        const PEER_COLUMN_COUNT: usize = 15;
 
         BIND_LIMIT / PEER_COLUMN_COUNT
     }
