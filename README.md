@@ -36,12 +36,6 @@ $ sudo nano .env
 
 # Enable the external tracker in UNIT3D's config
 $ sudo nano config/announce.php
-
-# Go back into UNIT3D-Announce's directory
-$ cd unit3d-announce
-
-# Run the tracker
-$ target/release/unit3d-announce
 ```
 
 ## Reverse proxy
@@ -73,4 +67,33 @@ Paste the following `location` block into the first `server` block immediately a
 ```sh
 # Reload nginx once finished
 $ service nginx reload
+```
+
+## Supervisor
+
+Add a supervisor config to run UNIT3D-Announce in the background:
+
+```sh
+# Edit supervisor config
+sudo nano /etc/supervisor/conf.d/unit3d.conf
+```
+
+Paste the following block at the end of the file:
+
+```supervisor
+[program:unit3d-announce]
+process_name=%(program_name)s_%(process_num)02d
+command=/var/www/html/unit3d-announce/target/release/unit3d-announce
+directory=/var/www/html/unit3d-announce
+autostart=true
+autorestart=false
+user=root
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/var/www/html/storage/logs/announce.log
+```
+
+Reload supervisor
+```sh
+$ sudo supervisorctl reread && sudo supervisorctl update && sudo supervisorctl reload
 ```
