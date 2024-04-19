@@ -11,22 +11,19 @@ High-performance backend BitTorrent tracker compatible with UNIT3D tracker softw
 $ cd /var/www/html
 
 # Create a new directory to save the tracker
-$ mkdir tracker
-
-# Go into this new directory
-$ cd tracker
+$ mkdir unit3d-rust-announce
 
 # Clone this repository
-$ git clone https://github.com/HDInnovations/UNIT3D-Announce
+$ git clone -b main https://github.com/HDInnovations/UNIT3D-Announce /var/www/html/unit3d-rust-announce
 
 # Go into the repository
-$ cd UNIT3D-Announce
+$ cd unit3d-rust-announce
 
 # Copy .env.example to .env
 $ cp .env.example .env
 
 # Adjust configuration as necessary
-$ nano .env
+$ sudo nano .env
 
 # Build the tracker
 $ cargo build --release
@@ -38,16 +35,10 @@ $ cd /var/www/html
 # (`TRACKER_HOST`, `TRACKER_PORT`, and `TRACKER_KEY`)
 # These values should match their respective values in UNIT3D-Announce's .env file:
 # (`LISTENING_IP_ADDRESS`, `LISTENING_PORT`, and `APIKEY`)
-$ nano .env
+$ sudo nano .env
 
 # Enable the external tracker in UNIT3D's config
-$ nano config/announce.php
-
-# Go back into UNIT3D-Announce's directory
-$ cd tracker/UNIT3D-Announce
-
-# Run the tracker
-$ target/release/unit3d-announce
+$ sudo nano config/announce.php
 ```
 
 ## Reverse proxy
@@ -56,7 +47,7 @@ If you serve both UNIT3D and UNIT3D-Announce on the same domain, add the followi
 
 ```sh
 # Edit nginx config
-$ nano /etc/nginx/sites-enabled/default
+$ sudo nano /etc/nginx/sites-enabled/default
 ```
 
 Paste the following `location` block into the first `server` block immediately after the last existing `location` block.
@@ -80,3 +71,36 @@ Paste the following `location` block into the first `server` block immediately a
 # Reload nginx once finished
 $ service nginx reload
 ```
+
+## Supervisor config
+
+```sh
+# Edit supervisor config
+$ sudo nano /etc/supervisor/conf.d/unit3d.conf
+```
+
+Paste the following block att end of file.
+
+```supervisor
+[program:unit3d-rust-announce]
+process_name=%(program_name)s_%(process_num)02d
+command=/var/www/html/unit3d-rust-announce/target/release/unit3d-announce
+directory=/var/www/html/unit3d-rust-announce
+autostart=true
+autorestart=false
+user=root
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/var/www/html/storage/logs/announce.log
+```
+
+Reload supervisor
+```sh
+$ sudo supervisorctl reread && sudo supervisorctl update && sudo supervisorctl reload
+```
+
+
+
+
+
+
