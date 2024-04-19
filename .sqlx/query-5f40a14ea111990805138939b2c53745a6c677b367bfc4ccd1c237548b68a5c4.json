@@ -1,0 +1,25 @@
+{
+  "db_name": "MySQL",
+  "query": "\n                SELECT\n                    torrent_id as `torrent_id: u32`\n                FROM\n                    featured_torrents\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "torrent_id: u32",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 10
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5f40a14ea111990805138939b2c53745a6c677b367bfc4ccd1c237548b68a5c4"
+}

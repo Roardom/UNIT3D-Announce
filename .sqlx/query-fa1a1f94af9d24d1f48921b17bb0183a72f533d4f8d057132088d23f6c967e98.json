@@ -1,0 +1,80 @@
+{
+  "db_name": "MySQL",
+  "query": "\n                SELECT\n                    users.id as `id: u32`,\n                    users.group_id as `group_id: i32`,\n                    users.passkey as `passkey: Passkey`,\n                    users.can_download as `can_download: bool`,\n                    CAST(COALESCE(SUM(peers.seeder = 1 AND peers.active = 1), 0) AS UNSIGNED) as `num_seeding: u32`,\n                    CAST(COALESCE(SUM(peers.seeder = 0 AND peers.active = 1), 0) AS UNSIGNED) as `num_leeching: u32`\n                FROM\n                    users\n                LEFT JOIN\n                    peers\n                ON\n                    users.id = peers.user_id\n                WHERE\n                    users.deleted_at IS NULL\n                GROUP BY\n                    users.id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: u32",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | PRIMARY_KEY | UNSIGNED | AUTO_INCREMENT",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "group_id: i32",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | MULTIPLE_KEY | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "passkey: Passkey",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "can_download: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "char_set": 63,
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "num_seeding: u32",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL | UNSIGNED | BINARY",
+          "char_set": 63,
+          "max_size": 21
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "num_leeching: u32",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL | UNSIGNED | BINARY",
+          "char_set": 63,
+          "max_size": 21
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "fa1a1f94af9d24d1f48921b17bb0183a72f533d4f8d057132088d23f6c967e98"
+}

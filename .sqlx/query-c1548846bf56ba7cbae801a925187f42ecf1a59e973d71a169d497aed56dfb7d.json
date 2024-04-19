@@ -1,0 +1,36 @@
+{
+  "db_name": "MySQL",
+  "query": "\n                SELECT\n                    torrents.id as `id: u32`,\n                    torrents.info_hash as `info_hash: InfoHash`\n                FROM\n                    torrents\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: u32",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | PRIMARY_KEY | UNSIGNED | AUTO_INCREMENT",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "info_hash: InfoHash",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | MULTIPLE_KEY | BINARY | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 20
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "c1548846bf56ba7cbae801a925187f42ecf1a59e973d71a169d497aed56dfb7d"
+}

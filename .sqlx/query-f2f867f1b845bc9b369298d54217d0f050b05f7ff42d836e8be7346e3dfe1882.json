@@ -1,0 +1,36 @@
+{
+  "db_name": "MySQL",
+  "query": "\n                SELECT\n                    users.id as `id: u32`,\n                    users.passkey as `passkey: Passkey`\n                FROM\n                    users\n                WHERE\n                    users.deleted_at IS NULL\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: u32",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | PRIMARY_KEY | UNSIGNED | AUTO_INCREMENT",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "passkey: Passkey",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "f2f867f1b845bc9b369298d54217d0f050b05f7ff42d836e8be7346e3dfe1882"
+}

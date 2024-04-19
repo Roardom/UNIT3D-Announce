@@ -1,0 +1,80 @@
+{
+  "db_name": "MySQL",
+  "query": "\n                SELECT\n                    torrents.id as `id: u32`,\n                    torrents.status as `status: Status`,\n                    torrents.times_completed as `times_completed: u32`,\n                    100 - LEAST(torrents.free, 100) as `download_factor: u8`,\n                    IF(doubleup, 200, 100) as `upload_factor: u8`,\n                    0 as `is_deleted: bool`\n                FROM\n                    torrents\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: u32",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | PRIMARY_KEY | UNSIGNED | AUTO_INCREMENT",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "status: Status",
+        "type_info": {
+          "type": "Short",
+          "flags": "NOT_NULL | MULTIPLE_KEY",
+          "char_set": 63,
+          "max_size": 6
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "times_completed: u32",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL",
+          "char_set": 63,
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "download_factor: u8",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL | BINARY",
+          "char_set": 63,
+          "max_size": 7
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "upload_factor: u8",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL | BINARY",
+          "char_set": 63,
+          "max_size": 4
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "is_deleted: bool",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL | BINARY",
+          "char_set": 63,
+          "max_size": 2
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "85ab7dd2f76b480c5b3a46bf26353242a502b8131a1a034ab29b00a6dd22b392"
+}

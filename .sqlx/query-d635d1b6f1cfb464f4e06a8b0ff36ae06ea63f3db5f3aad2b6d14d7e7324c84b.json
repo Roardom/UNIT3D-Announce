@@ -1,0 +1,80 @@
+{
+  "db_name": "MySQL",
+  "query": "\n                SELECT\n                    id as `id: i32`,\n                    slug as `slug: String`,\n                    download_slots as `download_slots: u32`,\n                    is_immune as `is_immune: bool`,\n                    IF(is_freeleech, 0, 100) as `download_factor: u8`,\n                    IF(is_double_upload, 200, 100) as `upload_factor: u8`\n                FROM\n                    `groups`\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: i32",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | PRIMARY_KEY | AUTO_INCREMENT",
+          "char_set": 63,
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "slug: String",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "download_slots: u32",
+        "type_info": {
+          "type": "Long",
+          "flags": "MULTIPLE_KEY",
+          "char_set": 63,
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "is_immune: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "char_set": 63,
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "download_factor: u8",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL | BINARY",
+          "char_set": 63,
+          "max_size": 4
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "upload_factor: u8",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL | BINARY",
+          "char_set": 63,
+          "max_size": 4
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d635d1b6f1cfb464f4e06a8b0ff36ae06ea63f3db5f3aad2b6d14d7e7324c84b"
+}

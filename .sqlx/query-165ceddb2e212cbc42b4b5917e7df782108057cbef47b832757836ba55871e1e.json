@@ -1,0 +1,25 @@
+{
+  "db_name": "MySQL",
+  "query": "\n                SELECT\n                    peer_id_prefix\n                FROM\n                    blacklist_clients\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "peer_id_prefix",
+        "type_info": {
+          "type": "VarString",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "char_set": 224,
+          "max_size": 1020
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "165ceddb2e212cbc42b4b5917e7df782108057cbef47b832757836ba55871e1e"
+}

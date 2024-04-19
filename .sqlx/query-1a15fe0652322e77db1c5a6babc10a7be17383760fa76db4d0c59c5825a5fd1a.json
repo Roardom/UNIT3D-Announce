@@ -1,0 +1,135 @@
+{
+  "db_name": "MySQL",
+  "query": "\n                SELECT\n                    INET6_NTOA(peers.ip) as `ip_address: String`,\n                    peers.user_id as `user_id: u32`,\n                    peers.torrent_id as `torrent_id: u32`,\n                    peers.port as `port: u16`,\n                    peers.seeder as `is_seeder: bool`,\n                    peers.active as `is_active: bool`,\n                    peers.visible as `is_visible: bool`,\n                    peers.updated_at as `updated_at: DateTime<Utc>`,\n                    peers.uploaded as `uploaded: u64`,\n                    peers.downloaded as `downloaded: u64`,\n                    peers.peer_id as `peer_id: PeerId`\n                FROM\n                    peers\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "ip_address: String",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "char_set": 224,
+          "max_size": 156
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id: u32",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "torrent_id: u32",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "port: u16",
+        "type_info": {
+          "type": "Short",
+          "flags": "NOT_NULL | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 5
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "is_seeder: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL | MULTIPLE_KEY | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "is_active: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL | MULTIPLE_KEY | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "is_visible: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "updated_at: DateTime<Utc>",
+        "type_info": {
+          "type": "Timestamp",
+          "flags": "BINARY",
+          "char_set": 63,
+          "max_size": 19
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "uploaded: u64",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 20
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "downloaded: u64",
+        "type_info": {
+          "type": "LongLong",
+          "flags": "NOT_NULL | UNSIGNED | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 20
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "peer_id: PeerId",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "char_set": 63,
+          "max_size": 20
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "1a15fe0652322e77db1c5a6babc10a7be17383760fa76db4d0c59c5825a5fd1a"
+}
