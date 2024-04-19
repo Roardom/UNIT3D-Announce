@@ -10,17 +10,11 @@ High-performance backend BitTorrent tracker compatible with UNIT3D tracker softw
 # Go to where UNIT3D is already installed
 $ cd /var/www/html
 
-# Create a new directory to save the tracker
-$ mkdir tracker
-
-# Go into this new directory
-$ cd tracker
-
 # Clone this repository
-$ git clone https://github.com/HDInnovations/UNIT3D-Announce
+$ git clone -b main https://github.com/HDInnovations/UNIT3D-Announce unit3d-announce
 
 # Go into the repository
-$ cd UNIT3D-Announce
+$ cd unit3d-announce
 
 # Copy .env.example to .env
 $ cp .env.example .env
@@ -44,7 +38,7 @@ $ nano .env
 $ nano config/announce.php
 
 # Go back into UNIT3D-Announce's directory
-$ cd tracker/UNIT3D-Announce
+$ cd unit3d-announce
 
 # Run the tracker
 $ target/release/unit3d-announce
