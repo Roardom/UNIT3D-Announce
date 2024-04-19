@@ -22,8 +22,8 @@ $ git clone https://github.com/HDInnovations/UNIT3D-Announce
 # Go into the repository
 $ cd UNIT3D-Announce
 
-# Rename .env.example to .env
-$ mv .env.example .env
+# Copy .env.example to .env
+$ cp .env.example .env
 
 # Adjust configuration as necessary
 $ nano .env
