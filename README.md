@@ -37,7 +37,7 @@ $ cd /var/www/html
 # Add the required environment variables to UNIT3D'S .env file:
 # (`TRACKER_HOST`, `TRACKER_PORT`, and `TRACKER_KEY`)
 # These values should match their respective values in UNIT3D-Announce's .env file:
-# (`LISTENING_IP_ADDRESS`, `LISTENING_PORT`, and `API_KEY`)
+# (`LISTENING_IP_ADDRESS`, `LISTENING_PORT`, and `APIKEY`)
 $ nano .env
 
 # Enable the external tracker in UNIT3D's config
