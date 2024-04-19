@@ -20,7 +20,7 @@ $ cd unit3d-announce
 $ cp .env.example .env
 
 # Adjust configuration as necessary
-$ nano .env
+$ sudo nano .env
 
 # Build the tracker
 $ cargo build --release
@@ -32,10 +32,10 @@ $ cd /var/www/html
 # (`TRACKER_HOST`, `TRACKER_PORT`, and `TRACKER_KEY`)
 # These values should match their respective values in UNIT3D-Announce's .env file:
 # (`LISTENING_IP_ADDRESS`, `LISTENING_PORT`, and `APIKEY`)
-$ nano .env
+$ sudo nano .env
 
 # Enable the external tracker in UNIT3D's config
-$ nano config/announce.php
+$ sudo nano config/announce.php
 
 # Go back into UNIT3D-Announce's directory
 $ cd unit3d-announce
@@ -50,7 +50,7 @@ If you serve both UNIT3D and UNIT3D-Announce on the same domain, add the followi
 
 ```sh
 # Edit nginx config
-$ nano /etc/nginx/sites-enabled/default
+$ sudo nano /etc/nginx/sites-enabled/default
 ```
 
 Paste the following `location` block into the first `server` block immediately after the last existing `location` block.
