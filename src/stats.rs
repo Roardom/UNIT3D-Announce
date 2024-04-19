@@ -6,7 +6,12 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use axum::{extract::State, http::Request, middleware::Next, response::Response, Json};
+use axum::{
+    extract::{Request, State},
+    middleware::Next,
+    response::Response,
+    Json,
+};
 
 use crate::tracker::Tracker;
 
@@ -177,10 +182,10 @@ pub struct APIGetStats {
     announce_responses_per_7200s: f64,
 }
 
-pub async fn record_request<B>(
+pub async fn record_request(
     State(state): State<Arc<Tracker>>,
-    request: Request<B>,
-    next: Next<B>,
+    request: Request,
+    next: Next,
 ) -> Response {
     state.stats.increment_request();
 
