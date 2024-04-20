@@ -451,7 +451,7 @@ pub async fn announce(
                     let mut peer_count = 0;
 
                     for &peer in torrent.peers.values() {
-                        if peer.user_id == user_id {
+                        if peer.user_id == user_id && peer.is_active && peer.is_visible {
                             peer_count += 1;
 
                             if peer_count >= tracker.config.max_peers_per_torrent_per_user {
