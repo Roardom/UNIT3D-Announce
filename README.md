@@ -71,7 +71,9 @@ $ service nginx reload
 
 ## Supervisor
 
-Add a supervisor config to run UNIT3D-Announce in the background:
+Add a supervisor config to run UNIT3D-Announce in the background.
+
+### Configuration
 
 ```sh
 # Edit supervisor config
@@ -93,7 +95,18 @@ redirect_stderr=true
 stdout_logfile=/var/www/html/storage/logs/announce.log
 ```
 
+### Starting UNIT3D-Announce
+
 Reload supervisor
+
 ```sh
 $ sudo supervisorctl reread && sudo supervisorctl update && sudo supervisorctl reload
+```
+
+### Exiting UNIT3D-Announce
+
+To gracefully exit the tracker:
+
+```sh
+sudo supervisorctl stop unit3d-announce:unit3d-announce_00
 ```
