@@ -13,9 +13,9 @@ pub enum AnnounceError {
     InvalidQueryStringKey,
     #[error("Invalid query string value.")]
     InvalidQueryStringValue,
-    #[error("Invalid 'info_hash'.")]
-    InvalidPeerId,
     #[error("Invalid 'peer_id'.")]
+    InvalidPeerId,
+    #[error("Invalid 'info_hash'.")]
     InvalidInfoHash,
     #[error("Invalid 'port' (must be greater than or equal to 0).")]
     InvalidPort,
