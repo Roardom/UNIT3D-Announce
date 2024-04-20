@@ -356,18 +356,8 @@ pub async fn announce(
                 uploaded_delta = queries.uploaded.saturating_sub(peer.uploaded);
                 downloaded_delta = queries.downloaded.saturating_sub(peer.downloaded);
 
-                if peer.is_active {
-                    if peer.is_seeder {
-                        seeder_delta = -1;
-                        leecher_delta = 0;
-                    } else {
-                        seeder_delta = 0;
-                        leecher_delta = -1;
-                    }
-                } else {
-                    seeder_delta = 0;
-                    leecher_delta = 0;
-                }
+                leecher_delta = 0 - peer.is_included_in_leech_list() as i32;
+                seeder_delta = 0 - peer.is_included_in_seed_list() as i32;
             } else {
                 return Err(StoppedPeerDoesntExist);
             }
@@ -375,67 +365,38 @@ pub async fn announce(
             times_completed_delta = 0;
         } else {
             // Insert the peer into the in-memory db
+            let new_peer = tracker::Peer {
+                ip_address: client_ip,
+                user_id,
+                torrent_id,
+                port: queries.port,
+                is_seeder: queries.left == 0,
+                is_active: true,
+                is_visible: !has_hit_download_slot_limit,
+                updated_at: Utc::now(),
+                uploaded: queries.uploaded,
+                downloaded: queries.downloaded,
+            };
+
             let old_peer = torrent.peers.insert(
                 tracker::peer::Index {
                     user_id,
                     peer_id: queries.peer_id,
                 },
-                tracker::Peer {
-                    ip_address: client_ip,
-                    user_id,
-                    torrent_id,
-                    port: queries.port,
-                    is_seeder: queries.left == 0,
-                    is_active: true,
-                    is_visible: !has_hit_download_slot_limit,
-                    updated_at: Utc::now(),
-                    uploaded: queries.uploaded,
-                    downloaded: queries.downloaded,
-                },
+                new_peer,
             );
 
             // Update the user and torrent seeding/leeching counts in the
             // in-memory db
             match old_peer {
                 Some(old_peer) => {
-                    if queries.left == 0 && !old_peer.is_seeder {
-                        // leech has turned into a seed
-                        seeder_delta = 1;
-                        times_completed_delta = 1;
-
-                        if old_peer.is_active {
-                            leecher_delta = -1;
-                        } else {
-                            leecher_delta = 0;
-                        }
-                    } else if queries.left > 0 && old_peer.is_seeder {
-                        // seed has turned into a leech
-                        leecher_delta = 1;
-                        times_completed_delta = 0;
-
-                        if old_peer.is_active {
-                            seeder_delta = -1;
-                        } else {
-                            seeder_delta = 0;
-                        }
-                    } else {
-                        times_completed_delta = 0;
-
-                        if !old_peer.is_active {
-                            if queries.left == 0 {
-                                // seeder is reactivated
-                                seeder_delta = 1;
-                                leecher_delta = 0;
-                            } else {
-                                // leecher is reactivated
-                                seeder_delta = 0;
-                                leecher_delta = 1;
-                            }
-                        } else {
-                            seeder_delta = 0;
-                            leecher_delta = 0;
-                        }
-                    }
+                    leecher_delta = new_peer.is_included_in_leech_list() as i32
+                        - old_peer.is_included_in_leech_list() as i32;
+                    seeder_delta = new_peer.is_included_in_seed_list() as i32
+                        - old_peer.is_included_in_seed_list() as i32;
+                    times_completed_delta = (new_peer.is_included_in_seed_list()
+                        && old_peer.is_included_in_leech_list())
+                        as u32;
 
                     // Calculate change in upload and download compared to previous
                     // announce
@@ -451,7 +412,7 @@ pub async fn announce(
                     let mut peer_count = 0;
 
                     for &peer in torrent.peers.values() {
-                        if peer.user_id == user_id && peer.is_active && peer.is_visible {
+                        if peer.user_id == user_id && peer.is_included_in_peer_list() {
                             peer_count += 1;
 
                             if peer_count >= tracker.config.max_peers_per_torrent_per_user {
@@ -465,16 +426,8 @@ pub async fn announce(
                         }
                     }
 
-                    if queries.left == 0 {
-                        // new seeder is inserted
-                        leecher_delta = 0;
-                        seeder_delta = 1;
-                    } else {
-                        // new leecher is inserted
-                        seeder_delta = 0;
-                        leecher_delta = 1;
-                    }
-
+                    leecher_delta = new_peer.is_included_in_leech_list() as i32;
+                    seeder_delta = new_peer.is_included_in_seed_list() as i32;
                     times_completed_delta = 0;
 
                     // Calculate change in upload and download compared to previous
@@ -516,7 +469,7 @@ pub async fn announce(
 
             // Don't return peers with the same user id or those that are marked as inactive
             let valid_peers = torrent.peers.iter().filter(|(_index, peer)| {
-                peer.user_id != user_id && peer.is_active && peer.is_visible
+                peer.user_id != user_id && peer.is_included_in_peer_list()
             });
 
             // Make sure leech peer lists are filled with seeds

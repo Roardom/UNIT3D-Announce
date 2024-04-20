@@ -35,8 +35,8 @@ impl Map {
                     users.group_id as `group_id: i32`,
                     users.passkey as `passkey: Passkey`,
                     users.can_download as `can_download: bool`,
-                    CAST(COALESCE(SUM(peers.seeder = 1 AND peers.active = 1), 0) AS UNSIGNED) as `num_seeding: u32`,
-                    CAST(COALESCE(SUM(peers.seeder = 0 AND peers.active = 1), 0) AS UNSIGNED) as `num_leeching: u32`
+                    CAST(COALESCE(SUM(peers.seeder = 1 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED) as `num_seeding: u32`,
+                    CAST(COALESCE(SUM(peers.seeder = 0 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED) as `num_leeching: u32`
                 FROM
                     users
                 LEFT JOIN

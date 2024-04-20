@@ -37,6 +37,26 @@ pub struct Peer {
     pub downloaded: u64,
 }
 
+impl Peer {
+    /// Determines if the peer should be included in the peer list
+    #[inline(always)]
+    pub fn is_included_in_peer_list(&self) -> bool {
+        self.is_active && self.is_visible
+    }
+
+    /// Determines if the peer should be included in the list of seeds
+    #[inline(always)]
+    pub fn is_included_in_seed_list(&self) -> bool {
+        self.is_seeder && self.is_included_in_peer_list()
+    }
+
+    /// Determines if the peer should be included in the list of leeches
+    #[inline(always)]
+    pub fn is_included_in_leech_list(&self) -> bool {
+        !self.is_seeder && self.is_included_in_peer_list()
+    }
+}
+
 impl Map {
     pub fn new() -> Map {
         Map(IndexMap::new())

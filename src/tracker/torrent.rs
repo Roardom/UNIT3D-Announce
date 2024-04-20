@@ -47,8 +47,8 @@ impl Map {
                 .entry(peer.torrent_id)
                 .and_modify(|torrent| {
                     torrent.peers.insert(*index, *peer);
-                    torrent.num_seeders += (peer.is_active && peer.is_seeder) as u32;
-                    torrent.num_leechers += (peer.is_active && !peer.is_seeder) as u32;
+                    torrent.num_seeders += peer.is_included_in_seed_list() as u32;
+                    torrent.num_leechers += peer.is_included_in_leech_list() as u32;
                 })
                 .or_insert_with(|| {
                     let mut peers = peer::Map::new();
@@ -56,8 +56,8 @@ impl Map {
 
                     GroupedPeer {
                         peers,
-                        num_seeders: (peer.is_active && peer.is_seeder) as u32,
-                        num_leechers: (peer.is_active && !peer.is_seeder) as u32,
+                        num_seeders: peer.is_included_in_seed_list() as u32,
+                        num_leechers: peer.is_included_in_leech_list() as u32,
                     }
                 });
         });
