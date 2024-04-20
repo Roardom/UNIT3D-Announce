@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+pub mod announce_update;
 pub mod history_update;
 pub mod peer_update;
 pub mod torrent_update;
@@ -32,6 +33,7 @@ pub async fn flush(tracker: &Arc<Tracker>) {
     flush_peer_updates(tracker).await;
     flush_torrent_updates(tracker).await;
     flush_user_updates(tracker).await;
+    flush_announce_updates(tracker).await;
 }
 
 /// Send history updates to mysql database
@@ -97,6 +99,23 @@ async fn flush_user_updates(tracker: &Arc<Tracker>) {
         Err(e) => {
             println!("User update failed: {}", e);
             tracker.user_updates.lock().upsert_batch(user_update_batch);
+        }
+    }
+}
+
+/// Send announce updates to mysql database
+async fn flush_announce_updates(tracker: &Arc<Tracker>) {
+    let announce_update_batch = tracker.announce_updates.lock().take_batch();
+    let result = announce_update_batch.flush_to_db(&tracker.pool).await;
+
+    match result {
+        Ok(_) => (),
+        Err(e) => {
+            println!("Announce update failed: {}", e);
+            tracker
+                .announce_updates
+                .lock()
+                .upsert_batch(announce_update_batch);
         }
     }
 }

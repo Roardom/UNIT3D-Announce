@@ -57,6 +57,10 @@ pub struct Config {
     /// The minimum number of seconds a socket's connectivity status is cached for
     /// before rechecking the peer's connectivity. Use `-1` for no caching.
     pub connectivity_check_interval: i64,
+    /// Enable logging of all successful announces to the `announces` table for
+    /// debugging. This will generate significant amounts of data. Do not
+    /// enable if you do not know what you are doing.
+    pub is_announce_logging_enabled: bool,
 }
 
 impl Config {
@@ -136,6 +140,11 @@ impl Config {
             .parse()
             .context("CONNECTIVITY_CHECK_INTERVAL must be a number between -(2^63) and 2^63 - 1")?;
 
+        let is_announce_logging_enabled = env::var("IS_ANNOUNCE_LOGGING_ENABLED")
+            .context("IS_ANNOUNCE_LOGGING_ENABLED not found in .env file.")?
+            .parse()
+            .context("IS_ANNOUNCE_LOGGING_ENABLED must be either `true` or `false`")?;
+
         let apikey = env::var("APIKEY").context("APIKEY not found in .env file.")?;
 
         if apikey.len() < 32 {
@@ -159,6 +168,7 @@ impl Config {
             max_peers_per_torrent_per_user,
             is_connectivity_check_enabled,
             connectivity_check_interval,
+            is_announce_logging_enabled,
         })
     }
 }

@@ -16,7 +16,7 @@ use sqlx::MySqlPool;
 use anyhow::{Context, Result};
 
 use crate::config;
-use crate::scheduler::{history_update, peer_update, torrent_update, user_update};
+use crate::scheduler::{announce_update, history_update, peer_update, torrent_update, user_update};
 use crate::stats::Stats;
 
 use dotenvy::dotenv;
@@ -27,6 +27,7 @@ use std::{env, sync::Arc, time::Duration};
 
 pub struct Tracker {
     pub agent_blacklist: RwLock<blacklisted_agent::Set>,
+    pub announce_updates: Mutex<announce_update::Queue>,
     pub config: config::Config,
     pub connectable_ports: RwLock<connectable_port::Map>,
     pub featured_torrents: RwLock<featured_torrent::Set>,
@@ -135,6 +136,7 @@ impl Tracker {
 
         Ok(Arc::new(Tracker {
             agent_blacklist: RwLock::new(agent_blacklist),
+            announce_updates: Mutex::new(announce_update::Queue::new()),
             config,
             connectable_ports: RwLock::new(connectable_ports),
             freeleech_tokens: RwLock::new(freeleech_tokens),

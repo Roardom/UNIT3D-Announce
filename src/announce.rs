@@ -11,6 +11,7 @@ use chrono::{DateTime, Duration};
 use rand::{rngs::SmallRng, seq::IteratorRandom, Rng, SeedableRng};
 use sqlx::types::chrono::Utc;
 use std::{
+    fmt::Display,
     net::{IpAddr, SocketAddr},
     str::FromStr,
     sync::Arc,
@@ -43,12 +44,23 @@ use crate::tracker::{
 use crate::utils;
 
 #[derive(Clone, Copy, PartialEq, Default)]
-enum Event {
+pub enum Event {
     Completed,
     #[default]
     Empty,
     Started,
     Stopped,
+}
+
+impl Display for Event {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Completed => write!(f, "completed"),
+            Self::Empty => write!(f, ""),
+            Self::Started => write!(f, "started"),
+            Self::Stopped => write!(f, "stopped"),
+        }
+    }
 }
 
 impl FromStr for Event {
@@ -74,6 +86,8 @@ pub struct Announce {
     left: u64,
     event: Event,
     numwant: usize,
+    corrupt: Option<u64>,
+    key: Option<String>,
 }
 
 pub struct Query<T>(pub T);
@@ -102,6 +116,8 @@ where
         let mut left: Option<u64> = None;
         let mut event: Option<Event> = None;
         let mut numwant: Option<usize> = None;
+        let mut corrupt: Option<u64> = None;
+        let mut key: Option<String> = None;
 
         for equal_sign_pos in memchr::memchr_iter(b'=', query_bytes) {
             let value_end_pos = ampersand_positions.next().unwrap_or(query_length);
@@ -139,6 +155,8 @@ where
                 }
                 "event" => event = Some(value.parse()?),
                 "numwant" => numwant = Some(value.parse().or(Err(InvalidNumwant))?),
+                "corrupt" => corrupt = value.parse().ok(),
+                "key" => key = value.parse().ok(),
                 _ => (),
             }
 
@@ -170,6 +188,8 @@ where
                         .min(tracker.config.numwant_max)
                 }
             },
+            corrupt,
+            key,
         }))
     }
 }
@@ -667,6 +687,22 @@ pub async fn announce(
             seeder_delta,
             leecher_delta,
             times_completed_delta,
+        );
+    }
+
+    if tracker.config.is_announce_logging_enabled {
+        tracker.announce_updates.lock().upsert(
+            user_id,
+            torrent_id,
+            queries.uploaded,
+            queries.downloaded,
+            queries.left,
+            queries.corrupt,
+            queries.peer_id,
+            queries.port,
+            queries.numwant.try_into().unwrap_or(u16::MAX),
+            queries.event,
+            queries.key,
         );
     }
 
