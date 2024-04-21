@@ -427,9 +427,7 @@ pub async fn announce(
                         - old_peer.is_included_in_leech_list() as i32;
                     seeder_delta = new_peer.is_included_in_seed_list() as i32
                         - old_peer.is_included_in_seed_list() as i32;
-                    times_completed_delta = (new_peer.is_included_in_seed_list()
-                        && old_peer.is_included_in_leech_list())
-                        as u32;
+                    times_completed_delta = (new_peer.is_seeder && !old_peer.is_seeder) as u32;
 
                     // Calculate change in upload and download compared to previous
                     // announce
