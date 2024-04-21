@@ -457,7 +457,9 @@ pub async fn announce(
                                     peer_id: queries.peer_id,
                                 });
 
-                                return Err(PeersPerTorrentPerUserLimit);
+                                return Err(PeersPerTorrentPerUserLimit(
+                                    tracker.config.max_peers_per_torrent_per_user,
+                                ));
                             }
                         }
                     }

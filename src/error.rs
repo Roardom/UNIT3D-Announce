@@ -87,8 +87,8 @@ pub enum AnnounceError {
     GroupValidating,
     #[error("Your account is not enabled. (Current: Disabled).")]
     GroupDisabled,
-    #[error("You already have 3 peers on this torrent. Ignoring.")]
-    PeersPerTorrentPerUserLimit,
+    #[error("You already have {0} peers on this torrent. Ignoring.")]
+    PeersPerTorrentPerUserLimit(u16),
 }
 
 impl IntoResponse for AnnounceError {
