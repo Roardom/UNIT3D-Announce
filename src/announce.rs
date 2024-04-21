@@ -338,6 +338,7 @@ pub async fn announce(
         seeder_delta,
         leecher_delta,
         times_completed_delta,
+        is_visible,
         response,
     ) = {
         let mut torrent_guard = tracker.torrents.lock();
@@ -362,6 +363,7 @@ pub async fn announce(
         let leecher_delta;
         let times_completed_delta;
         let mut updated_at: Option<DateTime<Utc>> = None;
+        let is_visible;
 
         if queries.event == Event::Stopped {
             // Try and remove the peer
@@ -383,6 +385,7 @@ pub async fn announce(
             }
 
             times_completed_delta = 0;
+            is_visible = false;
         } else {
             // Insert the peer into the in-memory db
             let mut old_peer: Option<Peer> = None;
@@ -418,6 +421,8 @@ pub async fn announce(
                     downloaded: queries.downloaded,
                 })
                 .clone();
+
+            is_visible = new_peer.is_visible;
 
             // Update the user and torrent seeding/leeching counts in the
             // in-memory db
@@ -488,7 +493,7 @@ pub async fn announce(
         // - the peer last announced more than announce_min seconds ago.
         if queries.event != Event::Stopped
             && torrent.leechers > 0
-            && !has_hit_download_slot_limit
+            && is_visible
             && (updated_at.is_none()
                 || updated_at.is_some_and(|updated_at| {
                     updated_at
@@ -605,6 +610,7 @@ pub async fn announce(
             seeder_delta,
             leecher_delta,
             times_completed_delta,
+            is_visible,
             response,
         )
     };
@@ -664,7 +670,7 @@ pub async fn announce(
         queries.downloaded,
         queries.event != Event::Stopped,
         queries.left == 0,
-        !has_hit_download_slot_limit,
+        is_visible,
         queries.left,
         torrent_id,
         user_id,
