@@ -461,6 +461,9 @@ pub async fn announce(
         // Has to be adjusted before the peer list is generated
         torrent.seeders = torrent.seeders.saturating_add_signed(seeder_delta);
         torrent.leechers = torrent.leechers.saturating_add_signed(leecher_delta);
+        torrent.times_completed = torrent
+            .times_completed
+            .saturating_add(times_completed_delta);
 
         // Generate peer lists to return to client
 
