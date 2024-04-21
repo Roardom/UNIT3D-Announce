@@ -149,20 +149,23 @@ pub async fn reap(tracker: &Arc<Tracker>) {
             // count are updated to reflect.
             if peer.updated_at < active_cutoff && peer.is_active {
                 peer.is_active = false;
-                tracker
-                    .users
-                    .write()
-                    .entry(peer.user_id)
-                    .and_modify(|user| {
-                        if peer.is_seeder {
-                            user.num_seeding = user.num_seeding.saturating_sub(1);
-                        } else {
-                            user.num_leeching = user.num_leeching.saturating_sub(1);
-                        }
-                    });
-                match peer.is_seeder {
-                    true => seeder_delta -= 1,
-                    false => leecher_delta -= 1,
+
+                if peer.is_visible {
+                    tracker
+                        .users
+                        .write()
+                        .entry(peer.user_id)
+                        .and_modify(|user| {
+                            if peer.is_seeder {
+                                user.num_seeding = user.num_seeding.saturating_sub(1);
+                            } else {
+                                user.num_leeching = user.num_leeching.saturating_sub(1);
+                            }
+                        });
+                    match peer.is_seeder {
+                        true => seeder_delta -= 1,
+                        false => leecher_delta -= 1,
+                    }
                 }
             }
         }
