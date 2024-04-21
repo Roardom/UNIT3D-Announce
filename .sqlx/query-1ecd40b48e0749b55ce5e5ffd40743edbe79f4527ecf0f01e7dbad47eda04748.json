@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n                SELECT\n                    users.id as `id: u32`,\n                    users.group_id as `group_id: i32`,\n                    users.passkey as `passkey: Passkey`,\n                    users.can_download as `can_download: bool`,\n                    CAST(COALESCE(SUM(peers.seeder = 1 AND peers.active = 1), 0) AS UNSIGNED) as `num_seeding: u32`,\n                    CAST(COALESCE(SUM(peers.seeder = 0 AND peers.active = 1), 0) AS UNSIGNED) as `num_leeching: u32`\n                FROM\n                    users\n                LEFT JOIN\n                    peers\n                ON\n                    users.id = peers.user_id\n                WHERE\n                    users.deleted_at IS NULL\n                GROUP BY\n                    users.id\n            ",
+  "query": "\n                SELECT\n                    users.id as `id: u32`,\n                    users.group_id as `group_id: i32`,\n                    users.passkey as `passkey: Passkey`,\n                    users.can_download as `can_download: bool`,\n                    CAST(COALESCE(SUM(peers.seeder = 1 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED) as `num_seeding: u32`,\n                    CAST(COALESCE(SUM(peers.seeder = 0 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED) as `num_leeching: u32`\n                FROM\n                    users\n                LEFT JOIN\n                    peers\n                ON\n                    users.id = peers.user_id\n                WHERE\n                    users.deleted_at IS NULL\n                GROUP BY\n                    users.id\n            ",
   "describe": {
     "columns": [
       {
@@ -76,5 +76,5 @@
       false
     ]
   },
-  "hash": "fa1a1f94af9d24d1f48921b17bb0183a72f533d4f8d057132088d23f6c967e98"
+  "hash": "1ecd40b48e0749b55ce5e5ffd40743edbe79f4527ecf0f01e7dbad47eda04748"
 }
