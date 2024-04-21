@@ -122,8 +122,6 @@ async fn flush_announce_updates(tracker: &Arc<Tracker>) {
 
 /// Remove peers that have not announced for some time
 pub async fn reap(tracker: &Arc<Tracker>) {
-    let flush_interval = Duration::seconds(tracker.config.flush_interval.try_into().unwrap());
-    let two_flushes_ago = Utc::now().checked_sub_signed(flush_interval * 2).unwrap();
     let ttl = Duration::seconds(tracker.config.active_peer_ttl.try_into().unwrap());
     let active_cutoff = Utc::now().checked_sub_signed(ttl).unwrap();
     let ttl = Duration::seconds(tracker.config.inactive_peer_ttl.try_into().unwrap());
@@ -135,13 +133,9 @@ pub async fn reap(tracker: &Arc<Tracker>) {
 
         // If a peer is marked as inactive and it has not announced for
         // more than inactive_peer_ttl, then it is permanently deleted.
-        // It is also permanently deleted if it was updated less than
-        // two flushes ago and was marked as inactive (meaning the user
-        // send a `stopped` event).
-        torrent.peers.retain(|_index, peer| {
-            (inactive_cutoff <= peer.updated_at && peer.updated_at <= two_flushes_ago)
-                || peer.is_active
-        });
+        torrent
+            .peers
+            .retain(|_index, peer| inactive_cutoff <= peer.updated_at || peer.is_active);
 
         for (_index, peer) in torrent.peers.iter_mut() {
             // Peers get marked as inactive if not announced for more than
