@@ -385,26 +385,39 @@ pub async fn announce(
             times_completed_delta = 0;
         } else {
             // Insert the peer into the in-memory db
-            let new_peer = tracker::Peer {
-                ip_address: client_ip,
-                user_id,
-                torrent_id,
-                port: queries.port,
-                is_seeder: queries.left == 0,
-                is_active: true,
-                is_visible: !has_hit_download_slot_limit,
-                updated_at: Utc::now(),
-                uploaded: queries.uploaded,
-                downloaded: queries.downloaded,
-            };
-
-            let old_peer = torrent.peers.insert(
-                tracker::peer::Index {
+            let mut old_peer: Option<Peer> = None;
+            let new_peer = torrent
+                .peers
+                .entry(tracker::peer::Index {
                     user_id,
                     peer_id: queries.peer_id,
-                },
-                new_peer,
-            );
+                })
+                .and_modify(|peer| {
+                    old_peer = Some(*peer);
+
+                    peer.ip_address = client_ip;
+                    peer.port = queries.port;
+                    peer.is_seeder = queries.left == 0;
+                    peer.is_visible =
+                        peer.is_included_in_leech_list() || !has_hit_download_slot_limit;
+                    peer.is_active = true;
+                    peer.updated_at = Utc::now();
+                    peer.uploaded = queries.uploaded;
+                    peer.downloaded = queries.downloaded;
+                })
+                .or_insert(tracker::Peer {
+                    ip_address: client_ip,
+                    user_id,
+                    torrent_id,
+                    port: queries.port,
+                    is_seeder: queries.left == 0,
+                    is_active: true,
+                    is_visible: !has_hit_download_slot_limit,
+                    updated_at: Utc::now(),
+                    uploaded: queries.uploaded,
+                    downloaded: queries.downloaded,
+                })
+                .clone();
 
             // Update the user and torrent seeding/leeching counts in the
             // in-memory db
