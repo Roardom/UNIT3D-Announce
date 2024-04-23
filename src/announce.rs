@@ -436,17 +436,8 @@ pub async fn announce(
 
                     // Calculate change in upload and download compared to previous
                     // announce
-                    if queries.uploaded >= old_peer.uploaded
-                        || queries.downloaded >= old_peer.downloaded
-                    {
-                        // User continues old session
-                        uploaded_delta = queries.uploaded - old_peer.uploaded;
-                        downloaded_delta = queries.downloaded - old_peer.downloaded;
-                    } else {
-                        // User has restarted their session but reused the same peer id
-                        uploaded_delta = queries.uploaded;
-                        downloaded_delta = queries.downloaded;
-                    }
+                    uploaded_delta = queries.uploaded.saturating_sub(old_peer.uploaded);
+                    downloaded_delta = queries.downloaded.saturating_sub(old_peer.downloaded);
 
                     updated_at = Some(old_peer.updated_at);
                 }
@@ -479,8 +470,8 @@ pub async fn announce(
 
                     // Calculate change in upload and download compared to previous
                     // announce
-                    uploaded_delta = queries.uploaded;
-                    downloaded_delta = queries.downloaded;
+                    uploaded_delta = 0;
+                    downloaded_delta = 0;
                 }
             }
         }
