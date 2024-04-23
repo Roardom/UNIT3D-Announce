@@ -436,8 +436,8 @@ pub async fn announce(
 
                     // Calculate change in upload and download compared to previous
                     // announce
-                    if queries.uploaded > old_peer.uploaded
-                        || queries.downloaded > old_peer.downloaded
+                    if queries.uploaded >= old_peer.uploaded
+                        || queries.downloaded >= old_peer.downloaded
                     {
                         // User continues old session
                         uploaded_delta = queries.uploaded - old_peer.uploaded;
