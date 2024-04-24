@@ -436,8 +436,18 @@ pub async fn announce(
 
                     // Calculate change in upload and download compared to previous
                     // announce
-                    uploaded_delta = queries.uploaded.saturating_sub(old_peer.uploaded);
-                    downloaded_delta = queries.downloaded.saturating_sub(old_peer.downloaded);
+                    if queries.uploaded < old_peer.uploaded
+                        || queries.downloaded < old_peer.downloaded
+                    {
+                        // Client sent the same peer id but restarted the session
+                        // Assume delta is 0
+                        uploaded_delta = 0;
+                        downloaded_delta = 0;
+                    } else {
+                        // Assume client continues previously tracked session
+                        uploaded_delta = queries.uploaded - old_peer.uploaded;
+                        downloaded_delta = queries.downloaded - old_peer.downloaded;
+                    }
 
                     updated_at = Some(old_peer.updated_at);
                 }
