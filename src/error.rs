@@ -19,11 +19,11 @@ pub enum AnnounceError {
     InvalidInfoHash,
     #[error("Invalid 'port' (must be greater than or equal to 0).")]
     InvalidPort,
-    #[error("Invalid 'port' (must be greater than or equal to 0).")]
-    InvalidUploaded,
     #[error("Invalid 'uploaded' (must be greater than or equal to 0).")]
-    InvalidDownloaded,
+    InvalidUploaded,
     #[error("Invalid 'downloaded' (must be greater than or equal to 0).")]
+    InvalidDownloaded,
+    #[error("Invalid 'left' (must be greater than or equal to 0).")]
     InvalidLeft,
     #[error("Your client does not support compact announces.")]
     InvalidCompact,
