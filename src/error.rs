@@ -5,7 +5,7 @@ use axum::{
 
 use thiserror::Error;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, Copy)]
 pub enum AnnounceError {
     #[error("Internal tracker error.")]
     InternalTrackerError,

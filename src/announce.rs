@@ -288,40 +288,18 @@ pub async fn announce(
     let passkey: Passkey = Passkey::from_str(&passkey).or(Err(InvalidPasskey))?;
 
     // Validate passkey
-    let user_id = *tracker
+    let user_id = tracker
         .passkey2id
         .read()
         .get(&passkey)
-        .ok_or(PasskeyNotFound)?;
+        .ok_or(PasskeyNotFound)
+        .cloned();
     let user = tracker
         .users
         .read()
-        .get(&user_id)
-        .ok_or(UserNotFound)?
-        .clone();
-
-    // Validate user
-    if !user.can_download && queries.left != 0 {
-        return Err(DownloadPrivilegesRevoked);
-    }
-
-    let group = tracker
-        .groups
-        .read()
-        .get(&user.group_id)
-        .ok_or(GroupNotFound)?
-        .clone();
-
-    match group.slug.as_str() {
-        "banned" => return Err(GroupBanned),
-        "validating" => return Err(GroupValidating),
-        "disabled" => return Err(GroupDisabled),
-        _ => (),
-    }
-
-    // Make sure user isn't leeching more torrents than their group allows
-    let has_hit_download_slot_limit = queries.left > 0
-        && matches!(group.download_slots, Some(slots) if slots <= user.num_leeching);
+        .get(&user_id.unwrap_or(0))
+        .ok_or(UserNotFound)
+        .cloned();
 
     // Validate torrent
     let torrent_id = *tracker
@@ -339,6 +317,8 @@ pub async fn announce(
         leecher_delta,
         times_completed_delta,
         is_visible,
+        user_id,
+        group,
         response,
     ) = {
         let mut torrent_guard = tracker.torrents.lock();
@@ -355,6 +335,32 @@ pub async fn announce(
             tracker::torrent::Status::Postponed => return Err(TorrentIsPostponed),
             _ => return Err(TorrentUnknownModerationStatus),
         }
+
+        let user_id = user_id?;
+        let user = user?;
+
+        // Validate user
+        if !user.can_download && queries.left != 0 {
+            return Err(DownloadPrivilegesRevoked);
+        }
+
+        let group = tracker
+            .groups
+            .read()
+            .get(&user.group_id)
+            .ok_or(GroupNotFound)?
+            .clone();
+
+        match group.slug.as_str() {
+            "banned" => return Err(GroupBanned),
+            "validating" => return Err(GroupValidating),
+            "disabled" => return Err(GroupDisabled),
+            _ => (),
+        }
+
+        // Make sure user isn't leeching more torrents than their group allows
+        let has_hit_download_slot_limit = queries.left > 0
+            && matches!(group.download_slots, Some(slots) if slots <= user.num_leeching);
 
         // Change of upload/download compared to previous announce
         let uploaded_delta;
@@ -623,6 +629,8 @@ pub async fn announce(
             leecher_delta,
             times_completed_delta,
             is_visible,
+            user_id,
+            group,
             response,
         )
     };
