@@ -1,6 +1,6 @@
 use std::fmt::Display;
+use std::net::IpAddr;
 use std::ops::{Deref, DerefMut};
-use std::str::FromStr;
 
 use chrono::serde::ts_seconds;
 use indexmap::IndexMap;
@@ -66,7 +66,7 @@ impl Map {
         let peers: Vec<(Index, Peer)> = sqlx::query!(
             r#"
                 SELECT
-                    INET6_NTOA(peers.ip) as `ip_address: String`,
+                    INET6_NTOA(peers.ip) as `ip_address: IpAddr`,
                     peers.user_id as `user_id: u32`,
                     peers.torrent_id as `torrent_id: u32`,
                     peers.port as `port: u16`,
@@ -88,11 +88,9 @@ impl Map {
                     peer_id: row.peer_id,
                 },
                 Peer {
-                    ip_address: std::net::IpAddr::from_str(
-                        &row.ip_address
-                            .expect("INET6_NTOA failed to decode peer ip."),
-                    )
-                    .expect("Peer ip failed to decode."),
+                    ip_address: row
+                        .ip_address
+                        .expect("INET6_NTOA failed to decode peer ip."),
                     user_id: row.user_id,
                     torrent_id: row.torrent_id,
                     port: row.port,
