@@ -2,8 +2,6 @@
 
 High-performance backend BitTorrent tracker compatible with UNIT3D tracker software.
 
-⚠️ **This is unstable, experimental code and should not be used in production** ⚠️
-
 ## Usage
 
 ```sh
