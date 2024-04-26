@@ -1,11 +1,11 @@
 {
   "db_name": "MySQL",
-  "query": "\n                SELECT\n                    INET6_NTOA(peers.ip) as `ip_address: String`,\n                    peers.user_id as `user_id: u32`,\n                    peers.torrent_id as `torrent_id: u32`,\n                    peers.port as `port: u16`,\n                    peers.seeder as `is_seeder: bool`,\n                    peers.active as `is_active: bool`,\n                    peers.visible as `is_visible: bool`,\n                    peers.updated_at as `updated_at: DateTime<Utc>`,\n                    peers.uploaded as `uploaded: u64`,\n                    peers.downloaded as `downloaded: u64`,\n                    peers.peer_id as `peer_id: PeerId`\n                FROM\n                    peers\n            ",
+  "query": "\n                SELECT\n                    INET6_NTOA(peers.ip) as `ip_address: IpAddr`,\n                    peers.user_id as `user_id: u32`,\n                    peers.torrent_id as `torrent_id: u32`,\n                    peers.port as `port: u16`,\n                    peers.seeder as `is_seeder: bool`,\n                    peers.active as `is_active: bool`,\n                    peers.visible as `is_visible: bool`,\n                    peers.updated_at as `updated_at: DateTime<Utc>`,\n                    peers.uploaded as `uploaded: u64`,\n                    peers.downloaded as `downloaded: u64`,\n                    peers.peer_id as `peer_id: PeerId`\n                FROM\n                    peers\n            ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "ip_address: String",
+        "name": "ip_address: IpAddr",
         "type_info": {
           "type": "VarString",
           "flags": "",
@@ -131,5 +131,5 @@
       false
     ]
   },
-  "hash": "1a15fe0652322e77db1c5a6babc10a7be17383760fa76db4d0c59c5825a5fd1a"
+  "hash": "7e8567608f846a5d5133fc09f489e277981d64cbf6241761e851e232d8e4fdbf"
 }
