@@ -108,3 +108,8 @@ To gracefully exit the tracker:
 ```sh
 sudo supervisorctl stop unit3d-announce:unit3d-announce_00
 ```
+## Performance
+
+UNIT3D's PHP announce can handle ~250 HTTP requests per second per core on modern hardware.
+
+Using the same hardware, UNIT3D-Announce handles ~50k HTTP requests per second per core (using wrk). Adding it behind an nginx proxy with TLS will reduce it to ~10k HTTP requests per second per core.
