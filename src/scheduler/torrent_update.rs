@@ -148,12 +148,26 @@ impl Queue {
                 "#,
             );
 
-        query_builder
+        let rows_affected_res = query_builder
             .build()
             .persistent(false)
             .execute(db)
             .await
-            .map(|result| result.rows_affected())
+            .map(|result| result.rows_affected());
+
+        if rows_affected_res.is_ok() {
+            // When torrent records are upserted after they have been deleted
+            // since the last flush interval, the record gets unintentionally
+            // re-inserted. So, we need to delete it again. All re-inserted
+            // records would have an info_hash of 20 bytes worth of binary 0.
+            let _ = sqlx::query!(
+                r#"DELETE from torrents WHERE info_hash = '\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0'"#
+            )
+            .execute(db)
+            .await;
+        }
+
+        rows_affected_res
     }
 }
 
