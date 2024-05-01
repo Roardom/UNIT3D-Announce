@@ -68,7 +68,7 @@ impl FromStr for Event {
 
     fn from_str(event: &str) -> Result<Self, AnnounceError> {
         match event {
-            "" | "empty" => Ok(Self::Empty),
+            "" | "empty" | "paused" => Ok(Self::Empty),
             "completed" => Ok(Self::Completed),
             "started" => Ok(Self::Started),
             "stopped" => Ok(Self::Stopped),
