@@ -1,0 +1,12 @@
+{
+  "db_name": "MySQL",
+  "query": "DELETE from torrents WHERE info_hash = '\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0\\0'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": []
+  },
+  "hash": "5c55650f5687f49810b1ec25cbfa98beb22c4b904c696422dd2ea219af08f9b9"
+}
