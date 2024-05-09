@@ -499,6 +499,20 @@ pub async fn announce(
             .times_completed
             .saturating_add(times_completed_delta);
 
+        let warning_opt = if updated_at.is_some_and(|updated_at| {
+            updated_at
+                .checked_add_signed(Duration::seconds(tracker.config.announce_min.into()))
+                .is_some_and(|blocked_until| blocked_until > Utc::now())
+        }) {
+            // Peer last announced less than announce_min seconds ago
+            Some("Rate limit exceeded.".to_string())
+        } else if !is_visible {
+            // User has full download slots
+            Some("Download slot limit reached.".to_string())
+        } else {
+            None
+        };
+
         // Generate peer lists to return to client
 
         let mut peers_ipv4: Vec<u8> = Vec::new();
@@ -507,18 +521,8 @@ pub async fn announce(
         // Only provide peer list if
         // - it is not a stopped event,
         // - there exist leechers (we have to remember to update the torrent leecher count before this check)
-        // - the user still has remaining open download slots, and
-        // - the peer last announced more than announce_min seconds ago.
-        if queries.event != Event::Stopped
-            && torrent.leechers > 0
-            && is_visible
-            && (updated_at.is_none()
-                || updated_at.is_some_and(|updated_at| {
-                    updated_at
-                        .checked_add_signed(Duration::seconds(tracker.config.announce_min.into()))
-                        .is_some_and(|blocked_until| blocked_until < Utc::now())
-                }))
-        {
+        // - there is no warning in the response
+        if queries.event != Event::Stopped && torrent.leechers > 0 && warning_opt.is_none() {
             let mut peers: Vec<(&peer::Index, &Peer)> = Vec::with_capacity(std::cmp::min(
                 queries.numwant,
                 torrent.seeders as usize + torrent.leechers as usize,
@@ -594,6 +598,13 @@ pub async fn announce(
             response.extend(peers_ipv6.len().to_string().as_bytes());
             response.extend(b":");
             response.extend(peers_ipv6);
+        }
+
+        if let Some(warning) = warning_opt {
+            response.extend(b"15:warning message");
+            response.extend(warning.len().to_string().as_bytes());
+            response.extend(b":");
+            response.extend(warning.as_bytes());
         }
 
         response.extend(b"e");
