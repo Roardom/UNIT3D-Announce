@@ -594,7 +594,7 @@ pub async fn announce(
         response.extend(&peers_ipv4);
 
         if !peers_ipv6.is_empty() {
-            response.extend(b"e6:peers6");
+            response.extend(b"6:peers6");
             response.extend(peers_ipv6.len().to_string().as_bytes());
             response.extend(b":");
             response.extend(peers_ipv6);
