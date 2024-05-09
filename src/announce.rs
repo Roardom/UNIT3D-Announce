@@ -589,9 +589,14 @@ pub async fn announce(
         response.extend(b"e12:min intervali");
         response.extend(tracker.config.announce_min.to_string().as_bytes());
         response.extend(b"e5:peers");
-        response.extend(peers_ipv4.len().to_string().as_bytes());
-        response.extend(b":");
-        response.extend(&peers_ipv4);
+
+        if peers_ipv4.is_empty() {
+            response.extend(b"0:")
+        } else {
+            response.extend(peers_ipv4.len().to_string().as_bytes());
+            response.extend(b":");
+            response.extend(&peers_ipv4);
+        }
 
         if !peers_ipv6.is_empty() {
             response.extend(b"6:peers6");
