@@ -93,7 +93,7 @@ redirect_stderr=true
 stdout_logfile=/var/www/html/storage/logs/announce.log
 ```
 
-### Starting UNIT3D-Announce
+### Starting/Restarting UNIT3D-Announce
 
 Reload supervisor
 
@@ -108,6 +108,29 @@ To gracefully exit the tracker:
 ```sh
 sudo supervisorctl stop unit3d-announce:unit3d-announce_00
 ```
+
+### Global Freeleech or Double Upload Events
+> When using the Rust based UNIT3D Announce tracker, the global freeleech and double upload events are handled by the external tracker itself. This means you must activate the events in the `config/other.php` file within UNIT3D as normal for timer and then also within the `.env` file of the UNIT3D Announce tracker.
+
+To enable\disable global freeleech or double upload events, you need to adjust the following environment variables in the `.env` file and then restart the tracker using the supervisorctl command above.:
+
+```sh
+# The upload_factor is multiplied by 0.01 before being multiplied with
+# the announced uploaded parameter and saved in the "credited" upload
+# column. An upload_factor of 200 means global double upload.
+#
+# Default: 100
+UPLOAD_FACTOR=100
+
+# The download factor is multiplied by 0.01 before being multiplied
+# with the announced downloaded parameter and saved in the "credited"
+# download column. A download_factor of 0 means global freeleech.
+#
+# Default: 100
+DOWNLOAD_FACTOR=100
+```
+
+
 ## Performance
 
 UNIT3D's PHP announce can handle ~250 HTTP requests per second per core on modern hardware.
