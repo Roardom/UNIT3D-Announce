@@ -505,7 +505,7 @@ pub async fn announce(
                 .is_some_and(|blocked_until| blocked_until > Utc::now())
         }) {
             // Peer last announced less than announce_min seconds ago
-            Some("Rate limit exceeded.".to_string())
+            Some("Rate limit exceeded. Please wait.".to_string())
         } else if !is_visible {
             // User has full download slots
             Some("Download slot limit reached.".to_string())
