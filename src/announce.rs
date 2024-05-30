@@ -395,7 +395,7 @@ pub async fn announce(
         } else {
             // Insert the peer into the in-memory db
             let mut old_peer: Option<Peer> = None;
-            let new_peer = torrent
+            let new_peer = *torrent
                 .peers
                 .entry(tracker::peer::Index {
                     user_id,
@@ -425,8 +425,7 @@ pub async fn announce(
                     updated_at: Utc::now(),
                     uploaded: queries.uploaded,
                     downloaded: queries.downloaded,
-                })
-                .clone();
+                });
 
             is_visible = new_peer.is_visible;
 
