@@ -43,8 +43,9 @@ impl Set {
 
     pub async fn upsert(State(tracker): State<Arc<Tracker>>, Json(agent): Json<Agent>) {
         println!(
-            "Inserting agent with peer_id_prefix {:?}.",
-            agent.peer_id_prefix
+            "Inserting agent with peer_id_prefix {} ({:?}).",
+            String::from_utf8_lossy(&agent.peer_id_prefix),
+            agent.peer_id_prefix,
         );
 
         tracker.agent_blacklist.write().insert(agent);
@@ -52,8 +53,9 @@ impl Set {
 
     pub async fn destroy(State(tracker): State<Arc<Tracker>>, Json(agent): Json<Agent>) {
         println!(
-            "Removing agent with peer_id_prefix {:?}.",
-            agent.peer_id_prefix
+            "Removing agent with peer_id_prefix {} ({:?}).",
+            String::from_utf8_lossy(&agent.peer_id_prefix),
+            agent.peer_id_prefix,
         );
 
         tracker.agent_blacklist.write().swap_remove(&agent);
@@ -76,5 +78,6 @@ impl DerefMut for Set {
 
 #[derive(Eq, Deserialize, Hash, PartialEq)]
 pub struct Agent {
+    #[serde(with = "serde_bytes")]
     pub peer_id_prefix: Vec<u8>,
 }
