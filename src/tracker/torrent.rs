@@ -76,6 +76,8 @@ impl Map {
                     0 as `is_deleted: bool`
                 FROM
                     torrents
+                WHERE
+                    torrents.deleted_at IS NULL
             "#
         )
         .fetch_all(db)
