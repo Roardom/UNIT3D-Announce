@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n                SELECT\n                    torrents.id as `id: u32`,\n                    torrents.info_hash as `info_hash: InfoHash`\n                FROM\n                    torrents\n            ",
+  "query": "\n                SELECT\n                    torrents.id as `id: u32`,\n                    torrents.info_hash as `info_hash: InfoHash`\n                FROM\n                    torrents\n                WHERE\n                    torrents.deleted_at IS NULL\n            ",
   "describe": {
     "columns": [
       {
@@ -32,5 +32,5 @@
       false
     ]
   },
-  "hash": "c1548846bf56ba7cbae801a925187f42ecf1a59e973d71a169d497aed56dfb7d"
+  "hash": "54a7512cb0319227712b599c5ab79faa961d55130a5f65f67d8f5e0250fd893d"
 }

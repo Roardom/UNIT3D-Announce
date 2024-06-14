@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n                SELECT\n                    torrents.id as `id: u32`,\n                    torrents.status as `status: Status`,\n                    torrents.times_completed as `times_completed: u32`,\n                    100 - LEAST(torrents.free, 100) as `download_factor: u8`,\n                    IF(doubleup, 200, 100) as `upload_factor: u8`,\n                    0 as `is_deleted: bool`\n                FROM\n                    torrents\n            ",
+  "query": "\n                SELECT\n                    torrents.id as `id: u32`,\n                    torrents.status as `status: Status`,\n                    torrents.times_completed as `times_completed: u32`,\n                    100 - LEAST(torrents.free, 100) as `download_factor: u8`,\n                    IF(doubleup, 200, 100) as `upload_factor: u8`,\n                    0 as `is_deleted: bool`\n                FROM\n                    torrents\n                WHERE\n                    torrents.deleted_at IS NULL\n            ",
   "describe": {
     "columns": [
       {
@@ -76,5 +76,5 @@
       false
     ]
   },
-  "hash": "85ab7dd2f76b480c5b3a46bf26353242a502b8131a1a034ab29b00a6dd22b392"
+  "hash": "6c420f48667da25c4b7bf0af6fd135cd66a9fe7cae85e526014b117e7be8773d"
 }
