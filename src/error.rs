@@ -93,15 +93,22 @@ pub enum AnnounceError {
 
 impl IntoResponse for AnnounceError {
     fn into_response(self) -> Response {
-        (
-            StatusCode::OK,
-            format!(
-                "d14:failure reason{}:{}8:intervali5400e12:min intervali5400ee",
-                self.to_string().chars().count(),
-                self,
-            ),
-        )
-            .into_response()
+        let mut response: Vec<u8> = vec![];
+        response.extend(b"d14:failure reason");
+        response.extend(self.to_string().len().to_string().as_bytes());
+        response.extend(b":");
+        response.extend(self.to_string().as_bytes());
+
+        // If the torrent status is pending, postponed, or rejected, reduce the interval to 30 seconds.
+        // This allows the uploader to start seeding sooner when the torrent is approved.
+        match self {
+            Self::TorrentIsPendingModeration
+            | Self::TorrentIsPostponed
+            | Self::TorrentIsRejected => response.extend(b"8:intervali30e12:min intervali30ee"),
+            _ => response.extend(b"8:intervali5400e12:min intervali5400ee"),
+        };
+
+        (StatusCode::OK, response).into_response()
     }
 }
 
