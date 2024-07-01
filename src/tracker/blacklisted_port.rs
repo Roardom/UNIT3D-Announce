@@ -7,7 +7,7 @@ pub struct Set(IndexSet<u16>);
 impl Default for Set {
     #[rustfmt::skip]
     fn default() -> Set {
-        Set(IndexSet::from([
+        let mut set = IndexSet::from([
             // SSH Port
             22,
             // DNS queries
@@ -34,7 +34,14 @@ impl Default for Set {
             6347,
             // Port used by p2p software, such as WinMX, Napster.
             6699,
-        ]))
+        ]);
+
+        // Block system-reserved ports since 99.9% of the time they're fake and thus not connectable
+        for system_reserved_port in 0..1024 {
+            set.insert(system_reserved_port);
+        }
+
+        Set(set)
     }
 }
 
