@@ -61,6 +61,11 @@ pub struct Config {
     /// debugging. This will generate significant amounts of data. Do not
     /// enable if you do not know what you are doing.
     pub is_announce_logging_enabled: bool,
+    /// The header provided by the reverse proxy that includes the bittorrent
+    /// client's original ip address. The last address in the comma separated
+    /// list will be selected. Leave empty to select the connecting ip address
+    /// if not using a reverse proxy.
+    pub reverse_proxy_client_ip_header_name: Option<String>,
 }
 
 impl Config {
@@ -145,6 +150,9 @@ impl Config {
             .parse()
             .context("IS_ANNOUNCE_LOGGING_ENABLED must be either `true` or `false`")?;
 
+        let reverse_proxy_client_ip_header_name =
+            env::var("REVERSE_PROXY_CLIENT_IP_HEADER_NAME").ok();
+
         let apikey = env::var("APIKEY").context("APIKEY not found in .env file.")?;
 
         if apikey.len() < 32 {
@@ -169,6 +177,7 @@ impl Config {
             is_connectivity_check_enabled,
             connectivity_check_interval,
             is_announce_logging_enabled,
+            reverse_proxy_client_ip_header_name,
         })
     }
 }
