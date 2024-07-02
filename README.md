@@ -53,14 +53,16 @@ Paste the following `location` block into the first `server` block immediately a
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header Host $host;
         proxy_pass http://aaa.bbb.ccc.ddd:eeee$request_uri;
+        real_ip_header X-Forwarded-For;
         real_ip_recursive on;
         set_real_ip_from fff.ggg.hhh.iii;
     }
 ```
 
 - `aaa.bbb.ccc.ddd:eeee` is the local listening IP address and port of UNIT3D-Announce. Set this to the `LISTENING_IP_ADDRESS` and `LISTENING_PORT` configured in the .env file.
-- `fff.ggg.hhh.iii` is the public listening IP address of the nginx proxy used for accessing the frontend website. You can add additional `set_real_ip_from jjj.kkk.lll.mmm;` lines for each additional proxy used so long as the proxy appends the proper values to the `X-Forwarded-For` header. Replace this with your proxy IP address.
+- `fff.ggg.hhh.iii` is the public listening IP address of the nginx proxy used for accessing the frontend website. You can add additional `set_real_ip_from jjj.kkk.lll.mmm/nn;` lines for each additional proxy used so long as the proxy appends the proper values to the `X-Forwarded-For` header. Replace this with your proxy IP address.
 
+Uncomment and set `REVERSE_PROXY_CLIENT_IP_HEADER_NAME` in the .env file to `X-Real-IP`.
 
 ```sh
 # Reload nginx once finished

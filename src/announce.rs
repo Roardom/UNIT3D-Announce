@@ -197,29 +197,43 @@ where
 pub struct ClientIp(pub std::net::IpAddr);
 
 #[async_trait]
-impl<S> FromRequestParts<S> for ClientIp
-where
-    S: Send + Sync,
-{
+impl FromRequestParts<Arc<Tracker>> for ClientIp {
     type Rejection = AnnounceError;
 
-    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        // Extract the IP from the X-Real-IP header set by nginx using real_ip_recursive
-        if let Some(ip_header) = parts.headers.get("X-Real-IP") {
-            if let Ok(ip_str) = ip_header.to_str() {
-                if let Ok(ip) = IpAddr::from_str(ip_str) {
-                    return Ok(ClientIp(ip));
-                }
-            }
-        }
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &Arc<Tracker>,
+    ) -> Result<Self, Self::Rejection> {
+        let ip = if let Some(header) = &state.config.reverse_proxy_client_ip_header_name {
+            // We need the right-most ip, which should be included in the last header
+            parts
+                .headers
+                .get_all(header)
+                .iter()
+                .last()
+                // Err: Missing the client ip header
+                .ok_or(InternalTrackerError)?
+                .to_str()
+                // Err: Client ip header is not UTF-8
+                .map_err(|_| InternalTrackerError)?
+                .split(',')
+                .last()
+                // Err: Client ip header is empty
+                .ok_or(InternalTrackerError)?
+                .trim()
+                .parse()
+                // Err: Client ip header does not contain a valid ip address
+                .map_err(|_| InternalTrackerError)?
+        } else {
+            // If the header isn't configured, use the connecting ip.
+            let ConnectInfo(addr) = ConnectInfo::<SocketAddr>::from_request_parts(parts, state)
+                .await
+                .or(Err(InternalTrackerError))?;
 
-        // If the X-Real-IP header isn't included, or if parsing the ip from it fails, then use the
-        // connecting ip.
-        let ConnectInfo(addr) = ConnectInfo::<SocketAddr>::from_request_parts(parts, state)
-            .await
-            .or(Err(InternalTrackerError))?;
+            addr.ip()
+        };
 
-        Ok(ClientIp(addr.ip()))
+        Ok(ClientIp(ip))
     }
 }
 
