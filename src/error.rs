@@ -77,8 +77,6 @@ pub enum AnnounceError {
     TorrentIsPostponed,
     #[error("Torrent not approved.")]
     TorrentUnknownModerationStatus,
-    #[error("Stopped peer doesn't exist.")]
-    StoppedPeerDoesntExist,
     #[error("Group not found.")]
     GroupNotFound,
     #[error("Your account is not enabled. (Current: Banned).")]

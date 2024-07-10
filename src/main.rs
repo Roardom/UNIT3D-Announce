@@ -18,6 +18,7 @@ mod scheduler;
 mod stats;
 mod tracker;
 mod utils;
+mod warning;
 
 #[tokio::main]
 async fn main() -> Result<()> {

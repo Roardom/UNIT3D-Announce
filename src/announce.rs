@@ -18,16 +18,19 @@ use std::{
 };
 use tokio::net::TcpStream;
 
-use crate::error::AnnounceError::{
-    self, AbnormalAccess, BlacklistedClient, BlacklistedPort, DownloadPrivilegesRevoked,
-    GroupBanned, GroupDisabled, GroupNotFound, GroupValidating, InfoHashNotFound,
-    InternalTrackerError, InvalidCompact, InvalidDownloaded, InvalidInfoHash, InvalidLeft,
-    InvalidNumwant, InvalidPasskey, InvalidPeerId, InvalidPort, InvalidQueryStringKey,
-    InvalidQueryStringValue, InvalidUploaded, InvalidUserAgent, MissingDownloaded, MissingInfoHash,
-    MissingLeft, MissingPeerId, MissingPort, MissingUploaded, NotAClient, PasskeyNotFound,
-    PeersPerTorrentPerUserLimit, StoppedPeerDoesntExist, TorrentIsDeleted,
-    TorrentIsPendingModeration, TorrentIsPostponed, TorrentIsRejected, TorrentNotFound,
-    TorrentUnknownModerationStatus, UnsupportedEvent, UserAgentTooLong, UserNotFound,
+use crate::{
+    error::AnnounceError::{
+        self, AbnormalAccess, BlacklistedClient, BlacklistedPort, DownloadPrivilegesRevoked,
+        GroupBanned, GroupDisabled, GroupNotFound, GroupValidating, InfoHashNotFound,
+        InternalTrackerError, InvalidCompact, InvalidDownloaded, InvalidInfoHash, InvalidLeft,
+        InvalidNumwant, InvalidPasskey, InvalidPeerId, InvalidPort, InvalidQueryStringKey,
+        InvalidQueryStringValue, InvalidUploaded, InvalidUserAgent, MissingDownloaded,
+        MissingInfoHash, MissingLeft, MissingPeerId, MissingPort, MissingUploaded, NotAClient,
+        PasskeyNotFound, PeersPerTorrentPerUserLimit, TorrentIsDeleted, TorrentIsPendingModeration,
+        TorrentIsPostponed, TorrentIsRejected, TorrentNotFound, TorrentUnknownModerationStatus,
+        UnsupportedEvent, UserAgentTooLong, UserNotFound,
+    },
+    warning::AnnounceWarning,
 };
 
 use crate::tracker::{
@@ -334,6 +337,7 @@ pub async fn announce(
         user,
         user_id,
         group,
+        warnings,
         response,
     ) = {
         let mut torrent_guard = tracker.torrents.lock();
@@ -383,8 +387,8 @@ pub async fn announce(
         let seeder_delta;
         let leecher_delta;
         let times_completed_delta;
-        let mut updated_at: Option<DateTime<Utc>> = None;
         let is_visible;
+        let mut warnings: Vec<AnnounceWarning> = Vec::new();
 
         if queries.event == Event::Stopped {
             // Try and remove the peer
@@ -402,7 +406,21 @@ pub async fn announce(
                 leecher_delta = 0 - peer.is_included_in_leech_list() as i32;
                 seeder_delta = 0 - peer.is_included_in_seed_list() as i32;
             } else {
-                return Err(StoppedPeerDoesntExist);
+                // Some clients (namely transmission) will keep sending
+                // `stopped` events until a successful announce is received.
+                // If a user's network is having issues, their peer might be
+                // deleted for inactivity from missed announces. If their peer
+                // isn't found when we receive a `stopped` event from them
+                // after regaining network connectivity, we can't return an
+                // error otherwise the client might enter into an infinite loop
+                // of sending `stopped` events. To prevent this, we need to
+                // send a warning (i.e. succcessful announce) instead, so that
+                // the client can successfully restart its session.
+                warnings.push(AnnounceWarning::StoppedPeerDoesntExist);
+                leecher_delta = 0;
+                seeder_delta = 0;
+                uploaded_delta = 0;
+                downloaded_delta = 0;
             }
 
             times_completed_delta = 0;
@@ -444,6 +462,11 @@ pub async fn announce(
 
             is_visible = new_peer.is_visible;
 
+            // Warn user if download slots are full
+            if !is_visible {
+                warnings.push(AnnounceWarning::HitDownloadSlotLimit);
+            };
+
             // Update the user and torrent seeding/leeching counts in the
             // in-memory db
             match old_peer {
@@ -469,7 +492,14 @@ pub async fn announce(
                         downloaded_delta = queries.downloaded - old_peer.downloaded;
                     }
 
-                    updated_at = Some(old_peer.updated_at);
+                    // Warn user if peer last announced less than announce_min seconds ago
+                    if old_peer
+                        .updated_at
+                        .checked_add_signed(Duration::seconds(tracker.config.announce_min.into()))
+                        .is_some_and(|blocked_until| blocked_until > Utc::now())
+                    {
+                        warnings.push(AnnounceWarning::RateLimitExceeded);
+                    }
                 }
                 None => {
                     // new peer is inserted
@@ -513,20 +543,6 @@ pub async fn announce(
             .times_completed
             .saturating_add(times_completed_delta);
 
-        let warning_opt = if updated_at.is_some_and(|updated_at| {
-            updated_at
-                .checked_add_signed(Duration::seconds(tracker.config.announce_min.into()))
-                .is_some_and(|blocked_until| blocked_until > Utc::now())
-        }) {
-            // Peer last announced less than announce_min seconds ago
-            Some("Rate limit exceeded. Please wait.".to_string())
-        } else if !is_visible && queries.event != Event::Stopped {
-            // User has full download slots
-            Some("Download slot limit reached.".to_string())
-        } else {
-            None
-        };
-
         // Generate peer lists to return to client
 
         let mut peers_ipv4: Vec<u8> = Vec::new();
@@ -536,7 +552,7 @@ pub async fn announce(
         // - it is not a stopped event,
         // - there exist leechers (we have to remember to update the torrent leecher count before this check)
         // - there is no warning in the response
-        if queries.event != Event::Stopped && torrent.leechers > 0 && warning_opt.is_none() {
+        if queries.event != Event::Stopped && torrent.leechers > 0 && warnings.is_empty() {
             let mut peers: Vec<(&peer::Index, &Peer)> = Vec::with_capacity(std::cmp::min(
                 queries.numwant,
                 torrent.seeders as usize + torrent.leechers as usize,
@@ -619,7 +635,13 @@ pub async fn announce(
             response.extend(peers_ipv6);
         }
 
-        if let Some(warning) = warning_opt {
+        if !warnings.is_empty() {
+            let warning = warnings
+                .clone()
+                .into_iter()
+                .map(|warning| warning.to_string())
+                .collect::<Vec<String>>()
+                .join("; ");
             response.extend(b"15:warning message");
             response.extend(warning.len().to_string().as_bytes());
             response.extend(b":");
@@ -662,9 +684,16 @@ pub async fn announce(
             user,
             user_id,
             group,
+            warnings,
             response,
         )
     };
+
+    // Short circuit response for stopped peer doesn't exist error since we
+    // can't do anything with it and don't want to update any data.
+    if warnings.contains(&AnnounceWarning::StoppedPeerDoesntExist) {
+        return Ok(response);
+    }
 
     let download_factor = if tracker
         .personal_freeleeches
