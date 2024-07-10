@@ -520,7 +520,7 @@ pub async fn announce(
         }) {
             // Peer last announced less than announce_min seconds ago
             Some("Rate limit exceeded. Please wait.".to_string())
-        } else if !is_visible {
+        } else if !is_visible && queries.event != Event::Stopped {
             // User has full download slots
             Some("Download slot limit reached.".to_string())
         } else {
