@@ -8,6 +8,7 @@ pub mod user_update;
 
 use crate::tracker::Tracker;
 use chrono::{Duration, Utc};
+use tokio::join;
 
 pub async fn handle(tracker: &Arc<Tracker>) {
     let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
@@ -29,11 +30,13 @@ pub async fn handle(tracker: &Arc<Tracker>) {
 
 /// Send queued updates to mysql database
 pub async fn flush(tracker: &Arc<Tracker>) {
-    flush_history_updates(tracker).await;
-    flush_peer_updates(tracker).await;
-    flush_torrent_updates(tracker).await;
-    flush_user_updates(tracker).await;
-    flush_announce_updates(tracker).await;
+    join!(
+        flush_history_updates(tracker),
+        flush_peer_updates(tracker),
+        flush_torrent_updates(tracker),
+        flush_user_updates(tracker),
+        flush_announce_updates(tracker),
+    );
 }
 
 /// Send history updates to mysql database
