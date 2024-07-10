@@ -55,7 +55,7 @@ impl Queue {
     pub fn take_batch(&mut self) -> Queue {
         let len = self.len();
 
-        Queue(self.split_off(len - min(Queue::user_limit(), len)))
+        Queue(self.drain(0..min(Queue::user_limit(), len)).collect())
     }
 
     /// Merge a torrent update batch into this torrent update batch

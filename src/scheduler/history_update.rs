@@ -105,7 +105,7 @@ impl Queue {
     pub fn take_batch(&mut self) -> Queue {
         let len = self.len();
 
-        Queue(self.split_off(len - min(Queue::history_limit(), len)))
+        Queue(self.drain(0..min(Queue::history_limit(), len)).collect())
     }
 
     /// Merge a history update batch into this history update batch
