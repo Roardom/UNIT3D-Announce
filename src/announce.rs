@@ -7,7 +7,7 @@ use axum::{
         HeaderMap,
     },
 };
-use chrono::{DateTime, Duration};
+use chrono::Duration;
 use rand::{rngs::SmallRng, seq::IteratorRandom, Rng, SeedableRng};
 use sqlx::types::chrono::Utc;
 use std::{
