@@ -54,31 +54,45 @@ impl Queue {
         left: u64,
         torrent_id: u32,
         user_id: u32,
+        updated_at: DateTime<Utc>,
         connectable: bool,
     ) {
-        self.insert(
-            Index {
-                torrent_id,
-                user_id,
-                peer_id,
-            },
-            PeerUpdate {
-                peer_id,
-                ip,
-                port,
-                agent,
-                uploaded,
-                downloaded,
-                is_active,
-                is_seeder,
-                is_visible,
-                left,
-                torrent_id,
-                user_id,
-                updated_at: Utc::now(),
-                connectable,
-            },
-        );
+        self.entry(Index {
+            torrent_id,
+            user_id,
+            peer_id,
+        })
+        .and_modify(|peer_update| {
+            if updated_at > peer_update.updated_at {
+                peer_update.ip = ip;
+                peer_update.port = port;
+                peer_update.agent = agent.clone();
+                peer_update.uploaded = uploaded;
+                peer_update.downloaded = downloaded;
+                peer_update.is_active = is_active;
+                peer_update.is_seeder = is_seeder;
+                peer_update.is_visible = is_visible;
+                peer_update.left = left;
+                peer_update.updated_at = updated_at;
+                peer_update.connectable = connectable;
+            }
+        })
+        .or_insert(PeerUpdate {
+            peer_id,
+            ip,
+            port,
+            agent,
+            uploaded,
+            downloaded,
+            is_active,
+            is_seeder,
+            is_visible,
+            left,
+            torrent_id,
+            user_id,
+            updated_at,
+            connectable,
+        });
     }
 
     /// Determine the max amount of peer records that can be inserted at
@@ -117,6 +131,7 @@ impl Queue {
                 peer_update.left,
                 peer_update.torrent_id,
                 peer_update.user_id,
+                peer_update.updated_at,
                 peer_update.connectable,
             );
         }

@@ -754,6 +754,7 @@ pub async fn announce(
         queries.left,
         torrent_id,
         user_id,
+        Utc::now(),
         connectable,
     );
 
