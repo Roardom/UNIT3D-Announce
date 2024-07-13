@@ -28,14 +28,19 @@ impl Queue {
     }
 
     pub fn upsert(&mut self, user_id: u32, uploaded_delta: u64, downloaded_delta: u64) {
-        self.insert(
-            Index { user_id },
-            UserUpdate {
+        self.entry(Index { user_id })
+            .and_modify(|user_update| {
+                user_update.uploaded_delta =
+                    user_update.uploaded_delta.saturating_add(uploaded_delta);
+                user_update.downloaded_delta = user_update
+                    .downloaded_delta
+                    .saturating_add(downloaded_delta);
+            })
+            .or_insert(UserUpdate {
                 user_id,
                 uploaded_delta,
                 downloaded_delta,
-            },
-        );
+            });
     }
 
     /// Determine the max amount of user records that can be inserted at
