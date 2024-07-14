@@ -15,6 +15,7 @@ pub struct Index {
     pub user_id: u32,
 }
 
+#[derive(Clone)]
 pub struct HistoryUpdate {
     pub user_id: u32,
     pub torrent_id: u32,
@@ -36,53 +37,24 @@ impl Queue {
         Queue(IndexMap::new())
     }
 
-    pub fn upsert(
-        &mut self,
-        user_id: u32,
-        torrent_id: u32,
-        user_agent: String,
-        credited_uploaded_delta: u64,
-        uploaded_delta: u64,
-        uploaded: u64,
-        credited_downloaded_delta: u64,
-        downloaded_delta: u64,
-        downloaded: u64,
-        is_seeder: bool,
-        is_active: bool,
-        is_immune: bool,
-        completed_at: Option<DateTime<Utc>>,
-    ) {
+    pub fn upsert(&mut self, new: HistoryUpdate) {
         self.entry(Index {
-            torrent_id,
-            user_id,
+            torrent_id: new.torrent_id,
+            user_id: new.user_id,
         })
         .and_modify(|history_update| {
-            history_update.user_agent = user_agent.to_owned();
-            history_update.is_active = is_active;
-            history_update.is_seeder = is_seeder;
-            history_update.uploaded = uploaded;
-            history_update.downloaded = downloaded;
-            history_update.uploaded_delta += uploaded_delta;
-            history_update.downloaded_delta += downloaded_delta;
-            history_update.credited_uploaded_delta += credited_uploaded_delta;
-            history_update.credited_downloaded_delta += credited_downloaded_delta;
-            history_update.completed_at = completed_at;
+            history_update.user_agent = new.user_agent.to_owned();
+            history_update.is_active = new.is_active;
+            history_update.is_seeder = new.is_seeder;
+            history_update.uploaded = new.uploaded;
+            history_update.downloaded = new.downloaded;
+            history_update.uploaded_delta += new.uploaded_delta;
+            history_update.downloaded_delta += new.downloaded_delta;
+            history_update.credited_uploaded_delta += new.credited_uploaded_delta;
+            history_update.credited_downloaded_delta += new.credited_downloaded_delta;
+            history_update.completed_at = new.completed_at;
         })
-        .or_insert(HistoryUpdate {
-            user_id,
-            torrent_id,
-            user_agent: user_agent.to_owned(),
-            is_active,
-            is_seeder,
-            is_immune,
-            uploaded,
-            downloaded,
-            uploaded_delta,
-            downloaded_delta,
-            credited_uploaded_delta,
-            credited_downloaded_delta,
-            completed_at,
-        });
+        .or_insert(new);
     }
 
     /// Determine the max amount of history records that can be inserted at
@@ -111,21 +83,7 @@ impl Queue {
     /// Merge a history update batch into this history update batch
     pub fn upsert_batch(&mut self, batch: Queue) {
         for history_update in batch.values() {
-            self.upsert(
-                history_update.user_id,
-                history_update.torrent_id,
-                history_update.user_agent.to_owned(),
-                history_update.credited_uploaded_delta,
-                history_update.uploaded_delta,
-                history_update.uploaded,
-                history_update.credited_downloaded_delta,
-                history_update.downloaded_delta,
-                history_update.downloaded,
-                history_update.is_seeder,
-                history_update.is_active,
-                history_update.is_immune,
-                history_update.completed_at,
-            );
+            self.upsert(history_update.clone());
         }
     }
 

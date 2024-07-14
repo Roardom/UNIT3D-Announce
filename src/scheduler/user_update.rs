@@ -16,6 +16,7 @@ pub struct Index {
 // TODO: Ideally unit3d should have `num_seeding` and `num_leeching` columns
 // on the user table so that the navbar doesn't query the history table.
 // If those columns existed, they should be updated too.
+#[derive(Clone)]
 pub struct UserUpdate {
     pub user_id: u32,
     pub uploaded_delta: u64,
@@ -27,20 +28,19 @@ impl Queue {
         Queue(IndexMap::new())
     }
 
-    pub fn upsert(&mut self, user_id: u32, uploaded_delta: u64, downloaded_delta: u64) {
-        self.entry(Index { user_id })
-            .and_modify(|user_update| {
-                user_update.uploaded_delta =
-                    user_update.uploaded_delta.saturating_add(uploaded_delta);
-                user_update.downloaded_delta = user_update
-                    .downloaded_delta
-                    .saturating_add(downloaded_delta);
-            })
-            .or_insert(UserUpdate {
-                user_id,
-                uploaded_delta,
-                downloaded_delta,
-            });
+    pub fn upsert(&mut self, new: UserUpdate) {
+        self.entry(Index {
+            user_id: new.user_id,
+        })
+        .and_modify(|user_update| {
+            user_update.uploaded_delta = user_update
+                .uploaded_delta
+                .saturating_add(new.uploaded_delta);
+            user_update.downloaded_delta = user_update
+                .downloaded_delta
+                .saturating_add(new.downloaded_delta);
+        })
+        .or_insert(new);
     }
 
     /// Determine the max amount of user records that can be inserted at
@@ -66,11 +66,7 @@ impl Queue {
     /// Merge a torrent update batch into this torrent update batch
     pub fn upsert_batch(&mut self, batch: Queue) {
         for user_update in batch.values() {
-            self.upsert(
-                user_update.user_id,
-                user_update.uploaded_delta,
-                user_update.downloaded_delta,
-            );
+            self.upsert(user_update.clone());
         }
     }
 

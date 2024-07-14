@@ -9,6 +9,7 @@ pub mod user_update;
 use crate::tracker::Tracker;
 use chrono::{Duration, Utc};
 use tokio::join;
+use torrent_update::TorrentUpdate;
 
 pub async fn handle(tracker: &Arc<Tracker>) {
     let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
@@ -172,10 +173,12 @@ pub async fn reap(tracker: &Arc<Tracker>) {
             torrent.seeders = torrent.seeders.saturating_add_signed(seeder_delta);
             torrent.leechers = torrent.leechers.saturating_add_signed(leecher_delta);
 
-            tracker
-                .torrent_updates
-                .lock()
-                .upsert(torrent.id, seeder_delta, leecher_delta, 0);
+            tracker.torrent_updates.lock().upsert(TorrentUpdate {
+                torrent_id: torrent.id,
+                seeder_delta,
+                leecher_delta,
+                times_completed_delta: 0,
+            });
         }
     }
 }

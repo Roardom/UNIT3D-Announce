@@ -9,6 +9,7 @@ use crate::{announce::Event, tracker::peer::PeerId};
 
 pub struct Queue(pub Vec<AnnounceUpdate>);
 
+#[derive(Clone)]
 pub struct AnnounceUpdate {
     pub user_id: u32,
     pub torrent_id: u32,
@@ -28,33 +29,8 @@ impl Queue {
         Queue(Vec::new())
     }
 
-    pub fn upsert(
-        &mut self,
-        user_id: u32,
-        torrent_id: u32,
-        uploaded: u64,
-        downloaded: u64,
-        left: u64,
-        corrupt: Option<u64>,
-        peer_id: PeerId,
-        port: u16,
-        numwant: u16,
-        event: Event,
-        key: Option<String>,
-    ) {
-        self.push(AnnounceUpdate {
-            user_id,
-            torrent_id,
-            uploaded,
-            downloaded,
-            left,
-            corrupt,
-            peer_id,
-            port,
-            numwant,
-            event,
-            key,
-        });
+    pub fn upsert(&mut self, new: AnnounceUpdate) {
+        self.push(new);
     }
 
     /// Determine the max amount of announce records that can be inserted at
@@ -80,19 +56,7 @@ impl Queue {
     /// Merge a announce update batch into this announce update batch
     pub fn upsert_batch(&mut self, batch: Queue) {
         for announce_update in batch.iter() {
-            self.upsert(
-                announce_update.user_id,
-                announce_update.torrent_id,
-                announce_update.uploaded,
-                announce_update.downloaded,
-                announce_update.left,
-                announce_update.corrupt,
-                announce_update.peer_id,
-                announce_update.port,
-                announce_update.numwant,
-                announce_update.event.to_owned(),
-                announce_update.key.to_owned(),
-            );
+            self.upsert(announce_update.clone());
         }
     }
 

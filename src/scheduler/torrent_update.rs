@@ -14,6 +14,7 @@ pub struct Index {
     pub torrent_id: u32,
 }
 
+#[derive(Clone)]
 pub struct TorrentUpdate {
     pub torrent_id: u32,
     pub seeder_delta: i32,
@@ -26,29 +27,21 @@ impl Queue {
         Queue(IndexMap::new())
     }
 
-    pub fn upsert(
-        &mut self,
-        torrent_id: u32,
-        seeder_delta: i32,
-        leecher_delta: i32,
-        times_completed_delta: u32,
-    ) {
-        self.entry(Index { torrent_id })
-            .and_modify(|torrent_update| {
-                torrent_update.seeder_delta =
-                    torrent_update.seeder_delta.saturating_add(seeder_delta);
-                torrent_update.leecher_delta =
-                    torrent_update.leecher_delta.saturating_add(leecher_delta);
-                torrent_update.times_completed_delta = torrent_update
-                    .times_completed_delta
-                    .saturating_add(times_completed_delta);
-            })
-            .or_insert(TorrentUpdate {
-                torrent_id,
-                seeder_delta,
-                leecher_delta,
-                times_completed_delta,
-            });
+    pub fn upsert(&mut self, new: TorrentUpdate) {
+        self.entry(Index {
+            torrent_id: new.torrent_id,
+        })
+        .and_modify(|torrent_update| {
+            torrent_update.seeder_delta =
+                torrent_update.seeder_delta.saturating_add(new.seeder_delta);
+            torrent_update.leecher_delta = torrent_update
+                .leecher_delta
+                .saturating_add(new.leecher_delta);
+            torrent_update.times_completed_delta = torrent_update
+                .times_completed_delta
+                .saturating_add(new.times_completed_delta);
+        })
+        .or_insert(new);
     }
 
     /// Determine the max amount of torrent records that can be inserted at
@@ -74,12 +67,7 @@ impl Queue {
     /// Merge a torrent update batch into this torrent update batch
     pub fn upsert_batch(&mut self, batch: Queue) {
         for torrent_update in batch.values() {
-            self.upsert(
-                torrent_update.torrent_id,
-                torrent_update.seeder_delta,
-                torrent_update.leecher_delta,
-                torrent_update.times_completed_delta,
-            );
+            self.upsert(torrent_update.clone());
         }
     }
 
