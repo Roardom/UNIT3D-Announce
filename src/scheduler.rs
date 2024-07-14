@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{cmp::min, hash::Hash, sync::Arc};
 
 pub mod announce_update;
 pub mod history_update;
@@ -8,8 +8,12 @@ pub mod user_update;
 
 use crate::tracker::Tracker;
 use chrono::{Duration, Utc};
+use indexmap::{map::Values, IndexMap};
+use sqlx::MySqlPool;
 use tokio::join;
 use torrent_update::TorrentUpdate;
+
+use self::history_update::HistoryUpdateExtraBindings;
 
 pub async fn handle(tracker: &Arc<Tracker>) {
     let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
@@ -46,7 +50,9 @@ async fn flush_history_updates(tracker: &Arc<Tracker>) {
     let result = history_update_batch
         .flush_to_db(
             &tracker.pool,
-            tracker.config.active_peer_ttl + tracker.config.peer_expiry_interval,
+            HistoryUpdateExtraBindings {
+                seedtime_ttl: tracker.config.active_peer_ttl + tracker.config.peer_expiry_interval,
+            },
         )
         .await;
 
@@ -65,7 +71,7 @@ async fn flush_history_updates(tracker: &Arc<Tracker>) {
 /// Send peer updates to mysql database
 async fn flush_peer_updates(tracker: &Arc<Tracker>) {
     let peer_update_batch = tracker.peer_updates.lock().take_batch();
-    let result = peer_update_batch.flush_to_db(&tracker.pool).await;
+    let result = peer_update_batch.flush_to_db(&tracker.pool, ()).await;
 
     match result {
         Ok(_) => (),
@@ -79,7 +85,7 @@ async fn flush_peer_updates(tracker: &Arc<Tracker>) {
 /// Send torrent updates to mysql database
 async fn flush_torrent_updates(tracker: &Arc<Tracker>) {
     let torrent_update_batch = tracker.torrent_updates.lock().take_batch();
-    let result = torrent_update_batch.flush_to_db(&tracker.pool).await;
+    let result = torrent_update_batch.flush_to_db(&tracker.pool, ()).await;
 
     match result {
         Ok(_) => (),
@@ -96,7 +102,7 @@ async fn flush_torrent_updates(tracker: &Arc<Tracker>) {
 /// Send user updates to mysql database
 async fn flush_user_updates(tracker: &Arc<Tracker>) {
     let user_update_batch = tracker.user_updates.lock().take_batch();
-    let result = user_update_batch.flush_to_db(&tracker.pool).await;
+    let result = user_update_batch.flush_to_db(&tracker.pool, ()).await;
 
     match result {
         Ok(_) => (),
@@ -181,4 +187,91 @@ pub async fn reap(tracker: &Arc<Tracker>) {
             });
         }
     }
+}
+
+pub struct Queue<K, V> {
+    records: IndexMap<K, V>,
+    config: QueueConfig,
+}
+
+pub struct QueueConfig {
+    pub max_bindings_per_flush: usize,
+    pub bindings_per_record: usize,
+    pub extra_bindings_per_flush: usize,
+}
+
+impl QueueConfig {
+    fn max_batch_size(&mut self) -> usize {
+        (self.max_bindings_per_flush - self.extra_bindings_per_flush) / self.bindings_per_record
+    }
+}
+
+impl<K, V> Queue<K, V>
+where
+    K: Hash + Eq,
+    V: Clone,
+    Queue<K, V>: Upsertable<V>,
+{
+    /// Initialize a new queue
+    pub fn new(config: QueueConfig) -> Queue<K, V> {
+        Self {
+            records: IndexMap::new(),
+            config,
+        }
+    }
+
+    /// Take a portion of the updates from the start of the queue with a max
+    /// size defined by the buffer config
+    fn take_batch(&mut self) -> Batch<K, V> {
+        let len = self.records.len();
+
+        Batch(
+            self.records
+                .drain(0..min(len, self.config.max_batch_size()))
+                .collect(),
+        )
+    }
+
+    /// Bulk upsert a batch into the end of the queue
+    fn upsert_batch(&mut self, batch: Batch<K, V>) {
+        for record in batch.values() {
+            self.upsert(record.clone());
+        }
+    }
+
+    pub fn is_not_empty(&self) -> bool {
+        self.records.len() != 0
+    }
+}
+
+pub trait Upsertable<T> {
+    fn upsert(&mut self, new: T);
+}
+
+pub struct Batch<K, V>(IndexMap<K, V>);
+
+impl<'a, K, V> Batch<K, V> {
+    fn is_empty(&self) -> bool {
+        self.0.len() == 0
+    }
+
+    fn values(&'a self) -> Values<'a, K, V> {
+        self.0.values()
+    }
+}
+
+pub trait Flushable<T> {
+    /// Used to store extra bindings used in the query when the record already
+    /// exists in the database
+    type ExtraBindings;
+
+    /// Flushes batch of updates to MySQL database
+    ///
+    /// **Warning**: this function does not make sure that the query isn't too long
+    /// or doesn't use too many bindings
+    async fn flush_to_db(
+        &self,
+        db: &MySqlPool,
+        extra_bindings: Self::ExtraBindings,
+    ) -> Result<u64, sqlx::Error>;
 }

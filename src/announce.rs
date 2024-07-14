@@ -32,7 +32,7 @@ use crate::{
     },
     scheduler::{
         announce_update::AnnounceUpdate, history_update::HistoryUpdate, peer_update::PeerUpdate,
-        torrent_update::TorrentUpdate, user_update::UserUpdate,
+        torrent_update::TorrentUpdate, user_update::UserUpdate, Upsertable,
     },
     warning::AnnounceWarning,
 };

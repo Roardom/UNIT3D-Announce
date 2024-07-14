@@ -1,15 +1,10 @@
-use std::{
-    cmp::min,
-    net::IpAddr,
-    ops::{Deref, DerefMut},
-};
+use std::net::IpAddr;
 
 use crate::tracker::peer::PeerId;
 use chrono::{DateTime, Utc};
-use indexmap::IndexMap;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
-pub struct Queue(pub IndexMap<Index, PeerUpdate>);
+use super::{Flushable, Upsertable};
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Index {
@@ -36,67 +31,38 @@ pub struct PeerUpdate {
     pub connectable: bool,
 }
 
-impl Queue {
-    pub fn new() -> Queue {
-        Queue(IndexMap::new())
+impl Upsertable<PeerUpdate> for super::Queue<Index, PeerUpdate> {
+    fn upsert(&mut self, new: PeerUpdate) {
+        self.records
+            .entry(Index {
+                torrent_id: new.torrent_id,
+                user_id: new.user_id,
+                peer_id: new.peer_id,
+            })
+            .and_modify(|peer_update| {
+                if new.updated_at > peer_update.updated_at {
+                    peer_update.ip = new.ip;
+                    peer_update.port = new.port;
+                    peer_update.agent = new.agent.clone();
+                    peer_update.uploaded = new.uploaded;
+                    peer_update.downloaded = new.downloaded;
+                    peer_update.is_active = new.is_active;
+                    peer_update.is_seeder = new.is_seeder;
+                    peer_update.is_visible = new.is_visible;
+                    peer_update.left = new.left;
+                    peer_update.updated_at = new.updated_at;
+                    peer_update.connectable = new.connectable;
+                }
+            })
+            .or_insert(new);
     }
+}
 
-    pub fn upsert(&mut self, new: PeerUpdate) {
-        self.entry(Index {
-            torrent_id: new.torrent_id,
-            user_id: new.user_id,
-            peer_id: new.peer_id,
-        })
-        .and_modify(|peer_update| {
-            if new.updated_at > peer_update.updated_at {
-                peer_update.ip = new.ip;
-                peer_update.port = new.port;
-                peer_update.agent = new.agent.clone();
-                peer_update.uploaded = new.uploaded;
-                peer_update.downloaded = new.downloaded;
-                peer_update.is_active = new.is_active;
-                peer_update.is_seeder = new.is_seeder;
-                peer_update.is_visible = new.is_visible;
-                peer_update.left = new.left;
-                peer_update.updated_at = new.updated_at;
-                peer_update.connectable = new.connectable;
-            }
-        })
-        .or_insert(new);
-    }
+impl Flushable<PeerUpdate> for super::Batch<Index, PeerUpdate> {
+    type ExtraBindings = ();
 
-    /// Determine the max amount of peer records that can be inserted at
-    /// once
-    const fn peer_limit() -> usize {
-        /// Max amount of bindings in a mysql query
-        const BIND_LIMIT: usize = 65535;
-
-        /// Number of columns being updated in the peer table
-        const PEER_COLUMN_COUNT: usize = 15;
-
-        BIND_LIMIT / PEER_COLUMN_COUNT
-    }
-
-    /// Take a portion of the peer updates small enough to be inserted into
-    /// the database.
-    pub fn take_batch(&mut self) -> Queue {
-        let len = self.len();
-
-        Queue(self.drain(0..min(Queue::peer_limit(), len)).collect())
-    }
-
-    /// Merge a peer update batch into this peer update batch
-    pub fn upsert_batch(&mut self, batch: Queue) {
-        for peer_update in batch.values() {
-            self.upsert(peer_update.clone());
-        }
-    }
-
-    /// Flushes peer updates to the mysql db
-    pub async fn flush_to_db(&self, db: &MySqlPool) -> Result<u64, sqlx::Error> {
-        let len = self.len();
-
-        if len == 0 {
+    async fn flush_to_db(&self, db: &MySqlPool, _extra_bindings: ()) -> Result<u64, sqlx::Error> {
+        if self.is_empty() {
             return Ok(0);
         }
 
@@ -183,19 +149,5 @@ impl Queue {
             .execute(db)
             .await
             .map(|result| result.rows_affected())
-    }
-}
-
-impl Deref for Queue {
-    type Target = IndexMap<Index, PeerUpdate>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Queue {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }

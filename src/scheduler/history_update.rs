@@ -1,13 +1,7 @@
-use std::{
-    cmp::min,
-    ops::{Deref, DerefMut},
-};
-
 use chrono::{DateTime, Utc};
-use indexmap::IndexMap;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
-pub struct Queue(pub IndexMap<Index, HistoryUpdate>);
+use super::{Flushable, Upsertable};
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Index {
@@ -32,69 +26,42 @@ pub struct HistoryUpdate {
     pub completed_at: Option<DateTime<Utc>>,
 }
 
-impl Queue {
-    pub fn new() -> Queue {
-        Queue(IndexMap::new())
+impl Upsertable<HistoryUpdate> for super::Queue<Index, HistoryUpdate> {
+    fn upsert(&mut self, new: HistoryUpdate) {
+        self.records
+            .entry(Index {
+                torrent_id: new.torrent_id,
+                user_id: new.user_id,
+            })
+            .and_modify(|history_update| {
+                history_update.user_agent = new.user_agent.to_owned();
+                history_update.is_active = new.is_active;
+                history_update.is_seeder = new.is_seeder;
+                history_update.uploaded = new.uploaded;
+                history_update.downloaded = new.downloaded;
+                history_update.uploaded_delta += new.uploaded_delta;
+                history_update.downloaded_delta += new.downloaded_delta;
+                history_update.credited_uploaded_delta += new.credited_uploaded_delta;
+                history_update.credited_downloaded_delta += new.credited_downloaded_delta;
+                history_update.completed_at = new.completed_at;
+            })
+            .or_insert(new);
     }
+}
 
-    pub fn upsert(&mut self, new: HistoryUpdate) {
-        self.entry(Index {
-            torrent_id: new.torrent_id,
-            user_id: new.user_id,
-        })
-        .and_modify(|history_update| {
-            history_update.user_agent = new.user_agent.to_owned();
-            history_update.is_active = new.is_active;
-            history_update.is_seeder = new.is_seeder;
-            history_update.uploaded = new.uploaded;
-            history_update.downloaded = new.downloaded;
-            history_update.uploaded_delta += new.uploaded_delta;
-            history_update.downloaded_delta += new.downloaded_delta;
-            history_update.credited_uploaded_delta += new.credited_uploaded_delta;
-            history_update.credited_downloaded_delta += new.credited_downloaded_delta;
-            history_update.completed_at = new.completed_at;
-        })
-        .or_insert(new);
-    }
+pub struct HistoryUpdateExtraBindings {
+    pub seedtime_ttl: u64,
+}
 
-    /// Determine the max amount of history records that can be inserted at
-    /// once
-    const fn history_limit() -> usize {
-        /// Max amount of bindings in a mysql query
-        const BIND_LIMIT: usize = 65535;
+impl Flushable<HistoryUpdate> for super::Batch<Index, HistoryUpdate> {
+    type ExtraBindings = HistoryUpdateExtraBindings;
 
-        /// Number of columns being updated in the history table
-        const HISTORY_COLUMN_COUNT: usize = 16;
-
-        /// 1 extra binding is used to insert the TTL
-        const EXTRA_BINDING_COUNT: usize = 1;
-
-        (BIND_LIMIT - EXTRA_BINDING_COUNT) / HISTORY_COLUMN_COUNT
-    }
-
-    /// Take a portion of the history updates small enough to be inserted into
-    /// the database.
-    pub fn take_batch(&mut self) -> Queue {
-        let len = self.len();
-
-        Queue(self.drain(0..min(Queue::history_limit(), len)).collect())
-    }
-
-    /// Merge a history update batch into this history update batch
-    pub fn upsert_batch(&mut self, batch: Queue) {
-        for history_update in batch.values() {
-            self.upsert(history_update.clone());
-        }
-    }
-
-    /// Flushes history updates to the mysql db
-    ///
-    /// **Warning**: this function does not make sure that the query isn't too long
-    /// or doesn't use too many bindings
-    pub async fn flush_to_db(&self, db: &MySqlPool, seedtime_ttl: u64) -> Result<u64, sqlx::Error> {
-        let len = self.len();
-
-        if len == 0 {
+    async fn flush_to_db(
+        &self,
+        db: &MySqlPool,
+        extra_bindings: HistoryUpdateExtraBindings,
+    ) -> Result<u64, sqlx::Error> {
+        if self.is_empty() {
             return Ok(0);
         }
 
@@ -158,7 +125,7 @@ impl Queue {
                             DATE_ADD(updated_at, INTERVAL
             "#,
             )
-            .push_bind(seedtime_ttl)
+            .push_bind(extra_bindings.seedtime_ttl)
             .push(
                 r#"
                                                                 SECOND) > VALUES(updated_at) AND seeder = 1 AND active = 1 AND VALUES(seeder) = 1,
@@ -179,19 +146,5 @@ impl Queue {
             .execute(db)
             .await
             .map(|result| result.rows_affected())
-    }
-}
-
-impl Deref for Queue {
-    type Target = IndexMap<Index, HistoryUpdate>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Queue {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }

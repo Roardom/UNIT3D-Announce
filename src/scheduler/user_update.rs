@@ -1,12 +1,6 @@
-use std::{
-    cmp::min,
-    ops::{Deref, DerefMut},
-};
-
-use indexmap::IndexMap;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
-pub struct Queue(pub IndexMap<Index, UserUpdate>);
+use super::{Flushable, Upsertable};
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Index {
@@ -23,58 +17,28 @@ pub struct UserUpdate {
     pub downloaded_delta: u64,
 }
 
-impl Queue {
-    pub fn new() -> Queue {
-        Queue(IndexMap::new())
+impl Upsertable<UserUpdate> for super::Queue<Index, UserUpdate> {
+    fn upsert(&mut self, new: UserUpdate) {
+        self.records
+            .entry(Index {
+                user_id: new.user_id,
+            })
+            .and_modify(|user_update| {
+                user_update.uploaded_delta = user_update
+                    .uploaded_delta
+                    .saturating_add(new.uploaded_delta);
+                user_update.downloaded_delta = user_update
+                    .downloaded_delta
+                    .saturating_add(new.downloaded_delta);
+            })
+            .or_insert(new);
     }
+}
+impl Flushable<UserUpdate> for super::Batch<Index, UserUpdate> {
+    type ExtraBindings = ();
 
-    pub fn upsert(&mut self, new: UserUpdate) {
-        self.entry(Index {
-            user_id: new.user_id,
-        })
-        .and_modify(|user_update| {
-            user_update.uploaded_delta = user_update
-                .uploaded_delta
-                .saturating_add(new.uploaded_delta);
-            user_update.downloaded_delta = user_update
-                .downloaded_delta
-                .saturating_add(new.downloaded_delta);
-        })
-        .or_insert(new);
-    }
-
-    /// Determine the max amount of user records that can be inserted at
-    /// once
-    const fn user_limit() -> usize {
-        /// Max amount of bindings in a mysql query
-        const BIND_LIMIT: usize = 65535;
-
-        /// Number of columns being updated in the user table
-        const USER_COLUMN_COUNT: usize = 9;
-
-        BIND_LIMIT / USER_COLUMN_COUNT
-    }
-
-    /// Take a portion of the user updates small enough to be inserted into
-    /// the database.
-    pub fn take_batch(&mut self) -> Queue {
-        let len = self.len();
-
-        Queue(self.drain(0..min(Queue::user_limit(), len)).collect())
-    }
-
-    /// Merge a torrent update batch into this torrent update batch
-    pub fn upsert_batch(&mut self, batch: Queue) {
-        for user_update in batch.values() {
-            self.upsert(user_update.clone());
-        }
-    }
-
-    /// Flushes user updates to the mysql db
-    pub async fn flush_to_db(&self, db: &MySqlPool) -> Result<u64, sqlx::Error> {
-        let len = self.len();
-
-        if len == 0 {
+    async fn flush_to_db(&self, db: &MySqlPool, _extra_bindings: ()) -> Result<u64, sqlx::Error> {
+        if self.is_empty() {
             return Ok(0);
         }
 
@@ -123,19 +87,5 @@ impl Queue {
             .execute(db)
             .await
             .map(|result| result.rows_affected())
-    }
-}
-
-impl Deref for Queue {
-    type Target = IndexMap<Index, UserUpdate>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Queue {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }
