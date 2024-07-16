@@ -184,6 +184,7 @@ pub async fn reap(tracker: &Arc<Tracker>) {
                 seeder_delta,
                 leecher_delta,
                 times_completed_delta: 0,
+                balance_delta: 0,
             });
         }
     }

@@ -786,12 +786,19 @@ pub async fn announce(
         });
     }
 
-    if seeder_delta != 0 || leecher_delta != 0 || times_completed_delta != 0 {
+    if seeder_delta != 0
+        || leecher_delta != 0
+        || times_completed_delta != 0
+        || uploaded_delta != 0
+        || downloaded_delta != 0
+    {
         tracker.torrent_updates.lock().upsert(TorrentUpdate {
             torrent_id,
             seeder_delta,
             leecher_delta,
             times_completed_delta,
+            balance_delta: uploaded_delta.try_into().unwrap_or(i64::MAX)
+                - downloaded_delta.try_into().unwrap_or(i64::MAX),
         });
     }
 

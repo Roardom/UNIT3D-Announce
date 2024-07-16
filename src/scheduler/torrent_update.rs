@@ -14,6 +14,7 @@ pub struct TorrentUpdate {
     pub seeder_delta: i32,
     pub leecher_delta: i32,
     pub times_completed_delta: u32,
+    pub balance_delta: i64,
 }
 
 impl Upsertable<TorrentUpdate> for super::Queue<Index, TorrentUpdate> {
@@ -31,6 +32,9 @@ impl Upsertable<TorrentUpdate> for super::Queue<Index, TorrentUpdate> {
                 torrent_update.times_completed_delta = torrent_update
                     .times_completed_delta
                     .saturating_add(new.times_completed_delta);
+                torrent_update.balance_delta = torrent_update
+                    .balance_delta
+                    .saturating_add(new.balance_delta);
             })
             .or_insert(new);
     }
@@ -87,7 +91,7 @@ impl Flushable<TorrentUpdate> for super::Batch<Index, TorrentUpdate> {
                     .push_bind(now)
                     .push_bind(now)
                     .push_bind(0)
-                    .push_bind(0)
+                    .push_bind(torrent_update.balance_delta)
                     .push_bind(0);
             })
             .push(
@@ -96,7 +100,8 @@ impl Flushable<TorrentUpdate> for super::Batch<Index, TorrentUpdate> {
                         seeders = seeders + VALUES(seeders),
                         leechers = leechers + VALUES(leechers),
                         times_completed = times_completed + VALUES(times_completed),
-                        updated_at = VALUES(updated_at)
+                        updated_at = VALUES(updated_at),
+                        balance = balance + VALUES(balance)
                 "#,
             );
 
