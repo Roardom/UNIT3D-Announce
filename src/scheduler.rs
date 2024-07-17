@@ -47,6 +47,8 @@ pub async fn flush(tracker: &Arc<Tracker>) {
 /// Send history updates to mysql database
 async fn flush_history_updates(tracker: &Arc<Tracker>) {
     let history_update_batch = tracker.history_updates.lock().take_batch();
+    let start = Utc::now();
+    let len = history_update_batch.len();
     let result = history_update_batch
         .flush_to_db(
             &tracker.pool,
@@ -55,11 +57,14 @@ async fn flush_history_updates(tracker: &Arc<Tracker>) {
             },
         )
         .await;
+    let elapsed = Utc::now().signed_duration_since(start).num_milliseconds();
 
     match result {
-        Ok(_) => (),
+        Ok(_) => {
+            println!("{start} - Upserted {len} histories in {elapsed} ms.");
+        }
         Err(e) => {
-            println!("History update failed: {}", e);
+            println!("{start} - Failed to update {len} histories after {elapsed} ms: {e}");
             tracker
                 .history_updates
                 .lock()
@@ -71,12 +76,17 @@ async fn flush_history_updates(tracker: &Arc<Tracker>) {
 /// Send peer updates to mysql database
 async fn flush_peer_updates(tracker: &Arc<Tracker>) {
     let peer_update_batch = tracker.peer_updates.lock().take_batch();
+    let start = Utc::now();
+    let len = peer_update_batch.len();
     let result = peer_update_batch.flush_to_db(&tracker.pool, ()).await;
+    let elapsed = Utc::now().signed_duration_since(start).num_milliseconds();
 
     match result {
-        Ok(_) => (),
+        Ok(_) => {
+            println!("{start} - Upserted {len} peers in {elapsed} ms.");
+        }
         Err(e) => {
-            println!("Peer update failed: {}", e);
+            println!("{start} - Failed to update {len} peers after {elapsed} ms: {e}");
             tracker.peer_updates.lock().upsert_batch(peer_update_batch);
         }
     }
@@ -85,12 +95,17 @@ async fn flush_peer_updates(tracker: &Arc<Tracker>) {
 /// Send torrent updates to mysql database
 async fn flush_torrent_updates(tracker: &Arc<Tracker>) {
     let torrent_update_batch = tracker.torrent_updates.lock().take_batch();
+    let start = Utc::now();
+    let len = torrent_update_batch.len();
     let result = torrent_update_batch.flush_to_db(&tracker.pool, ()).await;
+    let elapsed = Utc::now().signed_duration_since(start).num_milliseconds();
 
     match result {
-        Ok(_) => (),
+        Ok(_) => {
+            println!("{start} - Upserted {len} torrents in {elapsed} ms.");
+        }
         Err(e) => {
-            println!("Torrent update failed: {}", e);
+            println!("{start} - Failed to update {len} torrents after {elapsed} ms: {e}");
             tracker
                 .torrent_updates
                 .lock()
@@ -102,12 +117,17 @@ async fn flush_torrent_updates(tracker: &Arc<Tracker>) {
 /// Send user updates to mysql database
 async fn flush_user_updates(tracker: &Arc<Tracker>) {
     let user_update_batch = tracker.user_updates.lock().take_batch();
+    let start = Utc::now();
+    let len = user_update_batch.len();
     let result = user_update_batch.flush_to_db(&tracker.pool, ()).await;
+    let elapsed = Utc::now().signed_duration_since(start).num_milliseconds();
 
     match result {
-        Ok(_) => (),
+        Ok(_) => {
+            println!("{start} - Upserted {len} users in {elapsed} ms.");
+        }
         Err(e) => {
-            println!("User update failed: {}", e);
+            println!("{start} - Failed to update {len} users after {elapsed} ms: {e}");
             tracker.user_updates.lock().upsert_batch(user_update_batch);
         }
     }
@@ -116,12 +136,17 @@ async fn flush_user_updates(tracker: &Arc<Tracker>) {
 /// Send announce updates to mysql database
 async fn flush_announce_updates(tracker: &Arc<Tracker>) {
     let announce_update_batch = tracker.announce_updates.lock().take_batch();
+    let start = Utc::now();
+    let len = announce_update_batch.len();
     let result = announce_update_batch.flush_to_db(&tracker.pool).await;
+    let elapsed = Utc::now().signed_duration_since(start).num_milliseconds();
 
     match result {
-        Ok(_) => (),
+        Ok(_) => {
+            println!("{start} - Upserted {len} announces in {elapsed} ms.");
+        }
         Err(e) => {
-            println!("Announce update failed: {}", e);
+            println!("{start} - Failed to update {len} announces after {elapsed} ms: {e}");
             tracker
                 .announce_updates
                 .lock()
@@ -258,6 +283,10 @@ impl<'a, K, V> Batch<K, V> {
 
     fn values(&'a self) -> Values<'a, K, V> {
         self.0.values()
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
     }
 }
 
