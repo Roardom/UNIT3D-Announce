@@ -8,4 +8,6 @@ pub enum AnnounceWarning {
     RateLimitExceeded,
     #[error("Download slot limit reached")]
     HitDownloadSlotLimit,
+    #[error("Connectivity issue detected. Enable port-forwarding to resolve.")]
+    ConnectivityIssueDetected,
 }

@@ -329,6 +329,14 @@ pub async fn announce(
         .get(&queries.info_hash)
         .ok_or(InfoHashNotFound)?;
 
+    let is_connectable = check_connectivity(&tracker, client_ip, queries.port).await;
+
+    let mut warnings: Vec<AnnounceWarning> = Vec::new();
+
+    if !is_connectable && tracker.config.require_peer_connectivity {
+        warnings.push(AnnounceWarning::ConnectivityIssueDetected);
+    }
+
     let (
         upload_factor,
         download_factor,
@@ -392,7 +400,6 @@ pub async fn announce(
         let leecher_delta;
         let times_completed_delta;
         let is_visible;
-        let mut warnings: Vec<AnnounceWarning> = Vec::new();
 
         if queries.event == Event::Stopped {
             // Try and remove the peer
@@ -407,8 +414,8 @@ pub async fn announce(
                 uploaded_delta = queries.uploaded.saturating_sub(peer.uploaded);
                 downloaded_delta = queries.downloaded.saturating_sub(peer.downloaded);
 
-                leecher_delta = 0 - peer.is_included_in_leech_list() as i32;
-                seeder_delta = 0 - peer.is_included_in_seed_list() as i32;
+                leecher_delta = 0 - peer.is_included_in_leech_list(&tracker.config) as i32;
+                seeder_delta = 0 - peer.is_included_in_seed_list(&tracker.config) as i32;
             } else {
                 // Some clients (namely transmission) will keep sending
                 // `stopped` events until a successful announce is received.
@@ -444,8 +451,9 @@ pub async fn announce(
                     peer.ip_address = client_ip;
                     peer.port = queries.port;
                     peer.is_seeder = queries.left == 0;
-                    peer.is_visible =
-                        peer.is_included_in_leech_list() || !has_hit_download_slot_limit;
+                    peer.is_connectable = is_connectable;
+                    peer.is_visible = peer.is_included_in_leech_list(&tracker.config)
+                        || !has_hit_download_slot_limit;
                     peer.is_active = true;
                     peer.updated_at = Utc::now();
                     peer.uploaded = queries.uploaded;
@@ -459,6 +467,7 @@ pub async fn announce(
                     is_seeder: queries.left == 0,
                     is_active: true,
                     is_visible: !has_hit_download_slot_limit,
+                    is_connectable,
                     updated_at: Utc::now(),
                     uploaded: queries.uploaded,
                     downloaded: queries.downloaded,
@@ -475,10 +484,10 @@ pub async fn announce(
             // in-memory db
             match old_peer {
                 Some(old_peer) => {
-                    leecher_delta = new_peer.is_included_in_leech_list() as i32
-                        - old_peer.is_included_in_leech_list() as i32;
-                    seeder_delta = new_peer.is_included_in_seed_list() as i32
-                        - old_peer.is_included_in_seed_list() as i32;
+                    leecher_delta = new_peer.is_included_in_leech_list(&tracker.config) as i32
+                        - old_peer.is_included_in_leech_list(&tracker.config) as i32;
+                    seeder_delta = new_peer.is_included_in_seed_list(&tracker.config) as i32
+                        - old_peer.is_included_in_seed_list(&tracker.config) as i32;
                     times_completed_delta = (new_peer.is_seeder && !old_peer.is_seeder) as u32;
 
                     // Calculate change in upload and download compared to previous
@@ -512,7 +521,8 @@ pub async fn announce(
                     let mut peer_count = 0;
 
                     for &peer in torrent.peers.values() {
-                        if peer.user_id == user_id && peer.is_included_in_peer_list() {
+                        if peer.user_id == user_id && peer.is_included_in_peer_list(&tracker.config)
+                        {
                             peer_count += 1;
 
                             if peer_count >= tracker.config.max_peers_per_torrent_per_user {
@@ -528,8 +538,8 @@ pub async fn announce(
                         }
                     }
 
-                    leecher_delta = new_peer.is_included_in_leech_list() as i32;
-                    seeder_delta = new_peer.is_included_in_seed_list() as i32;
+                    leecher_delta = new_peer.is_included_in_leech_list(&tracker.config) as i32;
+                    seeder_delta = new_peer.is_included_in_seed_list(&tracker.config) as i32;
                     times_completed_delta = 0;
 
                     // Calculate change in upload and download compared to previous
@@ -564,7 +574,7 @@ pub async fn announce(
 
             // Don't return peers with the same user id or those that are marked as inactive
             let valid_peers = torrent.peers.iter().filter(|(_index, peer)| {
-                peer.user_id != user_id && peer.is_included_in_peer_list()
+                peer.user_id != user_id && peer.is_included_in_peer_list(&tracker.config)
             });
 
             // Make sure leech peer lists are filled with seeds
@@ -743,8 +753,6 @@ pub async fn announce(
         });
     }
 
-    let connectable = check_connectivity(&tracker, client_ip, queries.port).await;
-
     tracker.peer_updates.lock().upsert(PeerUpdate {
         peer_id: queries.peer_id,
         ip: client_ip,
@@ -759,7 +767,7 @@ pub async fn announce(
         torrent_id,
         user_id,
         updated_at: Utc::now(),
-        connectable,
+        connectable: is_connectable,
     });
 
     tracker.history_updates.lock().upsert(HistoryUpdate {

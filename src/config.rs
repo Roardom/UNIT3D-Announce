@@ -57,6 +57,10 @@ pub struct Config {
     /// The minimum number of seconds a socket's connectivity status is cached for
     /// before rechecking the peer's connectivity. Use `-1` for no caching.
     pub connectivity_check_interval: i64,
+    /// When enabled, restrict peers to those with open ports. Peers with closed
+    /// ports will receive empty peer lists and are not included in other returned
+    /// peer lists. Requires `IS_CONNECTIVITY_CHECK_ENABLED` to be `true`.
+    pub require_peer_connectivity: bool,
     /// Enable logging of all successful announces to the `announces` table for
     /// debugging. This will generate significant amounts of data. Do not
     /// enable if you do not know what you are doing.
@@ -145,6 +149,11 @@ impl Config {
             .parse()
             .context("CONNECTIVITY_CHECK_INTERVAL must be a number between -(2^63) and 2^63 - 1")?;
 
+        let require_peer_connectivity = env::var("REQUIRE_PEER_CONNECTIVITY")
+            .context("REQUIRE_PEER_CONNECTIVITY not found in .env file.")?
+            .parse()
+            .context("REQUIRE_PEER_CONNECTIVITY must be either `true` or `false`")?;
+
         let is_announce_logging_enabled = env::var("IS_ANNOUNCE_LOGGING_ENABLED")
             .context("IS_ANNOUNCE_LOGGING_ENABLED not found in .env file.")?
             .parse()
@@ -176,6 +185,7 @@ impl Config {
             max_peers_per_torrent_per_user,
             is_connectivity_check_enabled,
             connectivity_check_interval,
+            require_peer_connectivity,
             is_announce_logging_enabled,
             reverse_proxy_client_ip_header_name,
         })

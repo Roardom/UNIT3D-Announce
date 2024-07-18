@@ -8,6 +8,7 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use sqlx::MySqlPool;
 
+use crate::config::Config;
 use crate::tracker::peer;
 
 use anyhow::{Context, Result};
@@ -29,7 +30,7 @@ impl Map {
         Map(IndexMap::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Map> {
+    pub async fn from_db(db: &MySqlPool, config: &Config) -> Result<Map> {
         let peers = peer::Map::from_db(db).await?;
 
         // First, group the peers by their torrent id.
@@ -47,8 +48,8 @@ impl Map {
                 .entry(peer.torrent_id)
                 .and_modify(|torrent| {
                     torrent.peers.insert(*index, *peer);
-                    torrent.num_seeders += peer.is_included_in_seed_list() as u32;
-                    torrent.num_leechers += peer.is_included_in_leech_list() as u32;
+                    torrent.num_seeders += peer.is_included_in_seed_list(config) as u32;
+                    torrent.num_leechers += peer.is_included_in_leech_list(config) as u32;
                 })
                 .or_insert_with(|| {
                     let mut peers = peer::Map::new();
@@ -56,8 +57,8 @@ impl Map {
 
                     GroupedPeer {
                         peers,
-                        num_seeders: peer.is_included_in_seed_list() as u32,
-                        num_leechers: peer.is_included_in_leech_list() as u32,
+                        num_seeders: peer.is_included_in_seed_list(config) as u32,
+                        num_leechers: peer.is_included_in_leech_list(config) as u32,
                     }
                 });
         });

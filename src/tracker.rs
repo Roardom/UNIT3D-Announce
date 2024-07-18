@@ -86,7 +86,7 @@ impl Tracker {
         );
 
         println!("Loading from database into memory: torrents...");
-        let torrents = torrent::Map::from_db(&pool).await?;
+        let torrents = torrent::Map::from_db(&pool, &config).await?;
         println!("\x1B[1F\x1B[2KLoaded {:?} torrents", torrents.len());
 
         println!("Loading from database into memory: infohash to torrent id mapping...");

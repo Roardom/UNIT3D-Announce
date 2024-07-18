@@ -13,6 +13,8 @@ use anyhow::{Context, Result};
 pub mod peer_id;
 pub use peer_id::PeerId;
 
+use crate::config::Config;
+
 #[derive(Clone, Serialize)]
 pub struct Map(IndexMap<Index, Peer>);
 
@@ -31,6 +33,7 @@ pub struct Peer {
     pub is_seeder: bool,
     pub is_active: bool,
     pub is_visible: bool,
+    pub is_connectable: bool,
     #[serde(with = "ts_seconds")]
     pub updated_at: DateTime<Utc>,
     pub uploaded: u64,
@@ -40,20 +43,24 @@ pub struct Peer {
 impl Peer {
     /// Determines if the peer should be included in the peer list
     #[inline(always)]
-    pub fn is_included_in_peer_list(&self) -> bool {
-        self.is_active && self.is_visible
+    pub fn is_included_in_peer_list(&self, config: &Config) -> bool {
+        if config.require_peer_connectivity {
+            self.is_active && self.is_visible && self.is_connectable
+        } else {
+            self.is_active && self.is_visible
+        }
     }
 
     /// Determines if the peer should be included in the list of seeds
     #[inline(always)]
-    pub fn is_included_in_seed_list(&self) -> bool {
-        self.is_seeder && self.is_included_in_peer_list()
+    pub fn is_included_in_seed_list(&self, config: &Config) -> bool {
+        self.is_seeder && self.is_included_in_peer_list(config)
     }
 
     /// Determines if the peer should be included in the list of leeches
     #[inline(always)]
-    pub fn is_included_in_leech_list(&self) -> bool {
-        !self.is_seeder && self.is_included_in_peer_list()
+    pub fn is_included_in_leech_list(&self, config: &Config) -> bool {
+        !self.is_seeder && self.is_included_in_peer_list(config)
     }
 }
 
@@ -73,6 +80,7 @@ impl Map {
                     peers.seeder as `is_seeder: bool`,
                     peers.active as `is_active: bool`,
                     peers.visible as `is_visible: bool`,
+                    peers.connectable as `is_connectable: bool`,
                     peers.updated_at as `updated_at: DateTime<Utc>`,
                     peers.uploaded as `uploaded: u64`,
                     peers.downloaded as `downloaded: u64`,
@@ -97,6 +105,7 @@ impl Map {
                     is_seeder: row.is_seeder,
                     is_active: row.is_active,
                     is_visible: row.is_visible,
+                    is_connectable: row.is_connectable,
                     updated_at: row
                         .updated_at
                         .expect("Peer with a null updated_at found in database."),
