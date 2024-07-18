@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n                SELECT\n                    INET6_NTOA(peers.ip) as `ip_address: IpAddr`,\n                    peers.user_id as `user_id: u32`,\n                    peers.torrent_id as `torrent_id: u32`,\n                    peers.port as `port: u16`,\n                    peers.seeder as `is_seeder: bool`,\n                    peers.active as `is_active: bool`,\n                    peers.visible as `is_visible: bool`,\n                    peers.updated_at as `updated_at: DateTime<Utc>`,\n                    peers.uploaded as `uploaded: u64`,\n                    peers.downloaded as `downloaded: u64`,\n                    peers.peer_id as `peer_id: PeerId`\n                FROM\n                    peers\n            ",
+  "query": "\n                SELECT\n                    INET6_NTOA(peers.ip) as `ip_address: IpAddr`,\n                    peers.user_id as `user_id: u32`,\n                    peers.torrent_id as `torrent_id: u32`,\n                    peers.port as `port: u16`,\n                    peers.seeder as `is_seeder: bool`,\n                    peers.active as `is_active: bool`,\n                    peers.visible as `is_visible: bool`,\n                    peers.connectable as `is_connectable: bool`,\n                    peers.updated_at as `updated_at: DateTime<Utc>`,\n                    peers.uploaded as `uploaded: u64`,\n                    peers.downloaded as `downloaded: u64`,\n                    peers.peer_id as `peer_id: PeerId`\n                FROM\n                    peers\n            ",
   "describe": {
     "columns": [
       {
@@ -18,7 +18,7 @@
         "name": "user_id: u32",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
+          "flags": "NOT_NULL | PRIMARY_KEY | UNSIGNED | NO_DEFAULT_VALUE",
           "char_set": 63,
           "max_size": 10
         }
@@ -28,7 +28,7 @@
         "name": "torrent_id: u32",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
+          "flags": "NOT_NULL | PRIMARY_KEY | MULTIPLE_KEY | UNSIGNED | NO_DEFAULT_VALUE",
           "char_set": 63,
           "max_size": 10
         }
@@ -75,6 +75,16 @@
       },
       {
         "ordinal": 7,
+        "name": "is_connectable: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "char_set": 63,
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 8,
         "name": "updated_at: DateTime<Utc>",
         "type_info": {
           "type": "Timestamp",
@@ -84,7 +94,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "uploaded: u64",
         "type_info": {
           "type": "LongLong",
@@ -94,7 +104,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "downloaded: u64",
         "type_info": {
           "type": "LongLong",
@@ -104,11 +114,11 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 11,
         "name": "peer_id: PeerId",
         "type_info": {
           "type": "String",
-          "flags": "NOT_NULL | BINARY | NO_DEFAULT_VALUE",
+          "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
           "char_set": 63,
           "max_size": 20
         }
@@ -125,11 +135,12 @@
       false,
       false,
       false,
+      false,
       true,
       false,
       false,
       false
     ]
   },
-  "hash": "7e8567608f846a5d5133fc09f489e277981d64cbf6241761e851e232d8e4fdbf"
+  "hash": "3e1bd0d09ba49be5266185bd8411c8ba83b05ce292ab287676be905169bf1d38"
 }
