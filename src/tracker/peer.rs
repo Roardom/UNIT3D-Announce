@@ -69,7 +69,7 @@ impl Map {
         Map(IndexMap::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Map> {
+    pub async fn from_db(db: &MySqlPool) -> Result<Vec<(Index, Peer)>> {
         let peers: Vec<(Index, Peer)> = sqlx::query!(
             r#"
                 SELECT
@@ -118,13 +118,7 @@ impl Map {
         .await
         .context("Failed loading peers.")?;
 
-        let mut peer_map = Map::new();
-
-        for (index, peer) in peers {
-            peer_map.insert(index, peer);
-        }
-
-        Ok(peer_map)
+        Ok(peers)
     }
 }
 
