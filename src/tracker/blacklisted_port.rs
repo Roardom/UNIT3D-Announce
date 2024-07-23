@@ -7,22 +7,10 @@ pub struct Set(IndexSet<u16>);
 impl Default for Set {
     #[rustfmt::skip]
     fn default() -> Set {
-        let set = IndexSet::from([
-            // SSH Port
-            22,
-            // DNS queries
-            53,
+        let mut set = IndexSet::from([
             // Hyper Text Transfer Protocol (HTTP) - port used for web traffic
-            80,
-            81,
             8080,
             8081,
-            // 	Direct Connect Hub (unofficial)
-            411,
-            412,
-            413,
-            // HTTPS / SSL - encrypted web traffic, also used for VPN tunnels over HTTPS.
-            443,
             // Kazaa - peer-to-peer file sharing, some known vulnerabilities, and at least one worm (Benjamin) targeting it.
             1214,
             // IANA registered for Microsoft WBT Server, used for Windows Remote Desktop and Remote Assistance connections
@@ -35,6 +23,11 @@ impl Default for Set {
             // Port used by p2p software, such as WinMX, Napster.
             6699,
         ]);
+
+        // Block system-reserved ports (requires root for clients to listen on these ports)
+        for system_reserved_port in 0..1024 {
+            set.insert(system_reserved_port);
+        }
 
         Set(set)
     }
