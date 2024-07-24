@@ -37,8 +37,6 @@ impl Map {
 
         struct GroupedPeer {
             peers: peer::Map,
-            num_seeders: u32,
-            num_leechers: u32,
         }
 
         let mut grouped_peers: IndexMap<u32, GroupedPeer> = IndexMap::new();
@@ -48,18 +46,12 @@ impl Map {
                 .entry(peer.torrent_id)
                 .and_modify(|torrent| {
                     torrent.peers.insert(*index, *peer);
-                    torrent.num_seeders += peer.is_included_in_seed_list(config) as u32;
-                    torrent.num_leechers += peer.is_included_in_leech_list(config) as u32;
                 })
                 .or_insert_with(|| {
                     let mut peers = peer::Map::new();
                     peers.insert(*index, *peer);
 
-                    GroupedPeer {
-                        peers,
-                        num_seeders: peer.is_included_in_seed_list(config) as u32,
-                        num_leechers: peer.is_included_in_leech_list(config) as u32,
-                    }
+                    GroupedPeer { peers }
                 });
         });
 
@@ -71,6 +63,8 @@ impl Map {
                 SELECT
                     torrents.id as `id: u32`,
                     torrents.status as `status: Status`,
+                    torrents.seeders as `seeders: u32`,
+                    torrents.leechers as `leechers: u32`,
                     torrents.times_completed as `times_completed: u32`,
                     100 - LEAST(torrents.free, 100) as `download_factor: u8`,
                     IF(doubleup, 200, 100) as `upload_factor: u8`,
@@ -90,14 +84,10 @@ impl Map {
         torrents.iter().for_each(|torrent| {
             // Default values if torrent doesn't exist
             let mut peers = peer::Map::new();
-            let mut seeders = 0;
-            let mut leechers = 0;
 
             // Overwrite default values if peers exists
             if let Some(peer_group) = grouped_peers.get(&torrent.id) {
                 peers.extend(peer_group.peers.iter());
-                seeders = peer_group.num_seeders;
-                leechers = peer_group.num_leechers;
             }
 
             // Insert torrent with its peers
@@ -106,8 +96,8 @@ impl Map {
                 Torrent {
                     id: torrent.id,
                     status: torrent.status,
-                    seeders,
-                    leechers,
+                    seeders: torrent.seeders,
+                    leechers: torrent.leechers,
                     times_completed: torrent.times_completed,
                     download_factor: torrent.download_factor,
                     upload_factor: torrent.upload_factor,
@@ -199,6 +189,8 @@ impl DerefMut for Map {
 pub struct DBImportTorrent {
     pub id: u32,
     pub status: Status,
+    pub seeders: u32,
+    pub leechers: u32,
     pub times_completed: u32,
     pub download_factor: u8,
     pub upload_factor: u8,

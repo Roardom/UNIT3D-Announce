@@ -11,7 +11,7 @@ pub mod user;
 
 pub use peer::Peer;
 
-use sqlx::MySqlPool;
+use sqlx::{MySql, MySqlPool, QueryBuilder};
 
 use anyhow::{Context, Result};
 
@@ -70,6 +70,10 @@ impl Tracker {
         println!("Connecting to database...");
         let pool = connect_to_database().await;
         println!("\x1B[1F\x1B[2KConnected to database");
+
+        println!("Synchronizing peer counts...");
+        sync_peer_count_aggregates(&pool, &config).await?;
+        println!("\x1B[1F\x1B[2KSynchronized peer counts");
 
         println!("Loading from database into memory: blacklisted ports...");
         let port_blacklist = blacklisted_port::Set::default();
@@ -204,4 +208,44 @@ async fn connect_to_database() -> sqlx::Pool<sqlx::MySql> {
         .connect(&env::var("DATABASE_URL").expect("DATABASE_URL not found in .env file. Aborting."))
         .await
         .expect("Could not connect to the database using the DATABASE_URL value in .env file. Aborting.")
+}
+
+async fn sync_peer_count_aggregates(db: &MySqlPool, config: &config::Config) -> anyhow::Result<()> {
+    let mut query: QueryBuilder<MySql> = QueryBuilder::new(
+        r#"
+        UPDATE torrents
+            LEFT JOIN (
+                SELECT
+                    torrent_id,
+                    SUM(peers.left = 0) AS updated_seeders,
+                    SUM(peers.left > 0) AS updated_leechers
+                FROM peers
+                WHERE peers.active
+                    AND peers.visible
+        "#,
+    );
+
+    if config.require_peer_connectivity {
+        query.push(" AND peers.connectable ");
+    }
+
+    query
+        .push(
+            r#"
+                    GROUP BY torrent_id
+                ) AS seeders_leechers
+                    ON torrents.id = seeders_leechers.torrent_id
+            SET
+                torrents.seeders = COALESCE(seeders_leechers.updated_seeders, 0),
+                torrents.leechers = COALESCE(seeders_leechers.updated_leechers, 0)
+            WHERE
+                torrents.deleted_at IS NULL
+            "#,
+        )
+        .build()
+        .execute(db)
+        .await
+        .context("Failed synchronizing peer count aggregates to the database.")?;
+
+    Ok(())
 }
