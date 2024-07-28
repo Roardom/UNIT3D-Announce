@@ -8,7 +8,6 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use sqlx::MySqlPool;
 
-use crate::config::Config;
 use crate::tracker::peer;
 
 use anyhow::{Context, Result};
@@ -30,7 +29,7 @@ impl Map {
         Map(IndexMap::new())
     }
 
-    pub async fn from_db(db: &MySqlPool, config: &Config) -> Result<Map> {
+    pub async fn from_db(db: &MySqlPool) -> Result<Map> {
         let peers = peer::Map::from_db(db).await?;
 
         // First, group the peers by their torrent id.
