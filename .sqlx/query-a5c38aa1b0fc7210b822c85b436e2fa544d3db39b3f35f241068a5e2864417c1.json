@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n                SELECT\n                    torrents.id as `id: u32`,\n                    torrents.status as `status: Status`,\n                    torrents.times_completed as `times_completed: u32`,\n                    100 - LEAST(torrents.free, 100) as `download_factor: u8`,\n                    IF(doubleup, 200, 100) as `upload_factor: u8`,\n                    0 as `is_deleted: bool`\n                FROM\n                    torrents\n                WHERE\n                    torrents.deleted_at IS NULL\n            ",
+  "query": "\n                SELECT\n                    torrents.id as `id: u32`,\n                    torrents.status as `status: Status`,\n                    torrents.seeders as `seeders: u32`,\n                    torrents.leechers as `leechers: u32`,\n                    torrents.times_completed as `times_completed: u32`,\n                    100 - LEAST(torrents.free, 100) as `download_factor: u8`,\n                    IF(doubleup, 200, 100) as `upload_factor: u8`,\n                    0 as `is_deleted: bool`\n                FROM\n                    torrents\n                WHERE\n                    torrents.deleted_at IS NULL\n            ",
   "describe": {
     "columns": [
       {
@@ -25,6 +25,26 @@
       },
       {
         "ordinal": 2,
+        "name": "seeders: u32",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | MULTIPLE_KEY",
+          "char_set": 63,
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "leechers: u32",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | MULTIPLE_KEY",
+          "char_set": 63,
+          "max_size": 11
+        }
+      },
+      {
+        "ordinal": 4,
         "name": "times_completed: u32",
         "type_info": {
           "type": "Long",
@@ -34,7 +54,7 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 5,
         "name": "download_factor: u8",
         "type_info": {
           "type": "LongLong",
@@ -44,7 +64,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 6,
         "name": "upload_factor: u8",
         "type_info": {
           "type": "LongLong",
@@ -54,7 +74,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 7,
         "name": "is_deleted: bool",
         "type_info": {
           "type": "LongLong",
@@ -73,8 +93,10 @@
       false,
       false,
       false,
+      false,
+      false,
       false
     ]
   },
-  "hash": "6c420f48667da25c4b7bf0af6fd135cd66a9fe7cae85e526014b117e7be8773d"
+  "hash": "a5c38aa1b0fc7210b822c85b436e2fa544d3db39b3f35f241068a5e2864417c1"
 }
