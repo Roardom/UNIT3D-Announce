@@ -105,13 +105,11 @@ impl Flushable<TorrentUpdate> for super::Batch<Index, TorrentUpdate> {
                 "#,
             );
 
-        let rows_affected_res = query_builder
+        query_builder
             .build()
             .persistent(false)
             .execute(db)
             .await
-            .map(|result| result.rows_affected());
-
-        rows_affected_res
+            .map(|result| result.rows_affected())
     }
 }

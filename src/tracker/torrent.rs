@@ -225,5 +225,4 @@ pub struct APIInsertTorrent {
 #[derive(Clone, Deserialize)]
 pub struct APIRemoveTorrent {
     pub id: u32,
-    pub info_hash: String,
 }

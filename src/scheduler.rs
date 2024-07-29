@@ -266,7 +266,7 @@ where
     }
 
     pub fn is_not_empty(&self) -> bool {
-        self.records.len() != 0
+        !self.records.is_empty()
     }
 }
 
