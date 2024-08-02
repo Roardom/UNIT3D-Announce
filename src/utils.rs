@@ -34,14 +34,14 @@ pub async fn urlencoded_to_bytes(input: &str) -> Result<[u8; 20]> {
 #[inline(always)]
 pub fn hex_decode(chars: [u8; 2]) -> Result<u8> {
     Ok(match chars[0] {
-        b'0'..=b'9' => (chars[0] - b'0') << 4,
-        b'a'..=b'f' => (chars[0] - b'a' + 0xA) << 4,
-        b'A'..=b'F' => (chars[0] - b'A' + 0xA) << 4,
+        digit @ b'0'..=b'9' => (digit - b'0') << 4,
+        lower @ b'a'..=b'f' => (lower - b'a' + 0xA) << 4,
+        upper @ b'A'..=b'F' => (upper - b'A' + 0xA) << 4,
         _ => bail!("Invalid URL encoding."),
     } + match chars[1] {
-        b'0'..=b'9' => chars[1] - b'0',
-        b'a'..=b'f' => chars[1] - b'a' + 0xA,
-        b'A'..=b'F' => chars[1] - b'A' + 0xA,
+        digit @ b'0'..=b'9' => digit - b'0',
+        lower @ b'a'..=b'f' => lower - b'a' + 0xA,
+        upper @ b'A'..=b'F' => upper - b'A' + 0xA,
         _ => bail!("Invalid URL encoding."),
     })
 }
@@ -144,6 +144,54 @@ mod tests {
     #[test]
     fn hex_decode_invalid() -> Result<()> {
         let invalid_ascii_chars: [u8; 2] = [b'z', b'z'];
+        let hex = hex_decode(invalid_ascii_chars);
+        assert!(hex.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn hex_decode_invalid2() -> Result<()> {
+        let invalid_ascii_chars: [u8; 2] = [b':', b'a'];
+        let hex = hex_decode(invalid_ascii_chars);
+        assert!(hex.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn hex_decode_invalid3() -> Result<()> {
+        let invalid_ascii_chars: [u8; 2] = [b'@', b'a'];
+        let hex = hex_decode(invalid_ascii_chars);
+        assert!(hex.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn hex_decode_invalid4() -> Result<()> {
+        let invalid_ascii_chars: [u8; 2] = [b'`', b'a'];
+        let hex = hex_decode(invalid_ascii_chars);
+        assert!(hex.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn hex_decode_invalid5() -> Result<()> {
+        let invalid_ascii_chars: [u8; 2] = [b'!', b'a'];
+        let hex = hex_decode(invalid_ascii_chars);
+        assert!(hex.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn hex_decode_invalid6() -> Result<()> {
+        let invalid_ascii_chars: [u8; 2] = [28, b'a'];
+        let hex = hex_decode(invalid_ascii_chars);
+        assert!(hex.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn hex_decode_invalid7() -> Result<()> {
+        let invalid_ascii_chars: [u8; 2] = [18, b'a'];
         let hex = hex_decode(invalid_ascii_chars);
         assert!(hex.is_err());
         Ok(())
