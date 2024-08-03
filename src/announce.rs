@@ -650,16 +650,17 @@ pub async fn announce(
         }
 
         if !warnings.is_empty() {
-            let warning = warnings
-                .clone()
-                .into_iter()
-                .map(|warning| warning.to_string())
-                .collect::<Vec<String>>()
-                .join("; ");
+            let mut warning_message: Vec<u8> = Vec::with_capacity((64 + 2) * 4);
+
+            for warning in &warnings {
+                warning_message.extend(warning.to_string().as_bytes());
+                warning_message.extend(b"; ")
+            }
+
             response.extend(b"15:warning message");
-            response.extend(warning.len().to_string().as_bytes());
+            response.extend(warning_message.len().to_string().as_bytes());
             response.extend(b":");
-            response.extend(warning.as_bytes());
+            response.extend(warning_message);
         }
 
         response.extend(b"e");
