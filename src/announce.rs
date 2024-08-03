@@ -8,7 +8,7 @@ use axum::{
     },
 };
 use chrono::Duration;
-use rand::{rngs::SmallRng, seq::IteratorRandom, Rng, SeedableRng};
+use rand::{seq::IteratorRandom, thread_rng, Rng};
 use sqlx::types::chrono::Utc;
 use std::{
     fmt::Display,
@@ -583,7 +583,7 @@ pub async fn announce(
                     valid_peers
                         .clone()
                         .filter(|(_index, peer)| peer.is_seeder)
-                        .choose_multiple(&mut SmallRng::from_entropy(), queries.numwant),
+                        .choose_multiple(&mut thread_rng(), queries.numwant),
                 );
             }
 
@@ -593,7 +593,7 @@ pub async fn announce(
                     valid_peers
                         .filter(|(_index, peer)| !peer.is_seeder)
                         .choose_multiple(
-                            &mut SmallRng::from_entropy(),
+                            &mut thread_rng(),
                             queries.numwant.saturating_sub(peers.len()),
                         ),
                 );
@@ -617,8 +617,8 @@ pub async fn announce(
 
         // Generate bencoded response to return to client
 
-        let interval = SmallRng::from_entropy()
-            .gen_range(tracker.config.announce_min..=tracker.config.announce_max);
+        let interval =
+            thread_rng().gen_range(tracker.config.announce_min..=tracker.config.announce_max);
 
         // Write out bencoded response (keys must be sorted to be within spec)
         let mut response: Vec<u8> = vec![];
