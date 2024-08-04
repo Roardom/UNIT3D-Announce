@@ -621,7 +621,13 @@ pub async fn announce(
             thread_rng().gen_range(tracker.config.announce_min..=tracker.config.announce_max);
 
         // Write out bencoded response (keys must be sorted to be within spec)
-        let mut response: Vec<u8> = vec![];
+        let mut response: Vec<u8> = Vec::with_capacity(
+            82 // literal characters
+                + 5 * 5 // numbers with estimated digit quantity for each
+                + peers_ipv4.len() * 6 + 5 // bytes per ipv4 plus estimated length prefix
+                + peers_ipv6.len() * 18 + 5 // bytes per ipv6 plus estimated length prefix
+                + warnings.len() * (64 + 2), // max bytes per warning message plus separator
+        );
         response.extend(b"d8:completei");
         response.extend(torrent.seeders.to_string().as_bytes());
         response.extend(b"e10:downloadedi");
@@ -650,7 +656,7 @@ pub async fn announce(
         }
 
         if !warnings.is_empty() {
-            let mut warning_message: Vec<u8> = Vec::with_capacity((64 + 2) * 4);
+            let mut warning_message: Vec<u8> = Vec::with_capacity((64 + 2) * warnings.len());
 
             for warning in &warnings {
                 warning_message.extend(warning.to_string().as_bytes());
