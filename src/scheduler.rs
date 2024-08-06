@@ -235,7 +235,7 @@ impl QueueConfig {
 impl<K, V> Queue<K, V>
 where
     K: Hash + Eq,
-    V: Clone,
+    V: Clone + Mergeable,
     Queue<K, V>: Upsertable<V>,
 {
     /// Initialize a new queue
@@ -268,6 +268,11 @@ where
     pub fn is_not_empty(&self) -> bool {
         !self.records.is_empty()
     }
+}
+
+pub trait Mergeable {
+    /// Merge a record with a new record
+    fn merge(&mut self, new: &Self);
 }
 
 pub trait Upsertable<T> {

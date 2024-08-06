@@ -1,7 +1,7 @@
 use chrono::Utc;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
-use super::{Flushable, Upsertable};
+use super::{Flushable, Mergeable, Upsertable};
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Index {
@@ -17,6 +17,17 @@ pub struct TorrentUpdate {
     pub balance_delta: i64,
 }
 
+impl Mergeable for TorrentUpdate {
+    fn merge(&mut self, new: &Self) {
+        self.seeder_delta = self.seeder_delta.saturating_add(new.seeder_delta);
+        self.leecher_delta = self.leecher_delta.saturating_add(new.leecher_delta);
+        self.times_completed_delta = self
+            .times_completed_delta
+            .saturating_add(new.times_completed_delta);
+        self.balance_delta = self.balance_delta.saturating_add(new.balance_delta);
+    }
+}
+
 impl Upsertable<TorrentUpdate> for super::Queue<Index, TorrentUpdate> {
     fn upsert(&mut self, new: TorrentUpdate) {
         self.records
@@ -24,17 +35,7 @@ impl Upsertable<TorrentUpdate> for super::Queue<Index, TorrentUpdate> {
                 torrent_id: new.torrent_id,
             })
             .and_modify(|torrent_update| {
-                torrent_update.seeder_delta =
-                    torrent_update.seeder_delta.saturating_add(new.seeder_delta);
-                torrent_update.leecher_delta = torrent_update
-                    .leecher_delta
-                    .saturating_add(new.leecher_delta);
-                torrent_update.times_completed_delta = torrent_update
-                    .times_completed_delta
-                    .saturating_add(new.times_completed_delta);
-                torrent_update.balance_delta = torrent_update
-                    .balance_delta
-                    .saturating_add(new.balance_delta);
+                torrent_update.merge(&new);
             })
             .or_insert(new);
     }

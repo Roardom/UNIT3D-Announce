@@ -1,6 +1,6 @@
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
-use super::{Flushable, Upsertable};
+use super::{Flushable, Mergeable, Upsertable};
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Index {
@@ -17,6 +17,13 @@ pub struct UserUpdate {
     pub downloaded_delta: u64,
 }
 
+impl Mergeable for UserUpdate {
+    fn merge(&mut self, new: &Self) {
+        self.uploaded_delta = self.uploaded_delta.saturating_add(new.uploaded_delta);
+        self.downloaded_delta = self.downloaded_delta.saturating_add(new.downloaded_delta);
+    }
+}
+
 impl Upsertable<UserUpdate> for super::Queue<Index, UserUpdate> {
     fn upsert(&mut self, new: UserUpdate) {
         self.records
@@ -24,12 +31,7 @@ impl Upsertable<UserUpdate> for super::Queue<Index, UserUpdate> {
                 user_id: new.user_id,
             })
             .and_modify(|user_update| {
-                user_update.uploaded_delta = user_update
-                    .uploaded_delta
-                    .saturating_add(new.uploaded_delta);
-                user_update.downloaded_delta = user_update
-                    .downloaded_delta
-                    .saturating_add(new.downloaded_delta);
+                user_update.merge(&new);
             })
             .or_insert(new);
     }

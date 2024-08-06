@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
-use super::{Flushable, Upsertable};
+use super::{Flushable, Mergeable, Upsertable};
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Index {
@@ -26,6 +26,21 @@ pub struct HistoryUpdate {
     pub completed_at: Option<DateTime<Utc>>,
 }
 
+impl Mergeable for HistoryUpdate {
+    fn merge(&mut self, new: &Self) {
+        self.user_agent = new.user_agent.to_owned();
+        self.is_active = new.is_active;
+        self.is_seeder = new.is_seeder;
+        self.uploaded = new.uploaded;
+        self.downloaded = new.downloaded;
+        self.uploaded_delta += new.uploaded_delta;
+        self.downloaded_delta += new.downloaded_delta;
+        self.credited_uploaded_delta += new.credited_uploaded_delta;
+        self.credited_downloaded_delta += new.credited_downloaded_delta;
+        self.completed_at = new.completed_at;
+    }
+}
+
 impl Upsertable<HistoryUpdate> for super::Queue<Index, HistoryUpdate> {
     fn upsert(&mut self, new: HistoryUpdate) {
         self.records
@@ -34,16 +49,7 @@ impl Upsertable<HistoryUpdate> for super::Queue<Index, HistoryUpdate> {
                 user_id: new.user_id,
             })
             .and_modify(|history_update| {
-                history_update.user_agent = new.user_agent.to_owned();
-                history_update.is_active = new.is_active;
-                history_update.is_seeder = new.is_seeder;
-                history_update.uploaded = new.uploaded;
-                history_update.downloaded = new.downloaded;
-                history_update.uploaded_delta += new.uploaded_delta;
-                history_update.downloaded_delta += new.downloaded_delta;
-                history_update.credited_uploaded_delta += new.credited_uploaded_delta;
-                history_update.credited_downloaded_delta += new.credited_downloaded_delta;
-                history_update.completed_at = new.completed_at;
+                history_update.merge(&new);
             })
             .or_insert(new);
     }

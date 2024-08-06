@@ -4,7 +4,7 @@ use crate::tracker::peer::PeerId;
 use chrono::{DateTime, Utc};
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
-use super::{Flushable, Upsertable};
+use super::{Flushable, Mergeable, Upsertable};
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Index {
@@ -31,6 +31,24 @@ pub struct PeerUpdate {
     pub connectable: bool,
 }
 
+impl Mergeable for PeerUpdate {
+    fn merge(&mut self, new: &Self) {
+        if new.updated_at > self.updated_at {
+            self.ip = new.ip;
+            self.port = new.port;
+            self.agent = new.agent.clone();
+            self.uploaded = new.uploaded;
+            self.downloaded = new.downloaded;
+            self.is_active = new.is_active;
+            self.is_seeder = new.is_seeder;
+            self.is_visible = new.is_visible;
+            self.left = new.left;
+            self.updated_at = new.updated_at;
+            self.connectable = new.connectable;
+        }
+    }
+}
+
 impl Upsertable<PeerUpdate> for super::Queue<Index, PeerUpdate> {
     fn upsert(&mut self, new: PeerUpdate) {
         self.records
@@ -40,19 +58,7 @@ impl Upsertable<PeerUpdate> for super::Queue<Index, PeerUpdate> {
                 peer_id: new.peer_id,
             })
             .and_modify(|peer_update| {
-                if new.updated_at > peer_update.updated_at {
-                    peer_update.ip = new.ip;
-                    peer_update.port = new.port;
-                    peer_update.agent = new.agent.clone();
-                    peer_update.uploaded = new.uploaded;
-                    peer_update.downloaded = new.downloaded;
-                    peer_update.is_active = new.is_active;
-                    peer_update.is_seeder = new.is_seeder;
-                    peer_update.is_visible = new.is_visible;
-                    peer_update.left = new.left;
-                    peer_update.updated_at = new.updated_at;
-                    peer_update.connectable = new.connectable;
-                }
+                peer_update.merge(&new);
             })
             .or_insert(new);
     }
