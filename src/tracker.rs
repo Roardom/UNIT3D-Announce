@@ -176,7 +176,7 @@ impl Tracker {
             torrent_updates: Mutex::new(Queue::<torrent_update::Index, TorrentUpdate>::new(
                 QueueConfig {
                     max_bindings_per_flush: 65_535,
-                    bindings_per_record: 17,
+                    bindings_per_record: 15,
                     extra_bindings_per_flush: 0,
                 },
             )),

@@ -68,7 +68,6 @@ impl Flushable<TorrentUpdate> for super::Batch<Index, TorrentUpdate> {
                         user_id,
                         created_at,
                         updated_at,
-                        type_id,
                         balance,
                         balance_offset
                     )
@@ -90,7 +89,6 @@ impl Flushable<TorrentUpdate> for super::Batch<Index, TorrentUpdate> {
                     .push_bind(1)
                     .push_bind(now)
                     .push_bind(now)
-                    .push_bind(0)
                     .push_bind(torrent_update.balance_delta)
                     .push_bind(0);
             })
