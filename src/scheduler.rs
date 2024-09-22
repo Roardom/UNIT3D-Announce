@@ -16,18 +16,18 @@ use torrent_update::TorrentUpdate;
 use self::history_update::HistoryUpdateExtraBindings;
 
 pub async fn handle(tracker: &Arc<Tracker>) {
-    let mut interval = tokio::time::interval(std::time::Duration::from_secs(1));
+    let mut interval = tokio::time::interval(std::time::Duration::from_millis(1));
     let mut counter = 0_u64;
 
     loop {
         interval.tick().await;
         counter += 1;
 
-        if counter % tracker.config.flush_interval == 0 {
+        if counter % tracker.config.flush_interval_milliseconds == 0 {
             flush(tracker).await;
         }
 
-        if counter % tracker.config.peer_expiry_interval == 0 {
+        if counter % (tracker.config.peer_expiry_interval * 1000) == 0 {
             reap(tracker).await;
         }
     }

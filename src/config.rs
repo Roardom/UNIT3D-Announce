@@ -4,9 +4,9 @@ use anyhow::{bail, Context, Result};
 
 #[derive(Clone)]
 pub struct Config {
-    /// The interval (in seconds) between when history, peers, torrents and
+    /// The interval (in milliseconds) between when history, peers, torrents and
     /// users are flushed to the main mysql database.
-    pub flush_interval: u64,
+    pub flush_interval_milliseconds: u64,
     /// The amount of peers that should be sent back if the peer does not
     /// include a numwant.
     pub numwant_default: usize,
@@ -74,10 +74,10 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> Result<Config> {
-        let flush_interval: u64 = env::var("FLUSH_INTERVAL")
-            .context("FLUSH_INTERVAL not found in .env file.")?
+        let flush_interval_milliseconds: u64 = env::var("FLUSH_INTERVAL_MILLISECONDS")
+            .context("FLUSH_INTERVAL_MILLISECONDS not found in .env file.")?
             .parse()
-            .context("FLUSH_INTERVAL must be a number between 0 and 2^64 - 1")?;
+            .context("FLUSH_INTERVAL_MILLISECONDS must be a number between 0 and 2^64 - 1")?;
 
         let numwant_default = env::var("NUMWANT_DEFAULT")
             .context("NUMWANT_DEFAULT not found in .env file.")?
@@ -169,7 +169,7 @@ impl Config {
         }
 
         Ok(Config {
-            flush_interval,
+            flush_interval_milliseconds,
             numwant_default,
             numwant_max,
             announce_min,
