@@ -1,4 +1,4 @@
-use std::{env, net::IpAddr};
+use std::{env, net::IpAddr, num::NonZeroU64};
 
 use anyhow::{bail, Context, Result};
 
@@ -74,10 +74,10 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> Result<Config> {
-        let flush_interval_milliseconds: u64 = env::var("FLUSH_INTERVAL_MILLISECONDS")
+        let flush_interval_milliseconds: NonZeroU64 = env::var("FLUSH_INTERVAL_MILLISECONDS")
             .context("FLUSH_INTERVAL_MILLISECONDS not found in .env file.")?
             .parse()
-            .context("FLUSH_INTERVAL_MILLISECONDS must be a number between 0 and 2^64 - 1")?;
+            .context("FLUSH_INTERVAL_MILLISECONDS must be a number between 1 and 2^64 - 1")?;
 
         let numwant_default = env::var("NUMWANT_DEFAULT")
             .context("NUMWANT_DEFAULT not found in .env file.")?
@@ -109,10 +109,10 @@ impl Config {
             .parse()
             .context("DOWNLOAD_FACTOR must be a number between 0 and 2^8 - 1")?;
 
-        let peer_expiry_interval = env::var("PEER_EXPIRY_INTERVAL")
+        let peer_expiry_interval: NonZeroU64 = env::var("PEER_EXPIRY_INTERVAL")
             .context("PEER_EXPIRY_INTERVAL not found in .env file.")?
             .parse()
-            .context("PEER_EXPIRY_INTERVAL must be a number between 0 and 2^64 - 1")?;
+            .context("PEER_EXPIRY_INTERVAL must be a number between 1 and 2^64 - 1")?;
 
         let active_peer_ttl = env::var("ACTIVE_PEER_TTL")
             .context("ACTIVE_PEER_TTL not found in .env file.")?
@@ -169,14 +169,14 @@ impl Config {
         }
 
         Ok(Config {
-            flush_interval_milliseconds,
+            flush_interval_milliseconds: flush_interval_milliseconds.into(),
             numwant_default,
             numwant_max,
             announce_min,
             announce_max,
             upload_factor,
             download_factor,
-            peer_expiry_interval,
+            peer_expiry_interval: peer_expiry_interval.into(),
             active_peer_ttl,
             inactive_peer_ttl,
             apikey,
