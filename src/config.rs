@@ -2,6 +2,8 @@ use std::{env, net::IpAddr, num::NonZeroU64};
 
 use anyhow::{bail, Context, Result};
 
+use crate::rate::RateCollection;
+
 #[derive(Clone)]
 pub struct Config {
     /// The interval (in milliseconds) between when history, peers, torrents and
@@ -70,6 +72,18 @@ pub struct Config {
     /// list will be selected. Leave empty to select the connecting ip address
     /// if not using a reverse proxy.
     pub reverse_proxy_client_ip_header_name: Option<String>,
+    /// The max amount of peer lists containing seeds a user is allowed to
+    /// receive per time window (in seconds). The rate is calculated using an
+    /// exponential decay model. If a user requests peer lists faster than
+    /// this, then their peer lists will be empty. Mitigates peer scraping
+    /// attacks.
+    pub user_receive_seed_list_rate_limits: RateCollection,
+    /// The max amount of peer lists containing leeches a user is allowed to
+    /// receive per time window (in seconds). The rate is calculated using an
+    /// exponential decay model. If a user requests peer lists faster than
+    /// this, then their peer lists will be empty. Mitigates peer scraping
+    /// attacks.
+    pub user_receive_leech_list_rate_limits: RateCollection,
 }
 
 impl Config {
@@ -162,6 +176,18 @@ impl Config {
         let reverse_proxy_client_ip_header_name =
             env::var("REVERSE_PROXY_CLIENT_IP_HEADER_NAME").ok();
 
+        let user_receive_seed_list_rate_limits = RateCollection::new_from_string(
+            &env::var("USER_RECEIVE_SEED_LIST_RATE_LIMITS")
+                .context("USER_RECEIVE_SEED_LIST_RATE_LIMITS not found in .env file.")?,
+        )
+        .context("USER_RECEIVE_SEED_LIST_RATE_LIMITS has incorrect format.")?;
+
+        let user_receive_leech_list_rate_limits = RateCollection::new_from_string(
+            &env::var("USER_RECEIVE_LEECH_LIST_RATE_LIMITS")
+                .context("USER_RECEIVE_LEECH_LIST_RATE_LIMITS not found in .env file.")?,
+        )
+        .context("USER_RECEIVE_LEECH_LIST_RATE_LIMITS has incorrect format.")?;
+
         let apikey = env::var("APIKEY").context("APIKEY not found in .env file.")?;
 
         if apikey.len() < 32 {
@@ -188,6 +214,8 @@ impl Config {
             require_peer_connectivity,
             is_announce_logging_enabled,
             reverse_proxy_client_ip_header_name,
+            user_receive_seed_list_rate_limits,
+            user_receive_leech_list_rate_limits,
         })
     }
 }

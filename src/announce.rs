@@ -349,6 +349,8 @@ pub async fn announce(
         user,
         user_id,
         group,
+        has_received_seed_list,
+        has_received_leech_list,
         warnings,
         response,
     ) = {
@@ -562,6 +564,9 @@ pub async fn announce(
         let mut peers_ipv4: Vec<u8> = Vec::new();
         let mut peers_ipv6: Vec<u8> = Vec::new();
 
+        let mut has_received_seed_list = false;
+        let mut has_received_leech_list = false;
+
         // Only provide peer list if
         // - it is not a stopped event,
         // - there exist leechers (we have to remember to update the torrent leecher count before this check)
@@ -578,17 +583,25 @@ pub async fn announce(
             });
 
             // Make sure leech peer lists are filled with seeds
-            if queries.left > 0 && torrent.seeders > 0 && queries.numwant > peers.len() {
+            if queries.left > 0
+                && torrent.seeders > 0
+                && queries.numwant > peers.len()
+                && user.receive_seed_list_rates.is_under_limit()
+            {
                 peers.extend(
                     valid_peers
                         .clone()
                         .filter(|(_index, peer)| peer.is_seeder)
                         .choose_multiple(&mut thread_rng(), queries.numwant),
                 );
+                has_received_seed_list = true;
             }
 
             // Otherwise only send leeches until the numwant is reached
-            if torrent.leechers > 0 && queries.numwant > peers.len() {
+            if torrent.leechers > 0
+                && queries.numwant > peers.len()
+                && user.receive_leech_list_rates.is_under_limit()
+            {
                 peers.extend(
                     valid_peers
                         .filter(|(_index, peer)| !peer.is_seeder)
@@ -597,6 +610,7 @@ pub async fn announce(
                             queries.numwant.saturating_sub(peers.len()),
                         ),
                 );
+                has_received_leech_list = true;
             }
 
             // Split peers into ipv4 and ipv6 variants and serialize their socket
@@ -705,6 +719,8 @@ pub async fn announce(
             user,
             user_id,
             group,
+            has_received_seed_list,
+            has_received_leech_list,
             warnings,
             response,
         )
@@ -753,10 +769,19 @@ pub async fn announce(
         None
     };
 
-    if seeder_delta != 0 || leecher_delta != 0 {
+    if seeder_delta != 0 || leecher_delta != 0 || has_received_seed_list || has_received_leech_list
+    {
         tracker.users.write().entry(user_id).and_modify(|user| {
             user.num_seeding = user.num_seeding.saturating_add_signed(seeder_delta);
             user.num_leeching = user.num_leeching.saturating_add_signed(leecher_delta);
+
+            if has_received_seed_list {
+                user.receive_seed_list_rates.tick();
+            }
+
+            if has_received_leech_list {
+                user.receive_leech_list_rates.tick();
+            }
         });
     }
 

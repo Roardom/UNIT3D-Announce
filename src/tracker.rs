@@ -101,7 +101,7 @@ impl Tracker {
         );
 
         println!("Loading from database into memory: users...");
-        let users = user::Map::from_db(&pool).await?;
+        let users = user::Map::from_db(&pool, &config).await?;
         println!("\x1B[1F\x1B[2KLoaded {:?} users", users.len());
 
         println!("Loading from database into memory: passkey to user id mapping...");

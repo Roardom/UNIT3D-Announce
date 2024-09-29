@@ -11,6 +11,8 @@ use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
 
+use crate::config::Config;
+use crate::rate::RateCollection;
 use crate::tracker::Tracker;
 
 pub mod passkey;
@@ -26,9 +28,9 @@ impl Map {
         Map(IndexMap::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Map> {
+    pub async fn from_db(db: &MySqlPool, config: &Config) -> Result<Map> {
         let users = sqlx::query_as!(
-            User,
+            DBImportUser,
             r#"
                 SELECT
                     users.id as `id: u32`,
@@ -56,7 +58,19 @@ impl Map {
         let mut user_map = Map::new();
 
         for user in users {
-            user_map.insert(user.id, user);
+            user_map.insert(
+                user.id,
+                User {
+                    id: user.id,
+                    group_id: user.group_id,
+                    passkey: user.passkey,
+                    can_download: user.can_download,
+                    num_seeding: user.num_seeding,
+                    num_leeching: user.num_leeching,
+                    receive_seed_list_rates: config.user_receive_seed_list_rate_limits.clone(),
+                    receive_leech_list_rates: config.user_receive_leech_list_rate_limits.clone(),
+                },
+            );
         }
         Ok(user_map)
     }
@@ -68,6 +82,15 @@ impl Map {
         println!("Received user: {}", user.id);
         if let Ok(passkey) = Passkey::from_str(&user.passkey) {
             println!("Inserting user with id {}.", user.id);
+            let old_user = tracker.users.write().swap_remove(&user.id);
+            let (receive_seed_list_rates, receive_leech_list_rates) = old_user
+                .map(|user| (user.receive_seed_list_rates, user.receive_leech_list_rates))
+                .unwrap_or_else(|| {
+                    (
+                        tracker.config.user_receive_seed_list_rate_limits.clone(),
+                        tracker.config.user_receive_leech_list_rate_limits.clone(),
+                    )
+                });
 
             tracker.users.write().insert(
                 user.id,
@@ -78,6 +101,8 @@ impl Map {
                     can_download: user.can_download,
                     num_seeding: user.num_seeding,
                     num_leeching: user.num_leeching,
+                    receive_seed_list_rates,
+                    receive_leech_list_rates,
                 },
             );
 
@@ -132,7 +157,17 @@ impl DerefMut for Map {
     }
 }
 
-#[derive(Clone, Deserialize, Hash, Serialize)]
+#[derive(Clone)]
+pub struct DBImportUser {
+    pub id: u32,
+    pub group_id: i32,
+    pub passkey: Passkey,
+    pub can_download: bool,
+    pub num_seeding: u32,
+    pub num_leeching: u32,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
 pub struct User {
     pub id: u32,
     pub group_id: i32,
@@ -140,6 +175,8 @@ pub struct User {
     pub can_download: bool,
     pub num_seeding: u32,
     pub num_leeching: u32,
+    pub receive_seed_list_rates: RateCollection,
+    pub receive_leech_list_rates: RateCollection,
 }
 
 #[derive(Clone, Deserialize, Hash)]
