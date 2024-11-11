@@ -4,11 +4,16 @@ use std::sync::Arc;
 
 use axum::extract::{Json, Path, State};
 use axum::http::StatusCode;
+use diesel::deserialize::Queryable;
+use diesel::dsl::sql;
+use diesel::sql_types::{Bool, Integer, TinyInt, Unsigned};
+use diesel::Selectable;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use sqlx::MySqlPool;
 
 use crate::tracker::peer;
+
+use super::Db;
 
 use anyhow::{Context, Result};
 
@@ -29,7 +34,11 @@ impl Map {
         Map(IndexMap::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Map> {
+    pub async fn from_db(db: &Db) -> Result<Map> {
+        use crate::schema::torrents;
+        use diesel::prelude::*;
+        use diesel_async::RunQueryDsl;
+
         let peers = peer::Map::from_db(db).await?;
 
         // First, group the peers by their torrent id.
@@ -56,31 +65,25 @@ impl Map {
 
         // TODO: deleted_at column still needs added to unit3d. Until then, no
         // torrents are considered deleted.
-        let torrents: Vec<DBImportTorrent> = sqlx::query_as!(
-            DBImportTorrent,
-            r#"
-                SELECT
-                    torrents.id as `id: u32`,
-                    torrents.status as `status: Status`,
-                    torrents.seeders as `seeders: u32`,
-                    torrents.leechers as `leechers: u32`,
-                    torrents.times_completed as `times_completed: u32`,
-                    100 - LEAST(torrents.free, 100) as `download_factor: u8`,
-                    IF(doubleup, 200, 100) as `upload_factor: u8`,
-                    0 as `is_deleted: bool`
-                FROM
-                    torrents
-                WHERE
-                    torrents.deleted_at IS NULL
-            "#
-        )
-        .fetch_all(db)
-        .await
-        .context("Failed loading torrents.")?;
+        let torrents_data = torrents::table
+            .select((
+                torrents::id,
+                torrents::status,
+                sql::<Unsigned<Integer>>("GREATEST(0, seeders)"),
+                sql::<Unsigned<Integer>>("GREATEST(0, leechers)"),
+                sql::<Unsigned<Integer>>("GREATEST(0, times_completed)"),
+                sql::<Unsigned<TinyInt>>("100 - LEAST(torrents.free, 100)"),
+                sql::<Unsigned<TinyInt>>("IF(doubleup, 200, 100)"),
+                sql::<Bool>("0"),
+            ))
+            .filter(torrents::deleted_at.is_null())
+            .load::<DBImportTorrent>(&mut db.get().await?)
+            .await
+            .context("Failed loading torrents.")?;
 
         let mut torrent_map = Map::new();
 
-        torrents.iter().for_each(|torrent| {
+        torrents_data.iter().for_each(|torrent| {
             // Default values if torrent doesn't exist
             let mut peers = peer::Map::new();
 
@@ -184,7 +187,7 @@ impl DerefMut for Map {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Queryable, Clone, Default)]
 pub struct DBImportTorrent {
     pub id: u32,
     pub status: Status,

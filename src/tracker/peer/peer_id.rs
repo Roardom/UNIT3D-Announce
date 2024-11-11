@@ -3,12 +3,17 @@ use std::{
     ops::Deref,
 };
 
+use diesel::{
+    backend::Backend,
+    deserialize::{self, FromSql, FromSqlRow},
+    sql_types::Binary,
+};
 use serde::{Serialize, Serializer};
-use sqlx::{database::HasValueRef, Database, Decode};
 
 use crate::utils::hex_encode;
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, FromSqlRow)]
+#[diesel(sql_type = Binary)]
 pub struct PeerId(pub [u8; 20]);
 
 impl Deref for PeerId {
@@ -24,6 +29,19 @@ impl From<[u8; 20]> for PeerId {
         PeerId(array)
     }
 }
+impl TryFrom<Vec<u8>> for PeerId {
+    type Error = &'static str;
+
+    fn try_from(value: Vec<u8>) -> std::prelude::v1::Result<Self, Self::Error> {
+        if value.len() != 20 {
+            return Err("Peer id must be 20 bytes.");
+        }
+
+        Ok(Self(
+            <[u8; 20]>::try_from(value).map_err(|_| "Invalid peer id.")?,
+        ))
+    }
+}
 
 impl From<&[u8]> for PeerId {
     fn from(slice: &[u8]) -> Self {
@@ -32,17 +50,14 @@ impl From<&[u8]> for PeerId {
     }
 }
 
-impl<'r, DB: Database> Decode<'r, DB> for PeerId
+impl<DB> FromSql<Binary, DB> for PeerId
 where
-    &'r [u8]: Decode<'r, DB>,
+    DB: Backend,
+    Vec<u8>: FromSql<Binary, DB>,
 {
-    /// Decodes the database's 2-byte binary peer_id
-    fn decode(
-        value: <DB as HasValueRef<'r>>::ValueRef,
-    ) -> Result<PeerId, Box<dyn std::error::Error + 'static + Send + Sync>> {
-        let value = <&[u8] as Decode<DB>>::decode(value)?;
-
-        Ok(value.into())
+    /// Decodes the database's 20-byte binary peer_id
+    fn from_sql(bytes: DB::RawValue<'_>) -> diesel::deserialize::Result<Self> {
+        Ok(Self::try_from(<Vec<u8>>::from_sql(bytes)?)?)
     }
 }
 

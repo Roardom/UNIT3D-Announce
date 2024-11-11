@@ -2,11 +2,13 @@ use std::net::{IpAddr, SocketAddr};
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
+use chrono::NaiveDateTime;
+use diesel::deserialize::Queryable;
 use indexmap::IndexMap;
-use sqlx::types::chrono::{DateTime, Utc};
-use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
+
+use super::Db;
 
 #[derive(Clone)]
 pub struct Map(IndexMap<SocketAddr, ConnectablePort>);
@@ -14,7 +16,17 @@ pub struct Map(IndexMap<SocketAddr, ConnectablePort>);
 #[derive(Clone, Copy, Debug)]
 pub struct ConnectablePort {
     pub connectable: bool,
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: NaiveDateTime,
+}
+
+#[derive(Queryable, Clone, Copy, Debug)]
+pub struct DBImportConnectablePort {
+    #[diesel(column_name = ip)]
+    #[diesel(deserialize_as = crate::tracker::peer::IpAddress)]
+    pub ip: IpAddr,
+    pub port: u16,
+    pub connectable: bool,
+    pub updated_at: Option<NaiveDateTime>,
 }
 
 impl Map {
@@ -22,46 +34,41 @@ impl Map {
         Map(IndexMap::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Map> {
-        let peers: Vec<(SocketAddr, ConnectablePort)> = sqlx::query!(
-            r#"
-                SELECT
-                    INET6_NTOA(peers.ip) as `ip_address: String`,
-                    peers.port as `port: u16`,
-                    COALESCE(MAX(peers.connectable), 0) as `connectable: bool`,
-                    MAX(peers.updated_at) as `updated_at: DateTime<Utc>`
-                FROM
-                    peers
-                GROUP BY
-                    peers.ip, peers.port
-            "#
-        )
-        .map(|row| {
-            (
-                SocketAddr::from((
-                    IpAddr::from_str(
-                        &row.ip_address
-                            .expect("INET6_NTOA failed to decode peer ip."),
-                    )
-                    .expect("Peer ip failed to decode."),
-                    row.port,
-                )),
-                ConnectablePort {
-                    connectable: row.connectable,
-                    updated_at: row
-                        .updated_at
-                        .expect("Peer with a null updated_at found in database."),
-                },
-            )
-        })
-        .fetch_all(db)
-        .await
-        .context("Failed loading peers.")?;
+    pub async fn from_db(db: &Db) -> Result<Map> {
+        use crate::schema::*;
+        use diesel::dsl::max;
+        use diesel::dsl::sql;
+        use diesel::prelude::*;
+        use diesel::sql_types::Bool;
+        use diesel_async::RunQueryDsl;
+        let peers_data = peers::table
+            .group_by((peers::ip, peers::port))
+            .select((
+                peers::ip,
+                peers::port,
+                sql::<Bool>("COALESCE(MAX(peers.connectable), 0)"),
+                max(peers::updated_at),
+            ))
+            .load::<DBImportConnectablePort>(&mut db.get().await?)
+            .await
+            .context("Failed loading peers.")?;
 
         let mut peer_map = Map::new();
 
-        for (index, peer) in peers {
-            peer_map.insert(index, peer);
+        for DBImportConnectablePort {
+            ip,
+            port,
+            connectable,
+            updated_at,
+        } in peers_data
+        {
+            peer_map.insert(
+                SocketAddr::from((ip, port)),
+                ConnectablePort {
+                    connectable,
+                    updated_at: updated_at.expect("Nullable peer updated_at."),
+                },
+            );
         }
 
         Ok(peer_map)

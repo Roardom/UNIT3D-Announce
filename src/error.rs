@@ -114,4 +114,6 @@ impl IntoResponse for AnnounceError {
 pub enum DecodeError {
     #[error("Invalid infohash.")]
     InfoHash,
+    #[error("Invalid ip.")]
+    Ip,
 }

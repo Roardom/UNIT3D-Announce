@@ -1,10 +1,12 @@
 use std::ops::{Deref, DerefMut};
 
 use super::Passkey;
+use diesel::{prelude::Queryable, Selectable};
 use indexmap::IndexMap;
-use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
+
+use super::Db;
 
 pub struct Map(IndexMap<Passkey, u32>);
 
@@ -27,26 +29,21 @@ impl Map {
         Map(IndexMap::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Map> {
-        let passkey2ids = sqlx::query_as!(
-            Passkey2Id,
-            r#"
-                SELECT
-                    users.id as `id: u32`,
-                    users.passkey as `passkey: Passkey`
-                FROM
-                    users
-                WHERE
-                    users.deleted_at IS NULL
-            "#
-        )
-        .fetch_all(db)
-        .await
-        .context("Failed loading user passkey to id mappings.")?;
+    pub async fn from_db(db: &Db) -> Result<Map> {
+        use crate::schema::users;
+        use diesel::prelude::*;
+        use diesel_async::RunQueryDsl;
+
+        let passkey2ids_data = users::table
+            .select(Passkey2Id::as_select())
+            .filter(users::deleted_at.is_null())
+            .load::<Passkey2Id>(&mut db.get().await?)
+            .await
+            .context("Failed loading user passkey to id mappings.")?;
 
         let mut passkey2id_map = Map::new();
 
-        for passkey2id in passkey2ids {
+        for passkey2id in passkey2ids_data {
             passkey2id_map.insert(passkey2id.passkey, passkey2id.id);
         }
 
@@ -54,6 +51,9 @@ impl Map {
     }
 }
 
+#[derive(Queryable, Selectable)]
+#[diesel(check_for_backend(diesel::mysql::Mysql))]
+#[diesel(table_name = crate::schema::users)]
 pub struct Passkey2Id {
     pub id: u32,
     pub passkey: Passkey,

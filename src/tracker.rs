@@ -9,9 +9,14 @@ pub mod personal_freeleech;
 pub mod torrent;
 pub mod user;
 
+use chrono::Utc;
 pub use peer::Peer;
 
-use sqlx::{MySql, MySqlPool, QueryBuilder};
+use diesel_async::pooled_connection::deadpool::Pool;
+use diesel_async::pooled_connection::AsyncDieselConnectionManager;
+use diesel_async::AsyncMysqlConnection;
+
+type Db = Pool<AsyncMysqlConnection>;
 
 use anyhow::{Context, Result};
 
@@ -28,8 +33,6 @@ use crate::stats::Stats;
 
 use dotenvy::dotenv;
 use parking_lot::{Mutex, RwLock};
-use sqlx::mysql::MySqlPoolOptions;
-use sqlx::Connection;
 use std::{env, sync::Arc, time::Duration};
 
 pub struct Tracker {
@@ -45,7 +48,7 @@ pub struct Tracker {
     pub passkey2id: RwLock<user::passkey2id::Map>,
     pub peer_updates: Mutex<Queue<peer_update::Index, PeerUpdate>>,
     pub personal_freeleeches: RwLock<personal_freeleech::Set>,
-    pub pool: MySqlPool,
+    pub pool: Db,
     pub port_blacklist: RwLock<blacklisted_port::Set>,
     pub stats: Stats,
     pub torrents: Mutex<torrent::Map>,
@@ -59,6 +62,8 @@ impl Tracker {
     /// data into this shared tracker context. This is then passed to all
     /// handlers.
     pub async fn default() -> Result<Arc<Tracker>> {
+        let now = Utc::now();
+
         println!(".env file: verifying file exists...");
         dotenv().context(".env file not found.")?;
         println!("\x1B[1F\x1B[2KFound .env file");
@@ -72,7 +77,7 @@ impl Tracker {
         println!("\x1B[1F\x1B[2KConnected to database");
 
         println!("Synchronizing peer counts...");
-        sync_peer_count_aggregates(&pool, &config).await?;
+        // sync_peer_count_aggregates(&pool, &config).await?;
         println!("\x1B[1F\x1B[2KSynchronized peer counts");
 
         println!("Loading from database into memory: blacklisted ports...");
@@ -145,6 +150,11 @@ impl Tracker {
 
         let stats = Stats::default();
 
+        println!(
+            "Started up in {} seconds",
+            Utc::now().signed_duration_since(now).num_milliseconds() as f64 / 1000.0
+        );
+
         Ok(Arc::new(Tracker {
             agent_blacklist: RwLock::new(agent_blacklist),
             announce_updates: Mutex::new(announce_update::Queue::new()),
@@ -191,61 +201,70 @@ impl Tracker {
 }
 
 /// Uses the values in the .env file to create a connection pool to the database
-async fn connect_to_database() -> sqlx::Pool<sqlx::MySql> {
-    // Get pool of database connections.
-    MySqlPoolOptions::new()
-        .min_connections(0)
-        .max_connections(10)
-        .max_lifetime(Duration::from_secs(30 * 60))
-        .idle_timeout(Duration::from_secs(10 * 60))
-        .acquire_timeout(Duration::from_secs(30))
-        .before_acquire(|conn, _meta| Box::pin(async move {
-            // MySQL will never shrink its buffers and MySQL will eventually crash
-            // from running out of memory if we don't do this.
-            conn.shrink_buffers();
-            Ok(true)
-        }))
-        .connect(&env::var("DATABASE_URL").expect("DATABASE_URL not found in .env file. Aborting."))
-        .await
-        .expect("Could not connect to the database using the DATABASE_URL value in .env file. Aborting.")
-}
+async fn connect_to_database() -> Db {
+    let connection_url =
+        std::env::var("DATABASE_URL").expect("DATABASE_URL not found in .env file. Aborting.");
+    // create a new connection pool with the default config
+    let config = AsyncDieselConnectionManager::<AsyncMysqlConnection>::new(connection_url);
 
-async fn sync_peer_count_aggregates(db: &MySqlPool, config: &config::Config) -> anyhow::Result<()> {
-    let mut query: QueryBuilder<MySql> = QueryBuilder::new(
-        r#"
-        UPDATE torrents
-            LEFT JOIN (
-                SELECT
-                    torrent_id,
-                    SUM(peers.left = 0) AS updated_seeders,
-                    SUM(peers.left > 0) AS updated_leechers
-                FROM peers
-                WHERE peers.active
-                    AND peers.visible
-        "#,
+    return Pool::builder(config).max_size(32).build().expect(
+        "Could not connect to the database using the DATABASE_URL value in the .env file. Aborting",
     );
 
-    if config.require_peer_connectivity {
-        query.push(" AND peers.connectable ");
-    }
-
-    query
-        .push(
-            r#"
-                    GROUP BY torrent_id
-                ) AS seeders_leechers
-                    ON torrents.id = seeders_leechers.torrent_id
-            SET
-                torrents.seeders = COALESCE(seeders_leechers.updated_seeders, 0),
-                torrents.leechers = COALESCE(seeders_leechers.updated_leechers, 0)
-            WHERE
-                torrents.deleted_at IS NULL
-            "#,
-        )
-        .build()
-        .execute(db)
-        .await
-        .context("Failed synchronizing peer count aggregates to the database.")?;
-
-    Ok(())
+    // Get pool of database connections.
+    // MySqlPoolOptions::new()
+    //     .min_connections(0)
+    //     .max_connections(10)
+    //     .max_lifetime(Duration::from_secs(30 * 60))
+    //     .idle_timeout(Duration::from_secs(10 * 60))
+    //     .acquire_timeout(Duration::from_secs(30))
+    //     .before_acquire(|conn, _meta| Box::pin(async move {
+    //         // MySQL will never shrink its buffers and MySQL will eventually crash
+    //         // from running out of memory if we don't do this.
+    //         conn.shrink_buffers();
+    //         Ok(true)
+    //     }))
+    //     .connect(&env::var("DATABASE_URL").expect("DATABASE_URL not found in .env file. Aborting."))
+    //     .await
+    //     .expect("Could not connect to the database using the DATABASE_URL value in .env file. Aborting.")
 }
+
+// async fn sync_peer_count_aggregates(db: &MySqlPool, config: &config::Config) -> anyhow::Result<()> {
+//     let mut query: QueryBuilder<MySql> = QueryBuilder::new(
+//         r#"
+//         UPDATE torrents
+//             LEFT JOIN (
+//                 SELECT
+//                     torrent_id,
+//                     SUM(peers.left = 0) AS updated_seeders,
+//                     SUM(peers.left > 0) AS updated_leechers
+//                 FROM peers
+//                 WHERE peers.active
+//                     AND peers.visible
+//         "#,
+//     );
+
+//     if config.require_peer_connectivity {
+//         query.push(" AND peers.connectable ");
+//     }
+
+//     query
+//         .push(
+//             r#"
+//                     GROUP BY torrent_id
+//                 ) AS seeders_leechers
+//                     ON torrents.id = seeders_leechers.torrent_id
+//             SET
+//                 torrents.seeders = COALESCE(seeders_leechers.updated_seeders, 0),
+//                 torrents.leechers = COALESCE(seeders_leechers.updated_leechers, 0)
+//             WHERE
+//                 torrents.deleted_at IS NULL
+//             "#,
+//         )
+//         .build()
+//         .execute(db)
+//         .await
+//         .context("Failed synchronizing peer count aggregates to the database.")?;
+
+//     Ok(())
+// }

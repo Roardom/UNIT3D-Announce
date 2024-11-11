@@ -1,10 +1,12 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::tracker::torrent::InfoHash;
+use diesel::{prelude::Queryable, Selectable};
 use indexmap::IndexMap;
-use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
+
+use super::Db;
 
 pub struct Map(IndexMap<InfoHash, u32>);
 
@@ -27,26 +29,21 @@ impl Map {
         Map(IndexMap::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Map> {
-        let info_hash2ids = sqlx::query_as!(
-            InfoHash2Id,
-            r#"
-                SELECT
-                    torrents.id as `id: u32`,
-                    torrents.info_hash as `info_hash: InfoHash`
-                FROM
-                    torrents
-                WHERE
-                    torrents.deleted_at IS NULL
-            "#
-        )
-        .fetch_all(db)
-        .await
-        .context("Failed loading torrent infohash to id mappings.")?;
+    pub async fn from_db(db: &Db) -> Result<Map> {
+        use crate::schema::torrents;
+        use diesel::prelude::*;
+        use diesel_async::RunQueryDsl;
+
+        let info_hash2ids_data = torrents::table
+            .select(InfoHash2Id::as_select())
+            .filter(torrents::deleted_at.is_null())
+            .load::<InfoHash2Id>(&mut db.get().await?)
+            .await
+            .context("Failed loading torrent infohash to id mappings.")?;
 
         let mut info_hash2id_map = Map::new();
 
-        for info_hash2id in info_hash2ids {
+        for info_hash2id in info_hash2ids_data {
             info_hash2id_map.insert(info_hash2id.info_hash, info_hash2id.id);
         }
 
@@ -54,6 +51,9 @@ impl Map {
     }
 }
 
+#[derive(Queryable, Selectable)]
+#[diesel(check_for_backend(diesel::mysql::Mysql))]
+#[diesel(table_name = crate::schema::torrents)]
 pub struct InfoHash2Id {
     pub id: u32,
     pub info_hash: InfoHash,

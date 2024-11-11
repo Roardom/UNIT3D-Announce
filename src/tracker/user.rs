@@ -5,15 +5,19 @@ use std::{ops::Deref, sync::Arc};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
+use diesel::deserialize::Queryable;
+use diesel::dsl::sql;
+use diesel::sql_types::{Bool, Integer, TinyInt, Unsigned};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
 
 use crate::config::Config;
 use crate::rate::RateCollection;
 use crate::tracker::Tracker;
+
+use super::Db;
 
 pub mod passkey;
 pub use passkey::Passkey;
@@ -28,36 +32,31 @@ impl Map {
         Map(IndexMap::new())
     }
 
-    pub async fn from_db(db: &MySqlPool, config: &Config) -> Result<Map> {
-        let users = sqlx::query_as!(
-            DBImportUser,
-            r#"
-                SELECT
-                    users.id as `id: u32`,
-                    users.group_id as `group_id: i32`,
-                    users.passkey as `passkey: Passkey`,
-                    users.can_download as `can_download: bool`,
-                    CAST(COALESCE(SUM(peers.seeder = 1 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED) as `num_seeding: u32`,
-                    CAST(COALESCE(SUM(peers.seeder = 0 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED) as `num_leeching: u32`
-                FROM
-                    users
-                LEFT JOIN
-                    peers
-                ON
-                    users.id = peers.user_id
-                WHERE
-                    users.deleted_at IS NULL
-                GROUP BY
-                    users.id
-            "#
-        )
-        .fetch_all(db)
-        .await
+    pub async fn from_db(db: &Db, config: &Config) -> Result<Map> {
+        use crate::schema::peers;
+        use crate::schema::users;
+        use diesel::prelude::*;
+        use diesel_async::RunQueryDsl;
+
+        let users_data = users::table
+            .left_join(peers::table.on(peers::user_id.eq(users::id)))
+            .filter(users::deleted_at.is_null())
+            .group_by(users::id)
+            .select((
+                users::id,
+                users::group_id,
+                users::passkey,
+                users::can_download,
+                sql::<Unsigned<Integer>>("CAST(COALESCE(SUM(peers.seeder = 1 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED)"),
+                sql::<Unsigned<Integer>>("CAST(COALESCE(SUM(peers.seeder = 0 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED)"),
+            ))
+            .load::<DBImportUser>(&mut db.get().await?)
+            .await
         .context("Failed loading users.")?;
 
         let mut user_map = Map::new();
 
-        for user in users {
+        for user in users_data {
             user_map.insert(
                 user.id,
                 User {
@@ -157,7 +156,7 @@ impl DerefMut for Map {
     }
 }
 
-#[derive(Clone)]
+#[derive(Queryable, Clone)]
 pub struct DBImportUser {
     pub id: u32,
     pub group_id: i32,

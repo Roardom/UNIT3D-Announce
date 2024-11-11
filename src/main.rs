@@ -16,6 +16,7 @@ mod error;
 mod rate;
 mod routes;
 mod scheduler;
+mod schema;
 mod stats;
 mod tracker;
 mod utils;
@@ -70,7 +71,7 @@ async fn main() -> Result<()> {
             || tracker_clone2.torrent_updates.lock().is_not_empty()
             || tracker_clone2.user_updates.lock().is_not_empty())
     {
-        scheduler::flush(&tracker_clone2.clone()).await;
+        // scheduler::flush(&tracker_clone2.clone()).await;
         flushes += 1;
     }
 

@@ -3,13 +3,16 @@ use std::{ops::Deref, sync::Arc};
 
 use axum::extract::State;
 use axum::Json;
+use diesel::deserialize::Queryable;
+use diesel::Selectable;
 use indexmap::IndexSet;
 use serde::Deserialize;
-use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
 
 use crate::tracker::Tracker;
+
+use super::Db;
 
 pub struct Set(IndexSet<FeaturedTorrent>);
 
@@ -18,23 +21,20 @@ impl Set {
         Set(IndexSet::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Set> {
-        let featured_torrents = sqlx::query_as!(
-            FeaturedTorrent,
-            r#"
-                SELECT
-                    torrent_id as `torrent_id: u32`
-                FROM
-                    featured_torrents
-            "#
-        )
-        .fetch_all(db)
-        .await
-        .context("Failed loading featured torrents.")?;
+    pub async fn from_db(db: &Db) -> Result<Set> {
+        use crate::schema::featured_torrents;
+        use diesel::prelude::*;
+        use diesel_async::RunQueryDsl;
+
+        let featured_torrents_data: Vec<FeaturedTorrent> = featured_torrents::table
+            .select(FeaturedTorrent::as_select())
+            .load(&mut db.get().await?)
+            .await
+            .context("Failed loading featured torrents.")?;
 
         let mut featured_torrent_set = Set::new();
 
-        for featured_torrent in featured_torrents {
+        for featured_torrent in featured_torrents_data {
             featured_torrent_set.insert(featured_torrent);
         }
 
@@ -74,6 +74,9 @@ impl DerefMut for Set {
     }
 }
 
+#[derive(Queryable, Selectable)]
+#[diesel(table_name = crate::schema::featured_torrents)]
+#[diesel(check_for_backend(diesel::mysql::Mysql))]
 #[derive(Eq, Deserialize, Hash, PartialEq)]
 pub struct FeaturedTorrent {
     pub torrent_id: u32,

@@ -1,11 +1,15 @@
 use std::fmt::Display;
 
+use diesel::{
+    backend::Backend,
+    deserialize::{FromSql, FromSqlRow},
+    sql_types::SmallInt,
+};
 use serde::Serialize;
 use serde_repr::Deserialize_repr;
-use sqlx::{database::HasValueRef, Database, Decode};
 
 /// Torrent moderation status
-#[derive(Clone, Copy, Debug, Default, Deserialize_repr, Eq, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize_repr, Eq, PartialEq, Serialize, FromSqlRow)]
 #[repr(i16)]
 pub enum Status {
     /// A torrent with pending status is currently in moderation queue
@@ -45,16 +49,13 @@ impl Status {
     }
 }
 
-impl<'r, DB: Database> Decode<'r, DB> for Status
+impl<DB> FromSql<SmallInt, DB> for Status
 where
-    i16: Decode<'r, DB>,
+    DB: Backend,
+    i16: FromSql<SmallInt, DB>,
 {
-    fn decode(
-        value: <DB as HasValueRef<'r>>::ValueRef,
-    ) -> Result<Status, Box<dyn std::error::Error + 'static + Send + Sync>> {
-        let value = <i16 as Decode<DB>>::decode(value)?;
-
-        Ok(Status::from_i16(value))
+    fn from_sql(bytes: <DB as Backend>::RawValue<'_>) -> diesel::deserialize::Result<Self> {
+        Ok(Status::from_i16(i16::from_sql(bytes)?))
     }
 }
 

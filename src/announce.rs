@@ -7,9 +7,8 @@ use axum::{
         HeaderMap,
     },
 };
-use chrono::Duration;
+use chrono::{Duration, Utc};
 use rand::{seq::IteratorRandom, thread_rng, Rng};
-use sqlx::types::chrono::Utc;
 use std::{
     fmt::Display,
     net::{IpAddr, SocketAddr},
@@ -278,7 +277,10 @@ pub async fn announce(
 
     // Block user agent strings on the blacklist
     for client in tracker.agent_blacklist.read().iter() {
-        if queries.peer_id.starts_with(&client.peer_id_prefix) {
+        if queries
+            .peer_id
+            .starts_with(&client.peer_id_prefix.as_bytes())
+        {
             return Err(BlacklistedClient);
         }
     }
@@ -393,7 +395,7 @@ pub async fn announce(
 
         // Make sure user isn't leeching more torrents than their group allows
         let has_hit_download_slot_limit = queries.left > 0
-            && matches!(group.download_slots, Some(slots) if slots <= user.num_leeching);
+            && matches!(group.download_slots, Some(slots) if slots as i64 <= user.num_leeching as i64);
 
         // Change of upload/download compared to previous announce
         let uploaded_delta;
@@ -457,7 +459,7 @@ pub async fn announce(
                     peer.is_visible = peer.is_included_in_leech_list(&tracker.config)
                         || !has_hit_download_slot_limit;
                     peer.is_active = true;
-                    peer.updated_at = Utc::now();
+                    peer.updated_at = Some(Utc::now().naive_utc());
                     peer.uploaded = queries.uploaded;
                     peer.downloaded = queries.downloaded;
                 })
@@ -470,7 +472,7 @@ pub async fn announce(
                     is_active: true,
                     is_visible: !has_hit_download_slot_limit,
                     is_connectable,
-                    updated_at: Utc::now(),
+                    updated_at: Some(Utc::now().naive_utc()),
                     uploaded: queries.uploaded,
                     downloaded: queries.downloaded,
                 });
@@ -510,8 +512,9 @@ pub async fn announce(
                     // Warn user if peer last announced less than announce_min seconds ago
                     if old_peer
                         .updated_at
+                        .expect("peer has null updated_at (should never happen)")
                         .checked_add_signed(Duration::seconds(tracker.config.announce_min.into()))
-                        .is_some_and(|blocked_until| blocked_until > Utc::now())
+                        .is_some_and(|blocked_until| blocked_until > Utc::now().naive_utc())
                     {
                         warnings.push(AnnounceWarning::RateLimitExceeded);
                     }
@@ -867,7 +870,7 @@ pub async fn announce(
 
 async fn check_connectivity(tracker: &Arc<Tracker>, ip: IpAddr, port: u16) -> bool {
     if tracker.config.is_connectivity_check_enabled {
-        let now = Utc::now();
+        let now = Utc::now().naive_utc();
         let socket = SocketAddr::from((ip, port));
         let connectable_port_opt = tracker.connectable_ports.read().get(&socket).cloned();
 

@@ -1,13 +1,17 @@
 use std::{fmt, ops::Deref, str::FromStr};
 
+use diesel::{
+    backend::Backend,
+    deserialize::{FromSql, FromSqlRow},
+    sql_types::Binary,
+};
 use serde::Deserialize;
-use sqlx::{database::HasValueRef, Database, Decode};
 
 use crate::utils::{hex_decode, hex_encode};
 
 use anyhow::{bail, Context, Result};
 
-#[derive(Clone, Copy, Deserialize, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Deserialize, Debug, Eq, Hash, PartialEq, FromSqlRow)]
 pub struct InfoHash(pub [u8; 20]);
 
 impl FromStr for InfoHash {
@@ -30,6 +34,20 @@ impl FromStr for InfoHash {
     }
 }
 
+impl TryFrom<Vec<u8>> for InfoHash {
+    type Error = &'static str;
+
+    fn try_from(value: Vec<u8>) -> std::prelude::v1::Result<Self, Self::Error> {
+        if value.len() != 20 {
+            return Err("Info Hash must be 20 bytes.");
+        }
+
+        Ok(Self(
+            <[u8; 20]>::try_from(value).map_err(|_| "Invalid info hash.")?,
+        ))
+    }
+}
+
 impl From<[u8; 20]> for InfoHash {
     fn from(array: [u8; 20]) -> Self {
         InfoHash(array)
@@ -48,25 +66,13 @@ impl fmt::Display for InfoHash {
     }
 }
 
-impl<'r, DB: Database> Decode<'r, DB> for InfoHash
+impl<DB> FromSql<Binary, DB> for InfoHash
 where
-    &'r [u8]: Decode<'r, DB>,
+    DB: Backend,
+    Vec<u8>: FromSql<Binary, DB>,
 {
-    /// Decodes the database's string representation of the 40 character long
-    /// infohash in hex into a byte slice
-    fn decode(
-        value: <DB as HasValueRef<'r>>::ValueRef,
-    ) -> Result<InfoHash, Box<dyn std::error::Error + 'static + Send + Sync>> {
-        let value = <&[u8] as Decode<DB>>::decode(value)?;
-
-        if value.len() != 20 {
-            let error: Box<dyn std::error::Error + Send + Sync> =
-                Box::new(crate::error::DecodeError::InfoHash);
-
-            return Err(error);
-        }
-
-        Ok(InfoHash(<[u8; 20]>::try_from(&value[0..20])?))
+    fn from_sql(bytes: DB::RawValue<'_>) -> diesel::deserialize::Result<Self> {
+        Ok(Self::try_from(<Vec<u8>>::from_sql(bytes)?)?)
     }
 }
 

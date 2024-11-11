@@ -4,13 +4,16 @@ use std::{ops::Deref, sync::Arc};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
+use diesel::deserialize::Queryable;
+use diesel::Selectable;
 use indexmap::IndexMap;
 use serde::Deserialize;
-use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
 
 use crate::tracker::Tracker;
+
+use super::Db;
 
 pub struct Map(IndexMap<i32, Group>);
 
@@ -19,29 +22,21 @@ impl Map {
         Map(IndexMap::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Map> {
-        let groups = sqlx::query_as!(
-            Group,
-            r#"
-                SELECT
-                    id as `id: i32`,
-                    slug as `slug: String`,
-                    download_slots as `download_slots: u32`,
-                    is_immune as `is_immune: bool`,
-                    IF(is_freeleech, 0, 100) as `download_factor: u8`,
-                    IF(is_double_upload, 200, 100) as `upload_factor: u8`
-                FROM
-                    `groups`
-            "#
-        )
-        .fetch_all(db)
-        .await
-        .context("Failed loading groups.")?;
+    pub async fn from_db(db: &Db) -> Result<Map> {
+        use crate::schema::groups;
+        use diesel::prelude::*;
+        use diesel_async::RunQueryDsl;
+
+        let groups_data = groups::table
+            .select(DBImportGroup::as_select())
+            .load(&mut db.get().await?)
+            .await
+            .context("Failed loading groups.")?;
 
         let mut group_map = Map::new();
 
-        for group in groups {
-            group_map.insert(group.id, group);
+        for group in groups_data {
+            group_map.insert(group.id, group.into());
         }
 
         Ok(group_map)
@@ -94,11 +89,36 @@ impl DerefMut for Map {
     }
 }
 
+impl From<DBImportGroup> for Group {
+    fn from(value: DBImportGroup) -> Self {
+        Self {
+            id: value.id,
+            slug: value.slug,
+            download_slots: value.download_slots,
+            is_immune: value.is_immune,
+            download_factor: if value.is_freeleech { 0 } else { 100 },
+            upload_factor: if value.is_double_upload { 200 } else { 100 },
+        }
+    }
+}
+
+#[diesel(table_name = crate::schema::groups)]
+#[diesel(check_for_backend(diesel::mysql::Mysql))]
+#[derive(Queryable, Selectable)]
+pub struct DBImportGroup {
+    pub id: i32,
+    pub slug: String,
+    pub download_slots: Option<i32>,
+    pub is_immune: bool,
+    pub is_freeleech: bool,
+    pub is_double_upload: bool,
+}
+
 #[derive(Clone, Deserialize, Hash)]
 pub struct Group {
     pub id: i32,
     pub slug: String,
-    pub download_slots: Option<u32>,
+    pub download_slots: Option<i32>,
     pub is_immune: bool,
     pub download_factor: u8,
     pub upload_factor: u8,
@@ -108,7 +128,7 @@ pub struct Group {
 pub struct APIInsertGroup {
     pub id: i32,
     pub slug: String,
-    pub download_slots: Option<u32>,
+    pub download_slots: Option<i32>,
     pub is_immune: bool,
     pub is_freeleech: bool,
     pub is_double_upload: bool,

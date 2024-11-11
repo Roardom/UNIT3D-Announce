@@ -3,12 +3,16 @@ use std::{
     str::FromStr,
 };
 
+use diesel::{
+    backend::Backend,
+    deserialize::{FromSql, FromSqlRow},
+    sql_types::VarChar,
+};
 use serde::{Deserialize, Serialize, Serializer};
-use sqlx::{database::HasValueRef, Database, Decode};
 
 use anyhow::bail;
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, FromSqlRow)]
 pub struct Passkey(pub [u8; 32]);
 
 impl FromStr for Passkey {
@@ -27,19 +31,27 @@ impl FromStr for Passkey {
     }
 }
 
-impl<'r, DB: Database> Decode<'r, DB> for Passkey
+impl TryFrom<String> for Passkey {
+    type Error = &'static str;
+
+    fn try_from(value: String) -> std::prelude::v1::Result<Self, Self::Error> {
+        if value.len() != 32 {
+            return Err("Passkey must be 32 bytes.");
+        }
+
+        Ok(Self(
+            <[u8; 32]>::try_from(value.as_bytes()).map_err(|_| "Invalid passkey.")?,
+        ))
+    }
+}
+
+impl<DB> FromSql<VarChar, DB> for Passkey
 where
-    &'r str: Decode<'r, DB>,
+    DB: Backend,
+    String: FromSql<VarChar, DB>,
 {
-    fn decode(
-        value: <DB as HasValueRef<'r>>::ValueRef,
-    ) -> Result<Passkey, Box<dyn std::error::Error + 'static + Send + Sync>> {
-        let value = <&str as Decode<DB>>::decode(value)?;
-        let mut bytes = value.bytes();
-
-        let array = [(); 32].map(|_| bytes.next().expect("Invalid passkey length."));
-
-        Ok(Passkey(array))
+    fn from_sql(bytes: DB::RawValue<'_>) -> diesel::deserialize::Result<Self> {
+        Ok(Self::try_from(String::from_sql(bytes)?)?)
     }
 }
 

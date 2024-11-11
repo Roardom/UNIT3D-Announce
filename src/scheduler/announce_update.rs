@@ -3,8 +3,6 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use sqlx::{MySql, MySqlPool, QueryBuilder};
-
 use crate::{announce::Event, tracker::peer::PeerId};
 
 pub struct Queue(pub Vec<AnnounceUpdate>);
@@ -60,61 +58,61 @@ impl Queue {
         }
     }
 
-    /// Flushes announce updates to the mysql db
-    pub async fn flush_to_db(&self, db: &MySqlPool) -> Result<u64, sqlx::Error> {
-        let len = self.len();
+    //    /// Flushes announce updates to the mysql db
+    //     pub async fn flush_to_db(&self, db: &MySqlPool) -> Result<u64, sqlx::Error> {
+    //         let len = self.len();
 
-        if len == 0 {
-            return Ok(0);
-        }
+    //         if len == 0 {
+    //             return Ok(0);
+    //         }
 
-        // Trailing space required before the push values function
-        // Leading space required after the push values function
-        let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
-            r#"
-                INSERT INTO
-                    announces(
-                        user_id,
-                        torrent_id,
-                        uploaded,
-                        downloaded,
-                        `left`,
-                        corrupt,
-                        peer_id,
-                        port,
-                        numwant,
-                        event,
-                        `key`
-                    )
-            "#,
-        );
+    //         // Trailing space required before the push values function
+    //         // Leading space required after the push values function
+    //         let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
+    //             r#"
+    //                 INSERT INTO
+    //                     announces(
+    //                         user_id,
+    //                         torrent_id,
+    //                         uploaded,
+    //                         downloaded,
+    //                         `left`,
+    //                         corrupt,
+    //                         peer_id,
+    //                         port,
+    //                         numwant,
+    //                         event,
+    //                         `key`
+    //                     )
+    //             "#,
+    //         );
 
-        query_builder.push_values(self.iter(), |mut bind, announce_update| {
-            bind.push_bind(announce_update.user_id)
-                .push_bind(announce_update.torrent_id)
-                .push_bind(announce_update.uploaded)
-                .push_bind(announce_update.downloaded)
-                .push_bind(announce_update.left)
-                .push_bind(announce_update.corrupt.unwrap_or(0))
-                .push_bind(announce_update.peer_id.to_vec())
-                .push_bind(announce_update.port)
-                .push_bind(announce_update.numwant)
-                .push_bind(announce_update.event.to_string());
+    //         query_builder.push_values(self.iter(), |mut bind, announce_update| {
+    //             bind.push_bind(announce_update.user_id)
+    //                 .push_bind(announce_update.torrent_id)
+    //                 .push_bind(announce_update.uploaded)
+    //                 .push_bind(announce_update.downloaded)
+    //                 .push_bind(announce_update.left)
+    //                 .push_bind(announce_update.corrupt.unwrap_or(0))
+    //                 .push_bind(announce_update.peer_id.to_vec())
+    //                 .push_bind(announce_update.port)
+    //                 .push_bind(announce_update.numwant)
+    //                 .push_bind(announce_update.event.to_string());
 
-            if let Some(key) = &announce_update.key {
-                bind.push_bind(key);
-            } else {
-                bind.push_bind("");
-            }
-        });
+    //             if let Some(key) = &announce_update.key {
+    //                 bind.push_bind(key);
+    //             } else {
+    //                 bind.push_bind("");
+    //             }
+    //         });
 
-        query_builder
-            .build()
-            .persistent(false)
-            .execute(db)
-            .await
-            .map(|result| result.rows_affected())
-    }
+    //         query_builder
+    //             .build()
+    //             .persistent(false)
+    //             .execute(db)
+    //             .await
+    //             .map(|result| result.rows_affected())
+    //     }
 }
 
 impl Deref for Queue {

@@ -3,13 +3,16 @@ use std::{ops::Deref, sync::Arc};
 
 use axum::extract::State;
 use axum::Json;
+use diesel::deserialize::Queryable;
+use diesel::Selectable;
 use indexmap::IndexSet;
 use serde::Deserialize;
-use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
 
 use crate::tracker::Tracker;
+
+use super::Db;
 
 pub struct Set(IndexSet<FreeleechToken>);
 
@@ -18,24 +21,20 @@ impl Set {
         Set(IndexSet::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Set> {
-        let freeleech_tokens = sqlx::query_as!(
-            FreeleechToken,
-            r#"
-                SELECT
-                    user_id as `user_id: u32`,
-                    torrent_id as `torrent_id: u32`
-                FROM
-                    freeleech_tokens
-            "#
-        )
-        .fetch_all(db)
-        .await
-        .context("Failed loading freeleech tokens.")?;
+    pub async fn from_db(db: &Db) -> Result<Set> {
+        use crate::schema::freeleech_tokens;
+        use diesel::prelude::*;
+        use diesel_async::RunQueryDsl;
+
+        let freeleech_tokens_data: Vec<FreeleechToken> = freeleech_tokens::table
+            .select(FreeleechToken::as_select())
+            .load(&mut db.get().await?)
+            .await
+            .context("Failed loading freeleech tokens.")?;
 
         let mut freeleech_token_set = Set::new();
 
-        for freeleech_token in freeleech_tokens {
+        for freeleech_token in freeleech_tokens_data {
             freeleech_token_set.insert(freeleech_token);
         }
 
@@ -75,6 +74,9 @@ impl DerefMut for Set {
     }
 }
 
+#[derive(Queryable, Selectable)]
+#[diesel(table_name = crate::schema::freeleech_tokens)]
+#[diesel(check_for_backend(diesel::mysql::Mysql))]
 #[derive(Eq, Deserialize, Hash, PartialEq)]
 pub struct FreeleechToken {
     pub user_id: u32,

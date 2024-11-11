@@ -3,13 +3,16 @@ use std::{ops::Deref, sync::Arc};
 
 use axum::extract::State;
 use axum::Json;
+use diesel::prelude::Queryable;
+use diesel::Selectable;
 use indexmap::IndexSet;
 use serde::Deserialize;
-use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
 
 use crate::tracker::Tracker;
+
+use super::Db;
 
 pub struct Set(pub IndexSet<Agent>);
 
@@ -18,19 +21,16 @@ impl Set {
         Set(IndexSet::new())
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Set> {
-        let agents = sqlx::query_as!(
-            Agent,
-            r#"
-                SELECT
-                    peer_id_prefix
-                FROM
-                    blacklist_clients
-            "#
-        )
-        .fetch_all(db)
-        .await
-        .context("Failed loading blacklisted clients.")?;
+    pub async fn from_db(db: &Db) -> Result<Set> {
+        use crate::schema::blacklist_clients;
+        use diesel::prelude::*;
+        use diesel_async::RunQueryDsl;
+
+        let agents: Vec<Agent> = blacklist_clients::table
+            .select(Agent::as_select())
+            .load(&mut db.get().await?)
+            .await
+            .context("Failed loading blacklisted clients.")?;
 
         let mut agent_set = Set::new();
 
@@ -43,8 +43,7 @@ impl Set {
 
     pub async fn upsert(State(tracker): State<Arc<Tracker>>, Json(agent): Json<Agent>) {
         println!(
-            "Inserting agent with peer_id_prefix {} ({:?}).",
-            String::from_utf8_lossy(&agent.peer_id_prefix),
+            "Inserting agent with peer_id_prefix {}.",
             agent.peer_id_prefix,
         );
 
@@ -53,8 +52,7 @@ impl Set {
 
     pub async fn destroy(State(tracker): State<Arc<Tracker>>, Json(agent): Json<Agent>) {
         println!(
-            "Removing agent with peer_id_prefix {} ({:?}).",
-            String::from_utf8_lossy(&agent.peer_id_prefix),
+            "Removing agent with peer_id_prefix {}.",
             agent.peer_id_prefix,
         );
 
@@ -76,8 +74,10 @@ impl DerefMut for Set {
     }
 }
 
+#[derive(Queryable, Selectable)]
+#[diesel(table_name = crate::schema::blacklist_clients)]
+#[diesel(check_for_backend(diesel::mysql::Mysql))]
 #[derive(Eq, Deserialize, Hash, PartialEq)]
 pub struct Agent {
-    #[serde(with = "serde_bytes")]
-    pub peer_id_prefix: Vec<u8>,
+    pub peer_id_prefix: String,
 }
