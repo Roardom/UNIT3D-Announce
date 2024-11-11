@@ -1,7 +1,7 @@
 use std::{fmt, ops::Deref, str::FromStr};
 
 use serde::Deserialize;
-use sqlx::{database::HasValueRef, Database, Decode};
+use sqlx::{Database, Decode};
 
 use crate::utils::{hex_decode, hex_encode};
 
@@ -55,7 +55,7 @@ where
     /// Decodes the database's string representation of the 40 character long
     /// infohash in hex into a byte slice
     fn decode(
-        value: <DB as HasValueRef<'r>>::ValueRef,
+        value: <DB as Database>::ValueRef<'r>,
     ) -> Result<InfoHash, Box<dyn std::error::Error + 'static + Send + Sync>> {
         let value = <&[u8] as Decode<DB>>::decode(value)?;
 

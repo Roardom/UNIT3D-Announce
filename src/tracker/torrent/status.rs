@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use serde::Serialize;
 use serde_repr::Deserialize_repr;
-use sqlx::{database::HasValueRef, Database, Decode};
+use sqlx::{Database, Decode};
 
 /// Torrent moderation status
 #[derive(Clone, Copy, Debug, Default, Deserialize_repr, Eq, PartialEq, Serialize)]
@@ -50,7 +50,7 @@ where
     i16: Decode<'r, DB>,
 {
     fn decode(
-        value: <DB as HasValueRef<'r>>::ValueRef,
+        value: <DB as Database>::ValueRef<'r>,
     ) -> Result<Status, Box<dyn std::error::Error + 'static + Send + Sync>> {
         let value = <i16 as Decode<DB>>::decode(value)?;
 

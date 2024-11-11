@@ -4,7 +4,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize, Serializer};
-use sqlx::{database::HasValueRef, Database, Decode};
+use sqlx::{Database, Decode};
 
 use anyhow::bail;
 
@@ -32,7 +32,7 @@ where
     &'r str: Decode<'r, DB>,
 {
     fn decode(
-        value: <DB as HasValueRef<'r>>::ValueRef,
+        value: <DB as Database>::ValueRef<'r>,
     ) -> Result<Passkey, Box<dyn std::error::Error + 'static + Send + Sync>> {
         let value = <&str as Decode<DB>>::decode(value)?;
         let mut bytes = value.bytes();

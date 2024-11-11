@@ -4,7 +4,7 @@ use std::{
 };
 
 use serde::{Serialize, Serializer};
-use sqlx::{database::HasValueRef, Database, Decode};
+use sqlx::{Database, Decode};
 
 use crate::utils::hex_encode;
 
@@ -38,7 +38,7 @@ where
 {
     /// Decodes the database's 2-byte binary peer_id
     fn decode(
-        value: <DB as HasValueRef<'r>>::ValueRef,
+        value: <DB as Database>::ValueRef<'r>,
     ) -> Result<PeerId, Box<dyn std::error::Error + 'static + Send + Sync>> {
         let value = <&[u8] as Decode<DB>>::decode(value)?;
 
