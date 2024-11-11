@@ -3,7 +3,7 @@ use std::net::IpAddr;
 use std::ops::{Deref, DerefMut};
 
 use chrono::naive::serde::ts_seconds_option;
-use chrono::NaiveDateTime;
+use chrono::{NaiveDateTime, Utc};
 use diesel::deserialize::Queryable;
 use diesel::Selectable;
 use indexmap::IndexMap;
@@ -90,6 +90,7 @@ impl Map {
         use crate::schema::peers;
         use diesel::prelude::*;
         use diesel_async::RunQueryDsl;
+        let now = Utc::now();
 
         let peers_data = peers::table
             .select((Index::as_select(), Peer::as_select()))
@@ -97,6 +98,10 @@ impl Map {
             .await
             .context("Failed loading peers.")?;
 
+        println!(
+            "\n\nPeers loaded in {} seconds.\n\n",
+            Utc::now().signed_duration_since(now).num_milliseconds() as f64 / 1000.0
+        );
         Ok(peers_data)
     }
 }
