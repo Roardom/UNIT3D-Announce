@@ -32,7 +32,8 @@ use crate::{
     },
     scheduler::{
         announce_update::AnnounceUpdate, history_update::HistoryUpdate, peer_update::PeerUpdate,
-        torrent_update::TorrentUpdate, user_update::UserUpdate, Upsertable,
+        torrent_update::TorrentUpdate, unregistered_info_hash_update::UnregisteredInfoHashUpdate,
+        user_update::UserUpdate, Upsertable,
     },
     warning::AnnounceWarning,
 };
@@ -323,11 +324,27 @@ pub async fn announce(
         .cloned();
 
     // Validate torrent
-    let torrent_id = *tracker
+    let torrent_id_res = tracker
         .infohash2id
         .read()
         .get(&queries.info_hash)
-        .ok_or(InfoHashNotFound)?;
+        .ok_or(InfoHashNotFound)
+        .cloned();
+
+    if let Ok(user) = &user {
+        if let Err(InfoHashNotFound) = torrent_id_res {
+            tracker
+                .unregistered_info_hash_updates
+                .lock()
+                .upsert(UnregisteredInfoHashUpdate {
+                    user_id: user.id,
+                    info_hash: queries.info_hash,
+                    updated_at: Utc::now(),
+                });
+        }
+    }
+
+    let torrent_id = torrent_id_res?;
 
     let is_connectable = check_connectivity(&tracker, client_ip, queries.port).await;
 

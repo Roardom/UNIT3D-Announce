@@ -4,6 +4,7 @@ pub mod announce_update;
 pub mod history_update;
 pub mod peer_update;
 pub mod torrent_update;
+pub mod unregistered_info_hash_update;
 pub mod user_update;
 
 use crate::tracker::Tracker;
@@ -41,6 +42,7 @@ pub async fn flush(tracker: &Arc<Tracker>) {
         flush_torrent_updates(tracker),
         flush_user_updates(tracker),
         flush_announce_updates(tracker),
+        flush_unregistered_info_hash_updates(tracker),
     );
 }
 
@@ -151,6 +153,33 @@ async fn flush_announce_updates(tracker: &Arc<Tracker>) {
                 .announce_updates
                 .lock()
                 .upsert_batch(announce_update_batch);
+        }
+    }
+}
+
+/// Send unregistered info hash updates to mysql database
+async fn flush_unregistered_info_hash_updates(tracker: &Arc<Tracker>) {
+    let unregistered_info_hash_update_batch =
+        tracker.unregistered_info_hash_updates.lock().take_batch();
+    let start = Utc::now();
+    let len = unregistered_info_hash_update_batch.len();
+    let result = unregistered_info_hash_update_batch
+        .flush_to_db(&tracker.pool, ())
+        .await;
+    let elapsed = Utc::now().signed_duration_since(start).num_milliseconds();
+
+    match result {
+        Ok(_) => {
+            println!("{start} - Upserted {len} unregistered info hashes in {elapsed} ms.");
+        }
+        Err(e) => {
+            println!(
+                "{start} - Failed to update {len} unregistered info hashes after {elapsed} ms: {e}"
+            );
+            tracker
+                .unregistered_info_hash_updates
+                .lock()
+                .upsert_batch(unregistered_info_hash_update_batch);
         }
     }
 }

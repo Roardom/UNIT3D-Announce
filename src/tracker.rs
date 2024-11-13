@@ -16,6 +16,7 @@ use sqlx::{MySql, MySqlPool, QueryBuilder};
 use anyhow::{Context, Result};
 
 use crate::config;
+use crate::scheduler::unregistered_info_hash_update::{self, UnregisteredInfoHashUpdate};
 use crate::scheduler::{
     announce_update,
     history_update::{self, HistoryUpdate},
@@ -50,6 +51,8 @@ pub struct Tracker {
     pub stats: Stats,
     pub torrents: Mutex<torrent::Map>,
     pub torrent_updates: Mutex<Queue<torrent_update::Index, TorrentUpdate>>,
+    pub unregistered_info_hash_updates:
+        Mutex<Queue<unregistered_info_hash_update::Index, UnregisteredInfoHashUpdate>>,
     pub users: RwLock<user::Map>,
     pub user_updates: Mutex<Queue<user_update::Index, UserUpdate>>,
 }
@@ -180,6 +183,14 @@ impl Tracker {
                     extra_bindings_per_flush: 0,
                 },
             )),
+            unregistered_info_hash_updates: Mutex::new(Queue::<
+                unregistered_info_hash_update::Index,
+                UnregisteredInfoHashUpdate,
+            >::new(QueueConfig {
+                max_bindings_per_flush: 65_535,
+                bindings_per_record: 4,
+                extra_bindings_per_flush: 0,
+            })),
             users: RwLock::new(users),
             user_updates: Mutex::new(Queue::<user_update::Index, UserUpdate>::new(QueueConfig {
                 max_bindings_per_flush: 65_535,
