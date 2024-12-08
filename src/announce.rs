@@ -409,8 +409,15 @@ pub async fn announce(
         }
 
         // Make sure user isn't leeching more torrents than their group allows
-        let has_hit_download_slot_limit = queries.left > 0
-            && matches!(group.download_slots, Some(slots) if slots <= user.num_leeching);
+        let has_hit_download_slot_limit = if queries.left > 0 {
+            if let Some(slots) = group.download_slots {
+                user.num_leeching >= slots
+            } else {
+                false
+            }
+        } else {
+            false
+        };
 
         // Change of upload/download compared to previous announce
         let uploaded_delta;
