@@ -28,7 +28,7 @@ impl Map {
                 SELECT
                     INET6_NTOA(peers.ip) as `ip_address: String`,
                     peers.port as `port: u16`,
-                    COALESCE(MAX(peers.connectable), 0) as `connectable: bool`,
+                    COALESCE(MAX(peers.connectable), 0) as `connectable!: bool`,
                     MAX(peers.updated_at) as `updated_at: DateTime<Utc>`
                 FROM
                     peers
