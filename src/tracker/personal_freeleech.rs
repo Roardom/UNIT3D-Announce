@@ -8,6 +8,7 @@ use serde::Deserialize;
 use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
+use tracing::info;
 
 use crate::tracker::Tracker;
 
@@ -45,7 +46,7 @@ impl Set {
         State(tracker): State<Arc<Tracker>>,
         Json(personal_freeleech): Json<PersonalFreeleech>,
     ) {
-        println!(
+        info!(
             "Inserting personal freeleech with user_id {}.",
             personal_freeleech.user_id
         );
@@ -60,7 +61,7 @@ impl Set {
         State(tracker): State<Arc<Tracker>>,
         Json(personal_freeleech): Json<PersonalFreeleech>,
     ) {
-        println!(
+        info!(
             "Removing personal freeleech with user_id {}.",
             personal_freeleech.user_id
         );

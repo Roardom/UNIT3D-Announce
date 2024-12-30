@@ -8,6 +8,7 @@ use serde::Deserialize;
 use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
+use tracing::info;
 
 use crate::tracker::Tracker;
 
@@ -42,7 +43,7 @@ impl Set {
     }
 
     pub async fn upsert(State(tracker): State<Arc<Tracker>>, Json(agent): Json<Agent>) {
-        println!(
+        info!(
             "Inserting agent with peer_id_prefix {} ({:?}).",
             String::from_utf8_lossy(&agent.peer_id_prefix),
             agent.peer_id_prefix,
@@ -52,7 +53,7 @@ impl Set {
     }
 
     pub async fn destroy(State(tracker): State<Arc<Tracker>>, Json(agent): Json<Agent>) {
-        println!(
+        info!(
             "Removing agent with peer_id_prefix {} ({:?}).",
             String::from_utf8_lossy(&agent.peer_id_prefix),
             agent.peer_id_prefix,

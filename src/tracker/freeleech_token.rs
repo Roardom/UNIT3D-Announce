@@ -8,6 +8,7 @@ use serde::Deserialize;
 use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
+use tracing::info;
 
 use crate::tracker::Tracker;
 
@@ -43,7 +44,7 @@ impl Set {
     }
 
     pub async fn upsert(State(tracker): State<Arc<Tracker>>, Json(token): Json<FreeleechToken>) {
-        println!(
+        info!(
             "Inserting freeleech token with user_id {} and torrent_id {}.",
             token.user_id, token.torrent_id
         );
@@ -52,7 +53,7 @@ impl Set {
     }
 
     pub async fn destroy(State(tracker): State<Arc<Tracker>>, Json(token): Json<FreeleechToken>) {
-        println!(
+        info!(
             "Removing freeleech token with user_id {} and torrent_id {}.",
             token.user_id, token.torrent_id
         );

@@ -9,6 +9,7 @@ use serde::Deserialize;
 use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
+use tracing::info;
 
 use crate::tracker::Tracker;
 
@@ -51,7 +52,7 @@ impl Map {
         State(tracker): State<Arc<Tracker>>,
         Json(group): Json<APIInsertGroup>,
     ) -> StatusCode {
-        println!("Inserting group with id {}.", group.id);
+        info!("Inserting group with id {}.", group.id);
 
         tracker.groups.write().insert(
             group.id,
@@ -72,7 +73,7 @@ impl Map {
         State(tracker): State<Arc<Tracker>>,
         Json(group): Json<APIRemoveGroup>,
     ) -> StatusCode {
-        println!("Removing group with id {}.", group.id);
+        info!("Removing group with id {}.", group.id);
 
         tracker.groups.write().swap_remove(&group.id);
 

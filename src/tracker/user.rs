@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
+use tracing::info;
 
 use crate::config::Config;
 use crate::rate::RateCollection;
@@ -79,9 +80,9 @@ impl Map {
         State(tracker): State<Arc<Tracker>>,
         Json(user): Json<APIInsertUser>,
     ) -> StatusCode {
-        println!("Received user: {}", user.id);
+        info!("Received user: {}", user.id);
         if let Ok(passkey) = Passkey::from_str(&user.passkey) {
-            println!("Inserting user with id {}.", user.id);
+            info!("Inserting user with id {}.", user.id);
             let old_user = tracker.users.write().swap_remove(&user.id);
             let (receive_seed_list_rates, receive_leech_list_rates) = old_user
                 .map(|user| (user.receive_seed_list_rates, user.receive_leech_list_rates))
@@ -119,7 +120,7 @@ impl Map {
         Json(user): Json<APIRemoveUser>,
     ) -> StatusCode {
         if let Ok(passkey) = Passkey::from_str(&user.passkey) {
-            println!("Removing user with id {}.", user.id);
+            info!("Removing user with id {}.", user.id);
 
             tracker.users.write().swap_remove(&user.id);
             tracker.passkey2id.write().swap_remove(&passkey);

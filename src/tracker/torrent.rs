@@ -7,6 +7,7 @@ use axum::http::StatusCode;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use sqlx::MySqlPool;
+use tracing::info;
 
 use crate::tracker::peer;
 
@@ -114,7 +115,7 @@ impl Map {
         Json(torrent): Json<APIInsertTorrent>,
     ) -> StatusCode {
         if let Ok(info_hash) = InfoHash::from_str(&torrent.info_hash) {
-            println!("Inserting torrent with id {}.", torrent.id);
+            info!("Inserting torrent with id {}.", torrent.id);
             let old_torrent = tracker.torrents.lock().swap_remove(&torrent.id);
             let peers = old_torrent.unwrap_or_default().peers;
 
@@ -148,7 +149,7 @@ impl Map {
         let mut torrent_guard = tracker.torrents.lock();
 
         if let Some(torrent) = torrent_guard.get_mut(&torrent.id) {
-            println!("Removing torrent with id {}.", torrent.id);
+            info!("Removing torrent with id {}.", torrent.id);
             torrent.is_deleted = true;
 
             return StatusCode::OK;

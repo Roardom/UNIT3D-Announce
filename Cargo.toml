@@ -18,6 +18,8 @@ serde_repr = { version = "0.1", default-features = false }
 sqlx = { version = "0.8.0", default-features = false, features = ["runtime-tokio-rustls", "macros", "mysql", "chrono", "ipnetwork"] }
 thiserror = { version = "2.0.0", default-features = false }
 tokio = { version = "1", default-features = false, features = ["rt-multi-thread", "macros", "signal", "sync"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.5"

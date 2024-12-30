@@ -8,6 +8,7 @@ use serde::Deserialize;
 use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
+use tracing::info;
 
 use crate::tracker::Tracker;
 
@@ -42,7 +43,7 @@ impl Set {
     }
 
     pub async fn upsert(State(tracker): State<Arc<Tracker>>, Json(token): Json<FeaturedTorrent>) {
-        println!(
+        info!(
             "Inserting featured torrent with torrent_id {}.",
             token.torrent_id
         );
@@ -51,7 +52,7 @@ impl Set {
     }
 
     pub async fn destroy(State(tracker): State<Arc<Tracker>>, Json(token): Json<FeaturedTorrent>) {
-        println!(
+        info!(
             "Removing featured torrent with torrent_id {}.",
             token.torrent_id
         );

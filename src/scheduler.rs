@@ -13,6 +13,7 @@ use indexmap::{map::Values, IndexMap};
 use sqlx::MySqlPool;
 use tokio::join;
 use torrent_update::TorrentUpdate;
+use tracing::info;
 
 use self::history_update::HistoryUpdateExtraBindings;
 
@@ -63,10 +64,10 @@ async fn flush_history_updates(tracker: &Arc<Tracker>) {
 
     match result {
         Ok(_) => {
-            println!("{start} - Upserted {len} histories in {elapsed} ms.");
+            info!("Upserted {len} histories in {elapsed} ms.");
         }
         Err(e) => {
-            println!("{start} - Failed to update {len} histories after {elapsed} ms: {e}");
+            info!("Failed to update {len} histories after {elapsed} ms: {e}");
             tracker
                 .history_updates
                 .lock()
@@ -85,10 +86,10 @@ async fn flush_peer_updates(tracker: &Arc<Tracker>) {
 
     match result {
         Ok(_) => {
-            println!("{start} - Upserted {len} peers in {elapsed} ms.");
+            info!("Upserted {len} peers in {elapsed} ms.");
         }
         Err(e) => {
-            println!("{start} - Failed to update {len} peers after {elapsed} ms: {e}");
+            info!("Failed to update {len} peers after {elapsed} ms: {e}");
             tracker.peer_updates.lock().upsert_batch(peer_update_batch);
         }
     }
@@ -104,10 +105,10 @@ async fn flush_torrent_updates(tracker: &Arc<Tracker>) {
 
     match result {
         Ok(_) => {
-            println!("{start} - Upserted {len} torrents in {elapsed} ms.");
+            info!("Upserted {len} torrents in {elapsed} ms.");
         }
         Err(e) => {
-            println!("{start} - Failed to update {len} torrents after {elapsed} ms: {e}");
+            info!("Failed to update {len} torrents after {elapsed} ms: {e}");
             tracker
                 .torrent_updates
                 .lock()
@@ -126,10 +127,10 @@ async fn flush_user_updates(tracker: &Arc<Tracker>) {
 
     match result {
         Ok(_) => {
-            println!("{start} - Upserted {len} users in {elapsed} ms.");
+            info!("Upserted {len} users in {elapsed} ms.");
         }
         Err(e) => {
-            println!("{start} - Failed to update {len} users after {elapsed} ms: {e}");
+            info!("Failed to update {len} users after {elapsed} ms: {e}");
             tracker.user_updates.lock().upsert_batch(user_update_batch);
         }
     }
@@ -145,10 +146,10 @@ async fn flush_announce_updates(tracker: &Arc<Tracker>) {
 
     match result {
         Ok(_) => {
-            println!("{start} - Upserted {len} announces in {elapsed} ms.");
+            info!("Upserted {len} announces in {elapsed} ms.");
         }
         Err(e) => {
-            println!("{start} - Failed to update {len} announces after {elapsed} ms: {e}");
+            info!("Failed to update {len} announces after {elapsed} ms: {e}");
             tracker
                 .announce_updates
                 .lock()
@@ -170,12 +171,10 @@ async fn flush_unregistered_info_hash_updates(tracker: &Arc<Tracker>) {
 
     match result {
         Ok(_) => {
-            println!("{start} - Upserted {len} unregistered info hashes in {elapsed} ms.");
+            info!("Upserted {len} unregistered info hashes in {elapsed} ms.");
         }
         Err(e) => {
-            println!(
-                "{start} - Failed to update {len} unregistered info hashes after {elapsed} ms: {e}"
-            );
+            info!("Failed to update {len} unregistered info hashes after {elapsed} ms: {e}");
             tracker
                 .unregistered_info_hash_updates
                 .lock()

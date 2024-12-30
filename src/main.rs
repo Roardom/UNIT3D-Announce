@@ -1,7 +1,9 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use axum::Router;
+use dotenvy::dotenv;
 use std::net::SocketAddr;
 use tokio::signal;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[cfg(not(target_env = "msvc"))]
 use tikv_jemallocator::Jemalloc;
@@ -23,6 +25,21 @@ mod warning;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let _ = dotenv().context(".env file not found.")?;
+
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| format!("{}=trace", env!("CARGO_CRATE_NAME")).into()),
+        )
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_ansi(false)
+                .with_level(false)
+                .with_target(false),
+        )
+        .init();
+
     // The Tracker struct keeps track of all state within the application.
     let tracker = tracker::Tracker::default().await?;
 
