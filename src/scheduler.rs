@@ -11,7 +11,7 @@ use crate::tracker::Tracker;
 use chrono::{Duration, Utc};
 use indexmap::{map::Values, IndexMap};
 use sqlx::MySqlPool;
-use tokio::join;
+use tokio::{join, time::Instant};
 use torrent_update::TorrentUpdate;
 use tracing::info;
 
@@ -50,7 +50,7 @@ pub async fn flush(tracker: &Arc<Tracker>) {
 /// Send history updates to mysql database
 async fn flush_history_updates(tracker: &Arc<Tracker>) {
     let history_update_batch = tracker.history_updates.lock().take_batch();
-    let start = Utc::now();
+    let start = Instant::now();
     let len = history_update_batch.len();
     let result = history_update_batch
         .flush_to_db(
@@ -60,7 +60,7 @@ async fn flush_history_updates(tracker: &Arc<Tracker>) {
             },
         )
         .await;
-    let elapsed = Utc::now().signed_duration_since(start).num_milliseconds();
+    let elapsed = start.elapsed().as_millis();
 
     match result {
         Ok(_) => {
@@ -79,10 +79,10 @@ async fn flush_history_updates(tracker: &Arc<Tracker>) {
 /// Send peer updates to mysql database
 async fn flush_peer_updates(tracker: &Arc<Tracker>) {
     let peer_update_batch = tracker.peer_updates.lock().take_batch();
-    let start = Utc::now();
+    let start = Instant::now();
     let len = peer_update_batch.len();
     let result = peer_update_batch.flush_to_db(&tracker.pool, ()).await;
-    let elapsed = Utc::now().signed_duration_since(start).num_milliseconds();
+    let elapsed = start.elapsed().as_millis();
 
     match result {
         Ok(_) => {
@@ -98,10 +98,10 @@ async fn flush_peer_updates(tracker: &Arc<Tracker>) {
 /// Send torrent updates to mysql database
 async fn flush_torrent_updates(tracker: &Arc<Tracker>) {
     let torrent_update_batch = tracker.torrent_updates.lock().take_batch();
-    let start = Utc::now();
+    let start = Instant::now();
     let len = torrent_update_batch.len();
     let result = torrent_update_batch.flush_to_db(&tracker.pool, ()).await;
-    let elapsed = Utc::now().signed_duration_since(start).num_milliseconds();
+    let elapsed = start.elapsed().as_millis();
 
     match result {
         Ok(_) => {
@@ -120,10 +120,10 @@ async fn flush_torrent_updates(tracker: &Arc<Tracker>) {
 /// Send user updates to mysql database
 async fn flush_user_updates(tracker: &Arc<Tracker>) {
     let user_update_batch = tracker.user_updates.lock().take_batch();
-    let start = Utc::now();
+    let start = Instant::now();
     let len = user_update_batch.len();
     let result = user_update_batch.flush_to_db(&tracker.pool, ()).await;
-    let elapsed = Utc::now().signed_duration_since(start).num_milliseconds();
+    let elapsed = start.elapsed().as_millis();
 
     match result {
         Ok(_) => {
@@ -139,10 +139,10 @@ async fn flush_user_updates(tracker: &Arc<Tracker>) {
 /// Send announce updates to mysql database
 async fn flush_announce_updates(tracker: &Arc<Tracker>) {
     let announce_update_batch = tracker.announce_updates.lock().take_batch();
-    let start = Utc::now();
+    let start = Instant::now();
     let len = announce_update_batch.len();
     let result = announce_update_batch.flush_to_db(&tracker.pool).await;
-    let elapsed = Utc::now().signed_duration_since(start).num_milliseconds();
+    let elapsed = start.elapsed().as_millis();
 
     match result {
         Ok(_) => {
@@ -162,12 +162,12 @@ async fn flush_announce_updates(tracker: &Arc<Tracker>) {
 async fn flush_unregistered_info_hash_updates(tracker: &Arc<Tracker>) {
     let unregistered_info_hash_update_batch =
         tracker.unregistered_info_hash_updates.lock().take_batch();
-    let start = Utc::now();
+    let start = Instant::now();
     let len = unregistered_info_hash_update_batch.len();
     let result = unregistered_info_hash_update_batch
         .flush_to_db(&tracker.pool, ())
         .await;
-    let elapsed = Utc::now().signed_duration_since(start).num_milliseconds();
+    let elapsed = start.elapsed().as_millis();
 
     match result {
         Ok(_) => {
