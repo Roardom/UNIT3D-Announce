@@ -1,5 +1,4 @@
 use axum::{
-    async_trait,
     extract::{ConnectInfo, FromRef, FromRequestParts, Path, State},
     http::{
         header::{ACCEPT_CHARSET, ACCEPT_LANGUAGE, REFERER, USER_AGENT},
@@ -101,7 +100,6 @@ pub struct Announce {
 pub struct Query<T>(pub T);
 
 /// Extracts the query parameters in the HTTP GET request.
-#[async_trait]
 impl<S> FromRequestParts<S> for Query<Announce>
 where
     S: Send + Sync,
@@ -204,7 +202,6 @@ where
 
 pub struct ClientIp(pub std::net::IpAddr);
 
-#[async_trait]
 impl FromRequestParts<Arc<Tracker>> for ClientIp {
     type Rejection = AnnounceError;
 

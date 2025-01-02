@@ -16,7 +16,7 @@ pub fn routes(state: Arc<Tracker>) -> Router<Arc<Tracker>> {
         .nest(
             "/announce",
             Router::new()
-                .route("/:passkey", get(announce::announce))
+                .route("/{passkey}", get(announce::announce))
                 .nest(
                     &("/".to_string() + &state.config.apikey),
                     Router::new()
@@ -25,12 +25,12 @@ pub fn routes(state: Arc<Tracker>) -> Router<Arc<Tracker>> {
                             put(tracker::torrent::Map::upsert)
                                 .delete(tracker::torrent::Map::destroy),
                         )
-                        .route("/torrents/:id", get(tracker::torrent::Map::show))
+                        .route("/torrents/{id}", get(tracker::torrent::Map::show))
                         .route(
                             "/users",
                             put(tracker::user::Map::upsert).delete(tracker::user::Map::destroy),
                         )
-                        .route("/users/:id", get(tracker::user::Map::show))
+                        .route("/users/{id}", get(tracker::user::Map::show))
                         .route(
                             "/groups",
                             put(tracker::group::Map::upsert).delete(tracker::group::Map::destroy),
