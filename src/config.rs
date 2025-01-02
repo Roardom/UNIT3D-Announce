@@ -84,6 +84,24 @@ pub struct Config {
     /// this, then their peer lists will be empty. Mitigates peer scraping
     /// attacks.
     pub user_receive_leech_list_rate_limits: RateCollection,
+    /// If specified, this will override the immune status on the user's group
+    /// to the specified value.
+    pub donor_immunity_override: Option<bool>,
+    /// If specified, this will override the upload factor of the user's group.
+    /// The factor is stored as a percentage.
+    pub donor_upload_factor_override: Option<u8>,
+    /// If specified, this will override the download factor of the user's
+    /// group. The factor is stored as a percentage.
+    pub donor_download_factor_override: Option<u8>,
+    /// If specified, this will override the immune status on the user's group
+    /// to the specified value.
+    pub lifetime_donor_immunity_override: Option<bool>,
+    /// If specified, this will override the upload factor of the user's group.
+    /// The factor is stored as a percentage.
+    pub lifetime_donor_upload_factor_override: Option<u8>,
+    /// If specified, this will override the download factor of the user's
+    /// group. The factor is stored as a percentage.
+    pub lifetime_donor_download_factor_override: Option<u8>,
 }
 
 impl Config {
@@ -188,6 +206,56 @@ impl Config {
         )
         .context("USER_RECEIVE_LEECH_LIST_RATE_LIMITS has incorrect format.")?;
 
+        let donor_immunity_override = env::var("DONOR_IMMUNITY_OVERRIDE")
+            .ok()
+            .map(|s| s.parse())
+            .transpose()
+            .context("DONOR_IMMUNITY_OVERRIDE must be either `true` or `false`, if provided")?;
+
+        let donor_upload_factor_override = env::var("DONOR_UPLOAD_FACTOR_OVERRIDE")
+            .ok()
+            .map(|s| s.parse())
+            .transpose()
+            .context(
+                "DONOR_UPLOAD_FACTOR_OVERRIDE must be a number between 0 and 2^8 - 1, if provided",
+            )?;
+
+        let donor_download_factor_override = env::var("DONOR_DOWNLOAD_FACTOR_OVERRIDE")
+            .ok()
+            .map(|s| s.parse())
+            .transpose()
+            .context(
+                "DONOR_DOWNLOAD_FACTOR_OVERRIDE must be a number between 0 and 2^8 - 1, if provided",
+            )?;
+
+        let lifetime_donor_immunity_override = env::var("LIFETIME_DONOR_IMMUNITY_OVERRIDE")
+            .ok()
+            .map(|s| s.parse())
+            .transpose()
+            .context(
+                "LIFETIME_DONOR_IMMUNITY_OVERRIDE must be either `true` or `false`, if provided",
+            )?;
+
+        let lifetime_donor_upload_factor_override = env::var(
+                "LIFETIME_DONOR_UPLOAD_FACTOR_OVERRIDE",
+            )
+            .ok()
+            .map(|s| s.parse())
+            .transpose()
+            .context(
+                "LIFETIME_DONOR_UPLOAD_FACTOR_OVERRIDE must be a number between 0 and 2^8 - 1, if provided",
+            )?;
+
+        let lifetime_donor_download_factor_override = env::var(
+            "LIFETIME_DONOR_DOWNLOAD_FACTOR_OVERRIDE",
+        )
+        .ok()
+        .map(|s| s.parse())
+        .transpose()
+        .context(
+            "LIFETIME_DONOR_DOWNLOAD_FACTOR_OVERRIDE must be a number between 0 and 2^8 - 1, if provided",
+        )?;
+
         let apikey = env::var("APIKEY").context("APIKEY not found in .env file.")?;
 
         if apikey.len() < 32 {
@@ -216,6 +284,12 @@ impl Config {
             reverse_proxy_client_ip_header_name,
             user_receive_seed_list_rate_limits,
             user_receive_leech_list_rate_limits,
+            donor_immunity_override,
+            donor_upload_factor_override,
+            donor_download_factor_override,
+            lifetime_donor_immunity_override,
+            lifetime_donor_upload_factor_override,
+            lifetime_donor_download_factor_override,
         })
     }
 }

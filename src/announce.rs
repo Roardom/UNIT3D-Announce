@@ -705,15 +705,37 @@ pub async fn announce(
 
         response.extend(b"e");
 
-        let upload_factor = std::cmp::max(
+        let mut upload_factor = std::cmp::max(
             tracker.config.upload_factor,
             std::cmp::max(group.upload_factor, torrent.upload_factor),
         );
 
-        let download_factor = std::cmp::min(
+        let mut download_factor = std::cmp::min(
             tracker.config.download_factor,
             std::cmp::min(group.download_factor, torrent.download_factor),
         );
+
+        if user.is_lifetime {
+            if let Some(override_upload_factor) =
+                tracker.config.lifetime_donor_upload_factor_override
+            {
+                upload_factor = std::cmp::max(upload_factor, override_upload_factor)
+            }
+
+            if let Some(override_download_factor) =
+                tracker.config.lifetime_donor_download_factor_override
+            {
+                download_factor = std::cmp::min(download_factor, override_download_factor)
+            }
+        } else if user.is_donor {
+            if let Some(override_upload_factor) = tracker.config.donor_upload_factor_override {
+                upload_factor = std::cmp::max(upload_factor, override_upload_factor)
+            }
+
+            if let Some(override_download_factor) = tracker.config.donor_download_factor_override {
+                download_factor = std::cmp::min(download_factor, override_download_factor)
+            }
+        }
 
         // Has to be dropped before any `await` calls.
         //
@@ -831,7 +853,19 @@ pub async fn announce(
         user_agent: String::from(user_agent),
         is_active: queries.event != Event::Stopped,
         is_seeder: queries.left == 0,
-        is_immune: group.is_immune,
+        is_immune: if user.is_lifetime {
+            tracker
+                .config
+                .lifetime_donor_immunity_override
+                .unwrap_or(group.is_immune)
+        } else if user.is_donor {
+            tracker
+                .config
+                .donor_immunity_override
+                .unwrap_or(group.is_immune)
+        } else {
+            group.is_immune
+        },
         uploaded: queries.uploaded,
         downloaded: queries.downloaded,
         uploaded_delta,

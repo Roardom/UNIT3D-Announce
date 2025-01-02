@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n                SELECT\n                    users.id as `id: u32`,\n                    users.group_id as `group_id: i32`,\n                    users.passkey as `passkey: Passkey`,\n                    users.can_download as `can_download: bool`,\n                    CAST(COALESCE(SUM(peers.seeder = 1 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED) as `num_seeding!: u32`,\n                    CAST(COALESCE(SUM(peers.seeder = 0 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED) as `num_leeching!: u32`\n                FROM\n                    users\n                LEFT JOIN\n                    peers\n                ON\n                    users.id = peers.user_id\n                WHERE\n                    users.deleted_at IS NULL\n                GROUP BY\n                    users.id\n            ",
+  "query": "\n                SELECT\n                    users.id as `id: u32`,\n                    users.group_id as `group_id: i32`,\n                    users.passkey as `passkey: Passkey`,\n                    users.can_download as `can_download: bool`,\n                    CAST(COALESCE(SUM(peers.seeder = 1 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED) as `num_seeding!: u32`,\n                    CAST(COALESCE(SUM(peers.seeder = 0 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED) as `num_leeching!: u32`,\n                    users.is_donor as `is_donor: bool`,\n                    users.is_lifetime as `is_lifetime: bool`\n                FROM\n                    users\n                LEFT JOIN\n                    peers\n                ON\n                    users.id = peers.user_id\n                WHERE\n                    users.deleted_at IS NULL\n                GROUP BY\n                    users.id\n            ",
   "describe": {
     "columns": [
       {
@@ -56,6 +56,24 @@
           "flags": "NOT_NULL | UNSIGNED | BINARY",
           "max_size": 21
         }
+      },
+      {
+        "ordinal": 6,
+        "name": "is_donor: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "is_lifetime: bool",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "NOT_NULL",
+          "max_size": 1
+        }
       }
     ],
     "parameters": {
@@ -67,8 +85,10 @@
       false,
       false,
       false,
+      false,
+      false,
       false
     ]
   },
-  "hash": "d0701ebc6e47783b41512a2afa67a7dd38feb9d62e7c27709a66d94a3218657a"
+  "hash": "6389abd00531c2241beeab799e366953a8ed1251479ce4a341ccbd3b47ad4ad4"
 }
