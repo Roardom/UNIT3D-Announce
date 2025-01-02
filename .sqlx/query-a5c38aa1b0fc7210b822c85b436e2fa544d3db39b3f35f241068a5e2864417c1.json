@@ -8,8 +8,7 @@
         "name": "id: u32",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | PRIMARY_KEY | UNSIGNED | AUTO_INCREMENT",
-          "char_set": 63,
+          "flags": "NOT_NULL | PRIMARY_KEY | MULTIPLE_KEY | UNSIGNED | AUTO_INCREMENT",
           "max_size": 10
         }
       },
@@ -18,8 +17,7 @@
         "name": "status: Status",
         "type_info": {
           "type": "Short",
-          "flags": "NOT_NULL | MULTIPLE_KEY",
-          "char_set": 63,
+          "flags": "NOT_NULL",
           "max_size": 6
         }
       },
@@ -28,8 +26,7 @@
         "name": "seeders: u32",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | MULTIPLE_KEY",
-          "char_set": 63,
+          "flags": "NOT_NULL",
           "max_size": 11
         }
       },
@@ -38,8 +35,7 @@
         "name": "leechers: u32",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | MULTIPLE_KEY",
-          "char_set": 63,
+          "flags": "NOT_NULL",
           "max_size": 11
         }
       },
@@ -49,7 +45,6 @@
         "type_info": {
           "type": "Long",
           "flags": "NOT_NULL",
-          "char_set": 63,
           "max_size": 11
         }
       },
@@ -59,7 +54,6 @@
         "type_info": {
           "type": "LongLong",
           "flags": "NOT_NULL | BINARY",
-          "char_set": 63,
           "max_size": 7
         }
       },
@@ -69,7 +63,6 @@
         "type_info": {
           "type": "LongLong",
           "flags": "NOT_NULL | BINARY",
-          "char_set": 63,
           "max_size": 4
         }
       },
@@ -79,7 +72,6 @@
         "type_info": {
           "type": "LongLong",
           "flags": "NOT_NULL | BINARY",
-          "char_set": 63,
           "max_size": 2
         }
       }

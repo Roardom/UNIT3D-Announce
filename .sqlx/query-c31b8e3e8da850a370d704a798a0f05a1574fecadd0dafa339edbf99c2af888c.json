@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n                SELECT\n                    INET6_NTOA(peers.ip) as `ip_address: String`,\n                    peers.port as `port: u16`,\n                    COALESCE(MAX(peers.connectable), 0) as `connectable: bool`,\n                    MAX(peers.updated_at) as `updated_at: DateTime<Utc>`\n                FROM\n                    peers\n                GROUP BY\n                    peers.ip, peers.port\n            ",
+  "query": "\n                SELECT\n                    INET6_NTOA(peers.ip) as `ip_address: String`,\n                    peers.port as `port: u16`,\n                    COALESCE(MAX(peers.connectable), 0) as `connectable!: bool`,\n                    MAX(peers.updated_at) as `updated_at: DateTime<Utc>`\n                FROM\n                    peers\n                GROUP BY\n                    peers.ip, peers.port\n            ",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,6 @@
         "type_info": {
           "type": "VarString",
           "flags": "",
-          "char_set": 224,
           "max_size": 156
         }
       },
@@ -19,17 +18,15 @@
         "type_info": {
           "type": "Short",
           "flags": "NOT_NULL | UNSIGNED | NO_DEFAULT_VALUE",
-          "char_set": 63,
           "max_size": 5
         }
       },
       {
         "ordinal": 2,
-        "name": "connectable: bool",
+        "name": "connectable!: bool",
         "type_info": {
           "type": "LongLong",
           "flags": "NOT_NULL | BINARY",
-          "char_set": 63,
           "max_size": 4
         }
       },
@@ -39,7 +36,6 @@
         "type_info": {
           "type": "Timestamp",
           "flags": "",
-          "char_set": 224,
           "max_size": 76
         }
       }
@@ -54,5 +50,5 @@
       true
     ]
   },
-  "hash": "6c3c0ec4a3f8c287b5d14fcebf6c93409a4e5c82b6b7e9a5ae1c0a2b002674e2"
+  "hash": "c31b8e3e8da850a370d704a798a0f05a1574fecadd0dafa339edbf99c2af888c"
 }

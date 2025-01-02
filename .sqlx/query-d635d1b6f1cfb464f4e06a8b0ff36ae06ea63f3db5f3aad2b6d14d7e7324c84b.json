@@ -9,7 +9,6 @@
         "type_info": {
           "type": "Long",
           "flags": "NOT_NULL | PRIMARY_KEY | AUTO_INCREMENT",
-          "char_set": 63,
           "max_size": 11
         }
       },
@@ -19,8 +18,7 @@
         "type_info": {
           "type": "VarString",
           "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
-          "char_set": 224,
-          "max_size": 1020
+          "max_size": 360
         }
       },
       {
@@ -29,7 +27,6 @@
         "type_info": {
           "type": "Long",
           "flags": "MULTIPLE_KEY",
-          "char_set": 63,
           "max_size": 11
         }
       },
@@ -38,8 +35,7 @@
         "name": "is_immune: bool",
         "type_info": {
           "type": "Tiny",
-          "flags": "NOT_NULL",
-          "char_set": 63,
+          "flags": "NOT_NULL | NO_DEFAULT_VALUE",
           "max_size": 1
         }
       },
@@ -49,7 +45,6 @@
         "type_info": {
           "type": "LongLong",
           "flags": "NOT_NULL | BINARY",
-          "char_set": 63,
           "max_size": 4
         }
       },
@@ -59,7 +54,6 @@
         "type_info": {
           "type": "LongLong",
           "flags": "NOT_NULL | BINARY",
-          "char_set": 63,
           "max_size": 4
         }
       }

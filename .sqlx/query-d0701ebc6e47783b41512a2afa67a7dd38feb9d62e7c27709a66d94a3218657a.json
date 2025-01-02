@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n                SELECT\n                    users.id as `id: u32`,\n                    users.group_id as `group_id: i32`,\n                    users.passkey as `passkey: Passkey`,\n                    users.can_download as `can_download: bool`,\n                    CAST(COALESCE(SUM(peers.seeder = 1 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED) as `num_seeding: u32`,\n                    CAST(COALESCE(SUM(peers.seeder = 0 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED) as `num_leeching: u32`\n                FROM\n                    users\n                LEFT JOIN\n                    peers\n                ON\n                    users.id = peers.user_id\n                WHERE\n                    users.deleted_at IS NULL\n                GROUP BY\n                    users.id\n            ",
+  "query": "\n                SELECT\n                    users.id as `id: u32`,\n                    users.group_id as `group_id: i32`,\n                    users.passkey as `passkey: Passkey`,\n                    users.can_download as `can_download: bool`,\n                    CAST(COALESCE(SUM(peers.seeder = 1 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED) as `num_seeding!: u32`,\n                    CAST(COALESCE(SUM(peers.seeder = 0 AND peers.active = 1 AND peers.visible = 1), 0) AS UNSIGNED) as `num_leeching!: u32`\n                FROM\n                    users\n                LEFT JOIN\n                    peers\n                ON\n                    users.id = peers.user_id\n                WHERE\n                    users.deleted_at IS NULL\n                GROUP BY\n                    users.id\n            ",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,6 @@
         "type_info": {
           "type": "Long",
           "flags": "NOT_NULL | PRIMARY_KEY | UNSIGNED | AUTO_INCREMENT",
-          "char_set": 63,
           "max_size": 10
         }
       },
@@ -19,7 +18,6 @@
         "type_info": {
           "type": "Long",
           "flags": "NOT_NULL | MULTIPLE_KEY | NO_DEFAULT_VALUE",
-          "char_set": 63,
           "max_size": 11
         }
       },
@@ -28,9 +26,8 @@
         "name": "passkey: Passkey",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
-          "char_set": 224,
-          "max_size": 1020
+          "flags": "NOT_NULL | UNIQUE_KEY | MULTIPLE_KEY | NO_DEFAULT_VALUE",
+          "max_size": 160
         }
       },
       {
@@ -39,27 +36,24 @@
         "type_info": {
           "type": "Tiny",
           "flags": "NOT_NULL",
-          "char_set": 63,
           "max_size": 1
         }
       },
       {
         "ordinal": 4,
-        "name": "num_seeding: u32",
+        "name": "num_seeding!: u32",
         "type_info": {
           "type": "LongLong",
           "flags": "NOT_NULL | UNSIGNED | BINARY",
-          "char_set": 63,
           "max_size": 21
         }
       },
       {
         "ordinal": 5,
-        "name": "num_leeching: u32",
+        "name": "num_leeching!: u32",
         "type_info": {
           "type": "LongLong",
           "flags": "NOT_NULL | UNSIGNED | BINARY",
-          "char_set": 63,
           "max_size": 21
         }
       }
@@ -76,5 +70,5 @@
       false
     ]
   },
-  "hash": "1ecd40b48e0749b55ce5e5ffd40743edbe79f4527ecf0f01e7dbad47eda04748"
+  "hash": "d0701ebc6e47783b41512a2afa67a7dd38feb9d62e7c27709a66d94a3218657a"
 }

@@ -8,8 +8,7 @@
         "name": "id: u32",
         "type_info": {
           "type": "Long",
-          "flags": "NOT_NULL | PRIMARY_KEY | UNSIGNED | AUTO_INCREMENT",
-          "char_set": 63,
+          "flags": "NOT_NULL | PRIMARY_KEY | MULTIPLE_KEY | UNSIGNED | AUTO_INCREMENT",
           "max_size": 10
         }
       },
@@ -19,7 +18,6 @@
         "type_info": {
           "type": "String",
           "flags": "NOT_NULL | MULTIPLE_KEY | BINARY | NO_DEFAULT_VALUE",
-          "char_set": 63,
           "max_size": 20
         }
       }

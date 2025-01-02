@@ -9,7 +9,6 @@
         "type_info": {
           "type": "Long",
           "flags": "NOT_NULL | PRIMARY_KEY | UNSIGNED | AUTO_INCREMENT",
-          "char_set": 63,
           "max_size": 10
         }
       },
@@ -18,9 +17,8 @@
         "name": "passkey: Passkey",
         "type_info": {
           "type": "VarString",
-          "flags": "NOT_NULL | UNIQUE_KEY | NO_DEFAULT_VALUE",
-          "char_set": 224,
-          "max_size": 1020
+          "flags": "NOT_NULL | UNIQUE_KEY | MULTIPLE_KEY | NO_DEFAULT_VALUE",
+          "max_size": 160
         }
       }
     ],
