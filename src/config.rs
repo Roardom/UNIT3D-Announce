@@ -1,8 +1,15 @@
-use std::{env, net::IpAddr, num::NonZeroU64};
+use std::{env, net::IpAddr, num::NonZeroU64, sync::Arc};
 
 use anyhow::{bail, Context, Result};
+use axum::{
+    extract::State,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
+use dotenvy::dotenv_override;
+use tracing::{error, info};
 
-use crate::rate::RateCollection;
+use crate::{rate::RateCollection, tracker::Tracker};
 
 #[derive(Clone)]
 pub struct Config {
@@ -291,5 +298,36 @@ impl Config {
             lifetime_donor_upload_factor_override,
             lifetime_donor_download_factor_override,
         })
+    }
+
+    pub async fn reload(State(tracker): State<Arc<Tracker>>) -> Response {
+        info!("Reloading config.",);
+
+        if let Ok(_) = dotenv_override() {
+            let mut config = tracker.config.write();
+
+            match Config::from_env() {
+                Ok(new_config) => {
+                    *config = new_config;
+
+                    info!("Successfully reloaded config.");
+
+                    return (StatusCode::OK, "Successfully reloaded config.").into_response();
+                }
+                Err(e) => {
+                    error!("Ignoring config reload. Failed to parse config: {e}");
+
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Ignoring config reload. Failed to parse config: {e}"),
+                    )
+                        .into_response();
+                }
+            }
+        } else {
+            error!(".env file not found.");
+
+            return (StatusCode::INTERNAL_SERVER_ERROR, ".env file not found.").into_response();
+        }
     }
 }

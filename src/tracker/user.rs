@@ -87,13 +87,14 @@ impl Map {
         info!("Received user: {}", user.id);
         if let Ok(passkey) = Passkey::from_str(&user.passkey) {
             info!("Inserting user with id {}.", user.id);
+            let config = tracker.config.read();
             let old_user = tracker.users.write().swap_remove(&user.id);
             let (receive_seed_list_rates, receive_leech_list_rates) = old_user
                 .map(|user| (user.receive_seed_list_rates, user.receive_leech_list_rates))
                 .unwrap_or_else(|| {
                     (
-                        tracker.config.user_receive_seed_list_rate_limits.clone(),
-                        tracker.config.user_receive_leech_list_rate_limits.clone(),
+                        config.user_receive_seed_list_rate_limits.clone(),
+                        config.user_receive_leech_list_rate_limits.clone(),
                     )
                 });
 

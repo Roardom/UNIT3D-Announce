@@ -25,11 +25,11 @@ pub async fn handle(tracker: &Arc<Tracker>) {
         interval.tick().await;
         counter += 1;
 
-        if counter % tracker.config.flush_interval_milliseconds == 0 {
+        if counter % tracker.config.read().flush_interval_milliseconds == 0 {
             flush(tracker).await;
         }
 
-        if counter % (tracker.config.peer_expiry_interval * 1000) == 0 {
+        if counter % (tracker.config.read().peer_expiry_interval * 1000) == 0 {
             reap(tracker).await;
         }
     }
@@ -52,13 +52,10 @@ async fn flush_history_updates(tracker: &Arc<Tracker>) {
     let history_update_batch = tracker.history_updates.lock().take_batch();
     let start = Instant::now();
     let len = history_update_batch.len();
+    let seedtime_ttl =
+        tracker.config.read().active_peer_ttl + tracker.config.read().peer_expiry_interval;
     let result = history_update_batch
-        .flush_to_db(
-            &tracker.pool,
-            HistoryUpdateExtraBindings {
-                seedtime_ttl: tracker.config.active_peer_ttl + tracker.config.peer_expiry_interval,
-            },
-        )
+        .flush_to_db(&tracker.pool, HistoryUpdateExtraBindings { seedtime_ttl })
         .await;
     let elapsed = start.elapsed().as_millis();
 
@@ -185,9 +182,9 @@ async fn flush_unregistered_info_hash_updates(tracker: &Arc<Tracker>) {
 
 /// Remove peers that have not announced for some time
 pub async fn reap(tracker: &Arc<Tracker>) {
-    let ttl = Duration::seconds(tracker.config.active_peer_ttl.try_into().unwrap());
+    let ttl = Duration::seconds(tracker.config.read().active_peer_ttl.try_into().unwrap());
     let active_cutoff = Utc::now().checked_sub_signed(ttl).unwrap();
-    let ttl = Duration::seconds(tracker.config.inactive_peer_ttl.try_into().unwrap());
+    let ttl = Duration::seconds(tracker.config.read().inactive_peer_ttl.try_into().unwrap());
     let inactive_cutoff = Utc::now().checked_sub_signed(ttl).unwrap();
 
     for (_index, torrent) in tracker.torrents.lock().iter_mut() {

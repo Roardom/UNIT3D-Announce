@@ -177,6 +177,8 @@ where
             .await
             .or(Err(InternalTrackerError))?;
 
+        let config = tracker.config.read();
+
         Ok(Query(Announce {
             info_hash: info_hash.ok_or(MissingInfoHash)?,
             peer_id: peer_id.ok_or(MissingPeerId)?,
@@ -190,8 +192,8 @@ where
                     0
                 } else {
                     numwant
-                        .unwrap_or(tracker.config.numwant_default)
-                        .min(tracker.config.numwant_max)
+                        .unwrap_or(config.numwant_default)
+                        .min(config.numwant_max)
                 }
             },
             corrupt,
@@ -209,7 +211,13 @@ impl FromRequestParts<Arc<Tracker>> for ClientIp {
         parts: &mut Parts,
         state: &Arc<Tracker>,
     ) -> Result<Self, Self::Rejection> {
-        let ip = if let Some(header) = &state.config.reverse_proxy_client_ip_header_name {
+        let header_name_opt = &state
+            .config
+            .read()
+            .reverse_proxy_client_ip_header_name
+            .to_owned();
+
+        let ip = if let Some(header) = &header_name_opt {
             // We need the right-most ip, which should be included in the last header
             parts
                 .headers
@@ -347,7 +355,9 @@ pub async fn announce(
 
     let mut warnings: Vec<AnnounceWarning> = Vec::new();
 
-    if !is_connectable && tracker.config.require_peer_connectivity {
+    let config = tracker.config.read();
+
+    if !is_connectable && config.require_peer_connectivity {
         warnings.push(AnnounceWarning::ConnectivityIssueDetected);
     }
 
@@ -437,8 +447,8 @@ pub async fn announce(
                 uploaded_delta = queries.uploaded.saturating_sub(peer.uploaded);
                 downloaded_delta = queries.downloaded.saturating_sub(peer.downloaded);
 
-                leecher_delta = 0 - peer.is_included_in_leech_list(&tracker.config) as i32;
-                seeder_delta = 0 - peer.is_included_in_seed_list(&tracker.config) as i32;
+                leecher_delta = 0 - peer.is_included_in_leech_list(&config) as i32;
+                seeder_delta = 0 - peer.is_included_in_seed_list(&config) as i32;
             } else {
                 // Some clients (namely transmission) will keep sending
                 // `stopped` events until a successful announce is received.
@@ -475,8 +485,8 @@ pub async fn announce(
                     peer.port = queries.port;
                     peer.is_seeder = queries.left == 0;
                     peer.is_connectable = is_connectable;
-                    peer.is_visible = peer.is_included_in_leech_list(&tracker.config)
-                        || !has_hit_download_slot_limit;
+                    peer.is_visible =
+                        peer.is_included_in_leech_list(&config) || !has_hit_download_slot_limit;
                     peer.is_active = true;
                     peer.updated_at = Utc::now();
                     peer.uploaded = queries.uploaded;
@@ -507,10 +517,10 @@ pub async fn announce(
             // in-memory db
             match old_peer {
                 Some(old_peer) => {
-                    leecher_delta = new_peer.is_included_in_leech_list(&tracker.config) as i32
-                        - old_peer.is_included_in_leech_list(&tracker.config) as i32;
-                    seeder_delta = new_peer.is_included_in_seed_list(&tracker.config) as i32
-                        - old_peer.is_included_in_seed_list(&tracker.config) as i32;
+                    leecher_delta = new_peer.is_included_in_leech_list(&config) as i32
+                        - old_peer.is_included_in_leech_list(&config) as i32;
+                    seeder_delta = new_peer.is_included_in_seed_list(&config) as i32
+                        - old_peer.is_included_in_seed_list(&config) as i32;
                     times_completed_delta = (new_peer.is_seeder && !old_peer.is_seeder) as u32;
 
                     // Calculate change in upload and download compared to previous
@@ -531,7 +541,7 @@ pub async fn announce(
                     // Warn user if peer last announced less than announce_min seconds ago
                     if old_peer
                         .updated_at
-                        .checked_add_signed(Duration::seconds(tracker.config.announce_min.into()))
+                        .checked_add_signed(Duration::seconds(config.announce_min.into()))
                         .is_some_and(|blocked_until| blocked_until > Utc::now())
                     {
                         warnings.push(AnnounceWarning::RateLimitExceeded);
@@ -547,21 +557,21 @@ pub async fn announce(
                         if peer.user_id == user_id && peer.is_active {
                             peer_count += 1;
 
-                            if peer_count >= tracker.config.max_peers_per_torrent_per_user {
+                            if peer_count >= config.max_peers_per_torrent_per_user {
                                 torrent.peers.swap_remove(&tracker::peer::Index {
                                     user_id,
                                     peer_id: queries.peer_id,
                                 });
 
                                 return Err(PeersPerTorrentPerUserLimit(
-                                    tracker.config.max_peers_per_torrent_per_user,
+                                    config.max_peers_per_torrent_per_user,
                                 ));
                             }
                         }
                     }
 
-                    leecher_delta = new_peer.is_included_in_leech_list(&tracker.config) as i32;
-                    seeder_delta = new_peer.is_included_in_seed_list(&tracker.config) as i32;
+                    leecher_delta = new_peer.is_included_in_leech_list(&config) as i32;
+                    seeder_delta = new_peer.is_included_in_seed_list(&config) as i32;
                     times_completed_delta = 0;
 
                     // Calculate change in upload and download compared to previous
@@ -599,7 +609,7 @@ pub async fn announce(
 
             // Don't return peers with the same user id or those that are marked as inactive
             let valid_peers = torrent.peers.iter().filter(|(_index, peer)| {
-                peer.user_id != user_id && peer.is_included_in_peer_list(&tracker.config)
+                peer.user_id != user_id && peer.is_included_in_peer_list(&config)
             });
 
             // Make sure leech peer lists are filled with seeds
@@ -650,8 +660,7 @@ pub async fn announce(
 
         // Generate bencoded response to return to client
 
-        let interval =
-            thread_rng().gen_range(tracker.config.announce_min..=tracker.config.announce_max);
+        let interval = thread_rng().gen_range(config.announce_min..=config.announce_max);
 
         // Write out bencoded response (keys must be sorted to be within spec)
         let mut response: Vec<u8> = Vec::with_capacity(
@@ -670,7 +679,7 @@ pub async fn announce(
         response.extend(b"e8:intervali");
         response.extend(interval.to_string().as_bytes());
         response.extend(b"e12:min intervali");
-        response.extend(tracker.config.announce_min.to_string().as_bytes());
+        response.extend(config.announce_min.to_string().as_bytes());
         response.extend(b"e5:peers");
 
         if peers_ipv4.is_empty() {
@@ -705,33 +714,29 @@ pub async fn announce(
         response.extend(b"e");
 
         let mut upload_factor = std::cmp::max(
-            tracker.config.upload_factor,
+            config.upload_factor,
             std::cmp::max(group.upload_factor, torrent.upload_factor),
         );
 
         let mut download_factor = std::cmp::min(
-            tracker.config.download_factor,
+            config.download_factor,
             std::cmp::min(group.download_factor, torrent.download_factor),
         );
 
         if user.is_lifetime {
-            if let Some(override_upload_factor) =
-                tracker.config.lifetime_donor_upload_factor_override
-            {
+            if let Some(override_upload_factor) = config.lifetime_donor_upload_factor_override {
                 upload_factor = std::cmp::max(upload_factor, override_upload_factor)
             }
 
-            if let Some(override_download_factor) =
-                tracker.config.lifetime_donor_download_factor_override
-            {
+            if let Some(override_download_factor) = config.lifetime_donor_download_factor_override {
                 download_factor = std::cmp::min(download_factor, override_download_factor)
             }
         } else if user.is_donor {
-            if let Some(override_upload_factor) = tracker.config.donor_upload_factor_override {
+            if let Some(override_upload_factor) = config.donor_upload_factor_override {
                 upload_factor = std::cmp::max(upload_factor, override_upload_factor)
             }
 
-            if let Some(override_download_factor) = tracker.config.donor_download_factor_override {
+            if let Some(override_download_factor) = config.donor_download_factor_override {
                 download_factor = std::cmp::min(download_factor, override_download_factor)
             }
         }
@@ -853,15 +858,11 @@ pub async fn announce(
         is_active: queries.event != Event::Stopped,
         is_seeder: queries.left == 0,
         is_immune: if user.is_lifetime {
-            tracker
-                .config
+            config
                 .lifetime_donor_immunity_override
                 .unwrap_or(group.is_immune)
         } else if user.is_donor {
-            tracker
-                .config
-                .donor_immunity_override
-                .unwrap_or(group.is_immune)
+            config.donor_immunity_override.unwrap_or(group.is_immune)
         } else {
             group.is_immune
         },
@@ -898,7 +899,7 @@ pub async fn announce(
         });
     }
 
-    if tracker.config.is_announce_logging_enabled {
+    if config.is_announce_logging_enabled {
         tracker.announce_updates.lock().upsert(AnnounceUpdate {
             user_id,
             torrent_id,
@@ -920,13 +921,13 @@ pub async fn announce(
 }
 
 async fn check_connectivity(tracker: &Arc<Tracker>, ip: IpAddr, port: u16) -> bool {
-    if tracker.config.is_connectivity_check_enabled {
+    if tracker.config.read().is_connectivity_check_enabled {
         let now = Utc::now();
         let socket = SocketAddr::from((ip, port));
         let connectable_port_opt = tracker.connectable_ports.read().get(&socket).cloned();
 
         if let Some(connectable_port) = connectable_port_opt {
-            let ttl = Duration::seconds(tracker.config.connectivity_check_interval);
+            let ttl = Duration::seconds(tracker.config.read().connectivity_check_interval);
 
             if let Some(cached_until) = connectable_port.updated_at.checked_add_signed(ttl) {
                 if cached_until > now {

@@ -134,6 +134,16 @@ UPLOAD_FACTOR=200
 DOWNLOAD_FACTOR=0
 ```
 
+## Configuration
+
+### Reload
+
+To reload the configuration without restarting the tracker, send the following curl:
+
+```sh
+curl -X POST "http://<LISTENING_IP_ADDRESS>:<LISTENING_PORT>/announce/<APIKEY>/config/reload"
+```
+
 ## Performance
 
 UNIT3D's PHP announce can handle ~250 HTTP requests per second per core on modern hardware.

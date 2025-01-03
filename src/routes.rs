@@ -2,12 +2,14 @@ use std::sync::Arc;
 
 use axum::{
     middleware::from_fn_with_state,
-    routing::{get, put},
+    routing::{get, post, put},
     Router,
 };
 
 use crate::{
-    announce, stats,
+    announce,
+    config::Config,
+    stats,
     tracker::{self, Tracker},
 };
 
@@ -18,7 +20,7 @@ pub fn routes(state: Arc<Tracker>) -> Router<Arc<Tracker>> {
             Router::new()
                 .route("/{passkey}", get(announce::announce))
                 .nest(
-                    &("/".to_string() + &state.config.apikey),
+                    &("/".to_string() + &state.config.read().apikey),
                     Router::new()
                         .route(
                             "/torrents",
@@ -55,7 +57,8 @@ pub fn routes(state: Arc<Tracker>) -> Router<Arc<Tracker>> {
                             put(tracker::featured_torrent::Set::upsert)
                                 .delete(tracker::featured_torrent::Set::destroy),
                         )
-                        .route("/stats", get(crate::stats::show)),
+                        .route("/stats", get(crate::stats::show))
+                        .route("/config/reload", post(Config::reload)),
                 ),
         )
         .layer(from_fn_with_state(state.clone(), stats::record_request))

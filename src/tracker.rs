@@ -36,7 +36,7 @@ use std::{env, sync::Arc, time::Duration};
 pub struct Tracker {
     pub agent_blacklist: RwLock<blacklisted_agent::Set>,
     pub announce_updates: Mutex<announce_update::Queue>,
-    pub config: config::Config,
+    pub config: RwLock<config::Config>,
     pub connectable_ports: RwLock<connectable_port::Map>,
     pub featured_torrents: RwLock<featured_torrent::Set>,
     pub freeleech_tokens: RwLock<freeleech_token::Set>,
@@ -151,7 +151,7 @@ impl Tracker {
         Ok(Arc::new(Tracker {
             agent_blacklist: RwLock::new(agent_blacklist),
             announce_updates: Mutex::new(announce_update::Queue::new()),
-            config,
+            config: RwLock::new(config),
             connectable_ports: RwLock::new(connectable_ports),
             freeleech_tokens: RwLock::new(freeleech_tokens),
             featured_torrents: RwLock::new(featured_torrents),

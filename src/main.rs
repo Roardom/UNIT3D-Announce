@@ -60,8 +60,8 @@ async fn main() -> Result<()> {
 
     // Listening socket address.
     let addr = SocketAddr::from((
-        tracker.config.listening_ip_address,
-        tracker.config.listening_port,
+        tracker.config.read().listening_ip_address,
+        tracker.config.read().listening_port,
     ));
 
     // Start handling announces.
