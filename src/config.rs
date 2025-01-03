@@ -25,6 +25,9 @@ pub struct Config {
     /// A random amount of seconds between announce_min and announce_max will
     /// be returned to the peer for the next time they should announce.
     pub announce_min: u32,
+    /// If a user announces before this many seconds after their previous
+    /// announce, then they will receive a rate limit error.
+    pub announce_min_enforced: u32,
     /// A random amount of seconds between announce_min and announce_max will
     /// be returned to the peer for the next time they should announce.
     pub announce_max: u32,
@@ -132,6 +135,11 @@ impl Config {
             .context("ANNOUNCE_MIN not found in .env file.")?
             .parse()
             .context("ANNOUNCE_MIN must be a number between 0 and 2^32 - 1")?;
+
+        let announce_min_enforced = env::var("ANNOUNCE_MIN_ENFORCED")
+            .context("ANNOUNCE_MIN_ENFORCED not found in .env file.")?
+            .parse()
+            .context("ANNOUNCE_MIN_ENFORCED must be a number between 0 and 2^32 - 1")?;
 
         let announce_max = env::var("ANNOUNCE_MAX")
             .context("ANNOUNCE_MAX not found in .env file.")?
@@ -274,6 +282,7 @@ impl Config {
             numwant_default,
             numwant_max,
             announce_min,
+            announce_min_enforced,
             announce_max,
             upload_factor,
             download_factor,

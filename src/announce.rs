@@ -538,10 +538,11 @@ pub async fn announce(
                         downloaded_delta = queries.downloaded - old_peer.downloaded;
                     }
 
-                    // Warn user if peer last announced less than announce_min seconds ago
+                    // Warn user if peer last announced less than
+                    // announce_min_enforced seconds ago
                     if old_peer
                         .updated_at
-                        .checked_add_signed(Duration::seconds(config.announce_min.into()))
+                        .checked_add_signed(Duration::seconds(config.announce_min_enforced.into()))
                         .is_some_and(|blocked_until| blocked_until > Utc::now())
                     {
                         warnings.push(AnnounceWarning::RateLimitExceeded);
