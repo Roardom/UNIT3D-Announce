@@ -144,6 +144,27 @@ To reload the configuration without restarting the tracker, send the following c
 curl -X POST "http://<LISTENING_IP_ADDRESS>:<LISTENING_PORT>/announce/<APIKEY>/config/reload"
 ```
 
+## Uninstall
+
+To uninstall UNIT3D-announce, you need to [exit the tracker](#exiting-unit3d-announce) and then:
+
+```sh
+# Disable the external tracker in UNIT3D's config
+$ sudo nano /var/www/html/config/announce.php
+
+# Remove any potential `location /announce/` block from the nginx configuration
+$ sudo nano /etc/nginx/sites-enabled/default
+
+# Remove any potential `[program:unit3d-announce]` block from the supervisor configuration
+$ sudo nano /etc/supervisor/conf.d/unit3d.conf
+
+# Remove tracker files
+$ sudo rm -rf /var/www/html/unit3d-announce
+
+# Remove .env values from UNIT3D (`TRACKER_HOST`, `TRACKER_PORT`, and `TRACKER_KEY`)
+$ sudo nano /var/www/html/.env
+```
+
 ## Performance
 
 UNIT3D's PHP announce can handle ~250 HTTP requests per second per core on modern hardware.
