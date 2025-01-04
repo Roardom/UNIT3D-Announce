@@ -48,7 +48,7 @@ $ sudo nano /etc/nginx/sites-enabled/default
 Paste the following `location` block into the first `server` block immediately after the last existing `location` block.
 
 ```nginx
-     location /announce/ {
+    location /announce/ {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header Host $host;
