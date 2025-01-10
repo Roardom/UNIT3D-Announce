@@ -335,9 +335,8 @@ pub async fn announce(
     if let Ok(user) = &user {
         if let Err(InfoHashNotFound) = torrent_id_res {
             tracker
-                .unregistered_info_hash_updates
-                .lock()
-                .upsert(UnregisteredInfoHashUpdate {
+                .unregistered_info_hash_update_tx
+                .send(UnregisteredInfoHashUpdate {
                     user_id: user.id,
                     info_hash: queries.info_hash,
                     updated_at: Utc::now(),
@@ -831,7 +830,7 @@ pub async fn announce(
         });
     }
 
-    tracker.peer_updates.lock().upsert(PeerUpdate {
+    tracker.peer_update_tx.send(PeerUpdate {
         peer_id: queries.peer_id,
         ip: client_ip,
         port: queries.port,
@@ -848,7 +847,7 @@ pub async fn announce(
         connectable: is_connectable,
     });
 
-    tracker.history_updates.lock().upsert(HistoryUpdate {
+    tracker.history_update_tx.send(HistoryUpdate {
         user_id,
         torrent_id,
         user_agent: String::from(user_agent),
@@ -873,7 +872,7 @@ pub async fn announce(
     });
 
     if credited_uploaded_delta != 0 || credited_downloaded_delta != 0 {
-        tracker.user_updates.lock().upsert(UserUpdate {
+        tracker.user_update_tx.send(UserUpdate {
             user_id,
             uploaded_delta: credited_uploaded_delta,
             downloaded_delta: credited_downloaded_delta,
@@ -886,7 +885,7 @@ pub async fn announce(
         || uploaded_delta != 0
         || downloaded_delta != 0
     {
-        tracker.torrent_updates.lock().upsert(TorrentUpdate {
+        tracker.torrent_update_tx.send(TorrentUpdate {
             torrent_id,
             seeder_delta,
             leecher_delta,
@@ -897,7 +896,7 @@ pub async fn announce(
     }
 
     if config.is_announce_logging_enabled {
-        tracker.announce_updates.lock().upsert(AnnounceUpdate {
+        tracker.announce_update_tx.send(AnnounceUpdate {
             user_id,
             torrent_id,
             uploaded: queries.uploaded,

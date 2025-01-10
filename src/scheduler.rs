@@ -11,7 +11,7 @@ use crate::tracker::Tracker;
 use chrono::{Duration, Utc};
 use indexmap::{map::Values, IndexMap};
 use sqlx::MySqlPool;
-use tokio::{join, time::Instant};
+use tokio::{join, sync::mpsc, time::Instant};
 use torrent_update::TorrentUpdate;
 use tracing::info;
 
@@ -229,7 +229,7 @@ pub async fn reap(tracker: &Arc<Tracker>) {
             torrent.seeders = torrent.seeders.saturating_add_signed(seeder_delta);
             torrent.leechers = torrent.leechers.saturating_add_signed(leecher_delta);
 
-            tracker.torrent_updates.lock().upsert(TorrentUpdate {
+            tracker.torrent_update_tx.send(TorrentUpdate {
                 torrent_id: torrent.id,
                 seeder_delta,
                 leecher_delta,
@@ -243,6 +243,7 @@ pub async fn reap(tracker: &Arc<Tracker>) {
 pub struct Queue<K, V> {
     records: IndexMap<K, V>,
     config: QueueConfig,
+    receiver: mpsc::UnboundedReceiver<V>,
 }
 
 pub struct QueueConfig {
@@ -264,10 +265,11 @@ where
     Queue<K, V>: Upsertable<V>,
 {
     /// Initialize a new queue
-    pub fn new(config: QueueConfig) -> Queue<K, V> {
+    pub fn new(config: QueueConfig, receiver: mpsc::UnboundedReceiver<V>) -> Queue<K, V> {
         Self {
             records: IndexMap::new(),
             config,
+            receiver,
         }
     }
 
@@ -292,6 +294,12 @@ where
 
     pub fn is_not_empty(&self) -> bool {
         !self.records.is_empty()
+    }
+
+    pub async fn run(&mut self) {
+        while let Some(message) = self.receiver.recv().await {
+            self.upsert(message);
+        }
     }
 }
 

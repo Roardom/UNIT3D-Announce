@@ -14,8 +14,10 @@ pub use peer::Peer;
 use sqlx::{MySql, MySqlPool, QueryBuilder};
 
 use anyhow::{Context, Result};
+use tokio::sync::mpsc;
 
 use crate::config;
+use crate::scheduler::announce_update::AnnounceUpdate;
 use crate::scheduler::unregistered_info_hash_update::{self, UnregisteredInfoHashUpdate};
 use crate::scheduler::{
     announce_update,
@@ -35,26 +37,25 @@ use std::{env, sync::Arc, time::Duration};
 
 pub struct Tracker {
     pub agent_blacklist: RwLock<blacklisted_agent::Set>,
-    pub announce_updates: Mutex<announce_update::Queue>,
+    pub announce_update_tx: mpsc::UnboundedSender<AnnounceUpdate>,
     pub config: RwLock<config::Config>,
     pub connectable_ports: RwLock<connectable_port::Map>,
     pub featured_torrents: RwLock<featured_torrent::Set>,
     pub freeleech_tokens: RwLock<freeleech_token::Set>,
     pub groups: RwLock<group::Map>,
-    pub history_updates: Mutex<Queue<history_update::Index, HistoryUpdate>>,
+    pub history_update_tx: mpsc::UnboundedSender<HistoryUpdate>,
     pub infohash2id: RwLock<torrent::infohash2id::Map>,
     pub passkey2id: RwLock<user::passkey2id::Map>,
-    pub peer_updates: Mutex<Queue<peer_update::Index, PeerUpdate>>,
+    pub peer_update_tx: mpsc::UnboundedSender<PeerUpdate>,
     pub personal_freeleeches: RwLock<personal_freeleech::Set>,
     pub pool: MySqlPool,
     pub port_blacklist: RwLock<blacklisted_port::Set>,
     pub stats: Stats,
     pub torrents: Mutex<torrent::Map>,
-    pub torrent_updates: Mutex<Queue<torrent_update::Index, TorrentUpdate>>,
-    pub unregistered_info_hash_updates:
-        Mutex<Queue<unregistered_info_hash_update::Index, UnregisteredInfoHashUpdate>>,
+    pub torrent_update_tx: mpsc::UnboundedSender<TorrentUpdate>,
+    pub unregistered_info_hash_update_tx: mpsc::UnboundedSender<UnregisteredInfoHashUpdate>,
     pub users: RwLock<user::Map>,
-    pub user_updates: Mutex<Queue<user_update::Index, UserUpdate>>,
+    pub user_update_tx: mpsc::UnboundedSender<UserUpdate>,
 }
 
 impl Tracker {
@@ -148,55 +149,83 @@ impl Tracker {
 
         let stats = Stats::default();
 
+        let (announce_update_tx, announce_update_rx) = mpsc::unbounded_channel::<AnnounceUpdate>();
+        let (history_update_tx, history_update_rx) = mpsc::unbounded_channel::<HistoryUpdate>();
+        let (peer_update_tx, peer_update_rx) = mpsc::unbounded_channel::<PeerUpdate>();
+        let (torrent_update_tx, torrent_update_rx) = mpsc::unbounded_channel::<TorrentUpdate>();
+        let (unregistered_info_hash_update_tx, unregistered_info_hash_update_rx) =
+            mpsc::unbounded_channel::<UnregisteredInfoHashUpdate>();
+        let (user_update_tx, user_update_rx) = mpsc::unbounded_channel::<UserUpdate>();
+
+        let announce_updates = announce_update::Queue::new();
+        let history_updates = Queue::<history_update::Index, HistoryUpdate>::new(
+            QueueConfig {
+                max_bindings_per_flush: 65_535,
+                bindings_per_record: 16,
+                // 1 extra binding is used to insert the TTL
+                extra_bindings_per_flush: 1,
+            },
+            history_update_rx,
+        );
+
+        let peer_updates = Queue::<peer_update::Index, PeerUpdate>::new(
+            QueueConfig {
+                max_bindings_per_flush: 65_535,
+                bindings_per_record: 15,
+                extra_bindings_per_flush: 0,
+            },
+            peer_update_rx,
+        );
+
+        let torrent_updates = Queue::<torrent_update::Index, TorrentUpdate>::new(
+            QueueConfig {
+                max_bindings_per_flush: 65_535,
+                bindings_per_record: 15,
+                extra_bindings_per_flush: 0,
+            },
+            torrent_update_rx,
+        );
+
+        let unregistered_info_hash_updates =
+            Queue::<unregistered_info_hash_update::Index, UnregisteredInfoHashUpdate>::new(
+                QueueConfig {
+                    max_bindings_per_flush: 65_535,
+                    bindings_per_record: 4,
+                    extra_bindings_per_flush: 0,
+                },
+                unregistered_info_hash_update_rx,
+            );
+
+        let user_updates = Queue::<user_update::Index, UserUpdate>::new(
+            QueueConfig {
+                max_bindings_per_flush: 65_535,
+                bindings_per_record: 9,
+                extra_bindings_per_flush: 0,
+            },
+            user_update_rx,
+        );
+
         Ok(Arc::new(Tracker {
             agent_blacklist: RwLock::new(agent_blacklist),
-            announce_updates: Mutex::new(announce_update::Queue::new()),
+            announce_update_tx,
             config: RwLock::new(config),
             connectable_ports: RwLock::new(connectable_ports),
             freeleech_tokens: RwLock::new(freeleech_tokens),
             featured_torrents: RwLock::new(featured_torrents),
             groups: RwLock::new(groups),
-            history_updates: Mutex::new(Queue::<history_update::Index, HistoryUpdate>::new(
-                QueueConfig {
-                    max_bindings_per_flush: 65_535,
-                    bindings_per_record: 16,
-                    // 1 extra binding is used to insert the TTL
-                    extra_bindings_per_flush: 1,
-                },
-            )),
+            history_update_tx,
             infohash2id: RwLock::new(infohash2id),
             passkey2id: RwLock::new(passkey2id),
-            peer_updates: Mutex::new(Queue::<peer_update::Index, PeerUpdate>::new(QueueConfig {
-                max_bindings_per_flush: 65_535,
-                bindings_per_record: 15,
-                extra_bindings_per_flush: 0,
-            })),
+            peer_update_tx,
             personal_freeleeches: RwLock::new(personal_freeleeches),
             pool,
             port_blacklist: RwLock::new(port_blacklist),
             stats,
             torrents: Mutex::new(torrents),
-            torrent_updates: Mutex::new(Queue::<torrent_update::Index, TorrentUpdate>::new(
-                QueueConfig {
-                    max_bindings_per_flush: 65_535,
-                    bindings_per_record: 15,
-                    extra_bindings_per_flush: 0,
-                },
-            )),
-            unregistered_info_hash_updates: Mutex::new(Queue::<
-                unregistered_info_hash_update::Index,
-                UnregisteredInfoHashUpdate,
-            >::new(QueueConfig {
-                max_bindings_per_flush: 65_535,
-                bindings_per_record: 4,
-                extra_bindings_per_flush: 0,
-            })),
+            torrent_update_tx,
+            unregistered_info_hash_update_tx,
             users: RwLock::new(users),
-            user_updates: Mutex::new(Queue::<user_update::Index, UserUpdate>::new(QueueConfig {
-                max_bindings_per_flush: 65_535,
-                bindings_per_record: 9,
-                extra_bindings_per_flush: 0,
-            })),
+            user_update_tx,
         }))
     }
 }
