@@ -43,14 +43,14 @@ async fn main() -> Result<()> {
     // The Tracker struct keeps track of all state within the application.
     let tracker = tracker::Tracker::default().await?;
 
-    // Clone the tracker so that it can be passed to the scheduler.
-    let tracker_clone = tracker.clone();
-    let tracker_clone2 = tracker.clone();
-
     // Starts scheduler to automate flushing updates
     // to database and inactive peer removal.
-    let _handle = tokio::spawn(async move {
-        scheduler::handle(&tracker_clone.clone()).await;
+    let _handle = tokio::spawn({
+        let tracker = tracker.clone();
+
+        async move {
+            scheduler::handle(&tracker).await;
+        }
     });
 
     // Create router.
@@ -82,12 +82,12 @@ async fn main() -> Result<()> {
     let mut flushes = 0;
 
     while flushes < max_flushes
-        && (tracker_clone2.history_updates.lock().is_not_empty()
-            || tracker_clone2.peer_updates.lock().is_not_empty()
-            || tracker_clone2.torrent_updates.lock().is_not_empty()
-            || tracker_clone2.user_updates.lock().is_not_empty())
+        && (tracker.history_updates.lock().is_not_empty()
+            || tracker.peer_updates.lock().is_not_empty()
+            || tracker.torrent_updates.lock().is_not_empty()
+            || tracker.user_updates.lock().is_not_empty())
     {
-        scheduler::flush(&tracker_clone2.clone()).await;
+        scheduler::flush(&tracker).await;
         flushes += 1;
     }
 
