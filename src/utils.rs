@@ -4,7 +4,7 @@ use anyhow::{bail, Result};
 ///
 /// Used for decoding the peer_id and infohash from the HTTP GET request query string.
 #[inline(always)]
-pub async fn urlencoded_to_bytes(input: &str) -> Result<[u8; 20]> {
+pub fn urlencoded_to_bytes(input: &str) -> Result<[u8; 20]> {
     let mut output: [u8; 20] = [0; 20];
     let input = input.as_bytes();
     let percent_sign_count = memchr::memchr_iter(b'%', input).count();
@@ -71,7 +71,7 @@ mod tests {
     #[tokio::test]
     async fn urlencoded_all_percents() -> Result<()> {
         let url_encoded = "%00%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F%00%01%02%03";
-        let bytes = urlencoded_to_bytes(url_encoded).await?;
+        let bytes = urlencoded_to_bytes(url_encoded)?;
         assert_eq!(
             bytes,
             [
@@ -85,7 +85,7 @@ mod tests {
     #[tokio::test]
     async fn urlencoded_no_percents() -> Result<()> {
         let url_encoded = "33333333333333333333";
-        let bytes = urlencoded_to_bytes(url_encoded).await?;
+        let bytes = urlencoded_to_bytes(url_encoded)?;
         assert_eq!(
             bytes,
             // ASCII character '3' is 0x33 in hex
@@ -100,7 +100,7 @@ mod tests {
     #[tokio::test]
     async fn urlencoded_mixed_percents() -> Result<()> {
         let url_encoded = "%00%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F3333";
-        let bytes = urlencoded_to_bytes(url_encoded).await?;
+        let bytes = urlencoded_to_bytes(url_encoded)?;
         assert_eq!(
             bytes,
             [
@@ -114,14 +114,14 @@ mod tests {
     #[tokio::test]
     async fn urlencoded_incorrect_length() {
         let url_encoded = "%00";
-        let bytes = urlencoded_to_bytes(url_encoded).await;
+        let bytes = urlencoded_to_bytes(url_encoded);
         assert!(bytes.is_err());
     }
 
     #[tokio::test]
     async fn urlencoded_too_many_percents() {
         let url_encoded = "%0%%01%02%03%04%05%06%07%08%09%0A%0B%0C%0D%0E%0F%00%01%02%03";
-        let bytes = urlencoded_to_bytes(url_encoded).await;
+        let bytes = urlencoded_to_bytes(url_encoded);
         assert!(bytes.is_err());
     }
 

@@ -138,16 +138,12 @@ where
             match parameter {
                 "info_hash" => {
                     info_hash = Some(InfoHash::from(
-                        utils::urlencoded_to_bytes(value)
-                            .await
-                            .or(Err(InvalidInfoHash))?,
+                        utils::urlencoded_to_bytes(value).or(Err(InvalidInfoHash))?,
                     ))
                 }
                 "peer_id" => {
                     peer_id = Some(PeerId::from(
-                        utils::urlencoded_to_bytes(value)
-                            .await
-                            .or(Err(InvalidPeerId))?,
+                        utils::urlencoded_to_bytes(value).or(Err(InvalidPeerId))?,
                     ))
                 }
                 "port" => port = Some(value.parse().or(Err(InvalidPort))?),
