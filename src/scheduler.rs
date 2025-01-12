@@ -10,6 +10,7 @@ pub mod user_update;
 use crate::tracker::Tracker;
 use chrono::{Duration, Utc};
 use indexmap::{map::Values, IndexMap};
+use parking_lot::Mutex;
 use tokio::{join, time::Instant};
 use torrent_update::TorrentUpdate;
 use tracing::info;
@@ -35,95 +36,15 @@ pub async fn handle(tracker: &Arc<Tracker>) {
 /// Send queued updates to mysql database
 pub async fn flush(tracker: &Arc<Tracker>) {
     join!(
-        flush_history_updates(tracker),
-        flush_peer_updates(tracker),
-        flush_torrent_updates(tracker),
-        flush_user_updates(tracker),
         flush_announce_updates(tracker),
-        flush_unregistered_info_hash_updates(tracker),
+        tracker.history_updates.flush(tracker, "histories"),
+        tracker.peer_updates.flush(tracker, "peers"),
+        tracker.torrent_updates.flush(tracker, "torrents"),
+        tracker.user_updates.flush(tracker, "users"),
+        tracker
+            .unregistered_info_hash_updates
+            .flush(tracker, "unregistered info hashes"),
     );
-}
-
-/// Send history updates to mysql database
-async fn flush_history_updates(tracker: &Arc<Tracker>) {
-    let history_update_batch = tracker.history_updates.lock().take_batch();
-    let start = Instant::now();
-    let len = history_update_batch.len();
-    let result = history_update_batch.flush_to_db(&tracker).await;
-    let elapsed = start.elapsed().as_millis();
-
-    match result {
-        Ok(_) => {
-            info!("Upserted {len} histories in {elapsed} ms.");
-        }
-        Err(e) => {
-            info!("Failed to update {len} histories after {elapsed} ms: {e}");
-            tracker
-                .history_updates
-                .lock()
-                .upsert_batch(history_update_batch);
-        }
-    }
-}
-
-/// Send peer updates to mysql database
-async fn flush_peer_updates(tracker: &Arc<Tracker>) {
-    let peer_update_batch = tracker.peer_updates.lock().take_batch();
-    let start = Instant::now();
-    let len = peer_update_batch.len();
-    let result = peer_update_batch.flush_to_db(&tracker).await;
-    let elapsed = start.elapsed().as_millis();
-
-    match result {
-        Ok(_) => {
-            info!("Upserted {len} peers in {elapsed} ms.");
-        }
-        Err(e) => {
-            info!("Failed to update {len} peers after {elapsed} ms: {e}");
-            tracker.peer_updates.lock().upsert_batch(peer_update_batch);
-        }
-    }
-}
-
-/// Send torrent updates to mysql database
-async fn flush_torrent_updates(tracker: &Arc<Tracker>) {
-    let torrent_update_batch = tracker.torrent_updates.lock().take_batch();
-    let start = Instant::now();
-    let len = torrent_update_batch.len();
-    let result = torrent_update_batch.flush_to_db(&tracker).await;
-    let elapsed = start.elapsed().as_millis();
-
-    match result {
-        Ok(_) => {
-            info!("Upserted {len} torrents in {elapsed} ms.");
-        }
-        Err(e) => {
-            info!("Failed to update {len} torrents after {elapsed} ms: {e}");
-            tracker
-                .torrent_updates
-                .lock()
-                .upsert_batch(torrent_update_batch);
-        }
-    }
-}
-
-/// Send user updates to mysql database
-async fn flush_user_updates(tracker: &Arc<Tracker>) {
-    let user_update_batch = tracker.user_updates.lock().take_batch();
-    let start = Instant::now();
-    let len = user_update_batch.len();
-    let result = user_update_batch.flush_to_db(&tracker).await;
-    let elapsed = start.elapsed().as_millis();
-
-    match result {
-        Ok(_) => {
-            info!("Upserted {len} users in {elapsed} ms.");
-        }
-        Err(e) => {
-            info!("Failed to update {len} users after {elapsed} ms: {e}");
-            tracker.user_updates.lock().upsert_batch(user_update_batch);
-        }
-    }
 }
 
 /// Send announce updates to mysql database
@@ -144,31 +65,6 @@ async fn flush_announce_updates(tracker: &Arc<Tracker>) {
                 .announce_updates
                 .lock()
                 .upsert_batch(announce_update_batch);
-        }
-    }
-}
-
-/// Send unregistered info hash updates to mysql database
-async fn flush_unregistered_info_hash_updates(tracker: &Arc<Tracker>) {
-    let unregistered_info_hash_update_batch =
-        tracker.unregistered_info_hash_updates.lock().take_batch();
-    let start = Instant::now();
-    let len = unregistered_info_hash_update_batch.len();
-    let result = unregistered_info_hash_update_batch
-        .flush_to_db(&tracker)
-        .await;
-    let elapsed = start.elapsed().as_millis();
-
-    match result {
-        Ok(_) => {
-            info!("Upserted {len} unregistered info hashes in {elapsed} ms.");
-        }
-        Err(e) => {
-            info!("Failed to update {len} unregistered info hashes after {elapsed} ms: {e}");
-            tracker
-                .unregistered_info_hash_updates
-                .lock()
-                .upsert_batch(unregistered_info_hash_update_batch);
         }
     }
 }
@@ -285,6 +181,36 @@ where
 
     pub fn is_not_empty(&self) -> bool {
         !self.records.is_empty()
+    }
+}
+
+trait MutexQueueExt {
+    async fn flush<'a>(&self, tracker: &Arc<Tracker>, record_type: &'a str);
+}
+
+impl<K, V> MutexQueueExt for Mutex<Queue<K, V>>
+where
+    K: Hash + Eq,
+    V: Clone + Mergeable,
+    Queue<K, V>: Upsertable<V>,
+    Batch<K, V>: Flushable<V>,
+{
+    async fn flush<'a>(&self, tracker: &Arc<Tracker>, record_type: &'a str) {
+        let batch = self.lock().take_batch();
+        let len = batch.len();
+        let result = batch.flush_to_db(tracker).await;
+        let start = Instant::now();
+        let elapsed = start.elapsed().as_millis();
+
+        match result {
+            Ok(_) => {
+                info!("Upserted {len} {record_type} in {elapsed} ms.");
+            }
+            Err(e) => {
+                info!("Failed to update {len} {record_type} after {elapsed} ms: {e}");
+                self.lock().upsert_batch(batch);
+            }
+        }
     }
 }
 
