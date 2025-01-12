@@ -1,8 +1,8 @@
-use std::net::IpAddr;
+use std::{net::IpAddr, sync::Arc};
 
-use crate::tracker::peer::PeerId;
+use crate::tracker::{peer::PeerId, Tracker};
 use chrono::{DateTime, Utc};
-use sqlx::{MySql, MySqlPool, QueryBuilder};
+use sqlx::{MySql, QueryBuilder};
 
 use super::{Flushable, Mergeable, Upsertable};
 
@@ -65,9 +65,7 @@ impl Upsertable<PeerUpdate> for super::Queue<Index, PeerUpdate> {
 }
 
 impl Flushable<PeerUpdate> for super::Batch<Index, PeerUpdate> {
-    type ExtraBindings = ();
-
-    async fn flush_to_db(&self, db: &MySqlPool, _extra_bindings: ()) -> Result<u64, sqlx::Error> {
+    async fn flush_to_db(&self, tracker: &Arc<Tracker>) -> Result<u64, sqlx::Error> {
         if self.is_empty() {
             return Ok(0);
         }
@@ -152,7 +150,7 @@ impl Flushable<PeerUpdate> for super::Batch<Index, PeerUpdate> {
         query_builder
             .build()
             .persistent(false)
-            .execute(db)
+            .execute(&tracker.pool)
             .await
             .map(|result| result.rows_affected())
     }

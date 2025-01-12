@@ -1,4 +1,8 @@
-use sqlx::{MySql, MySqlPool, QueryBuilder};
+use std::sync::Arc;
+
+use sqlx::{MySql, QueryBuilder};
+
+use crate::tracker::Tracker;
 
 use super::{Flushable, Mergeable, Upsertable};
 
@@ -37,9 +41,7 @@ impl Upsertable<UserUpdate> for super::Queue<Index, UserUpdate> {
     }
 }
 impl Flushable<UserUpdate> for super::Batch<Index, UserUpdate> {
-    type ExtraBindings = ();
-
-    async fn flush_to_db(&self, db: &MySqlPool, _extra_bindings: ()) -> Result<u64, sqlx::Error> {
+    async fn flush_to_db(&self, tracker: &Arc<Tracker>) -> Result<u64, sqlx::Error> {
         if self.is_empty() {
             return Ok(0);
         }
@@ -86,7 +88,7 @@ impl Flushable<UserUpdate> for super::Batch<Index, UserUpdate> {
         query_builder
             .build()
             .persistent(false)
-            .execute(db)
+            .execute(&tracker.pool)
             .await
             .map(|result| result.rows_affected())
     }

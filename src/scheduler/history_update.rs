@@ -1,5 +1,9 @@
+use std::sync::Arc;
+
 use chrono::{DateTime, Utc};
-use sqlx::{MySql, MySqlPool, QueryBuilder};
+use sqlx::{MySql, QueryBuilder};
+
+use crate::tracker::Tracker;
 
 use super::{Flushable, Mergeable, Upsertable};
 
@@ -55,18 +59,8 @@ impl Upsertable<HistoryUpdate> for super::Queue<Index, HistoryUpdate> {
     }
 }
 
-pub struct HistoryUpdateExtraBindings {
-    pub seedtime_ttl: u64,
-}
-
 impl Flushable<HistoryUpdate> for super::Batch<Index, HistoryUpdate> {
-    type ExtraBindings = HistoryUpdateExtraBindings;
-
-    async fn flush_to_db(
-        &self,
-        db: &MySqlPool,
-        extra_bindings: HistoryUpdateExtraBindings,
-    ) -> Result<u64, sqlx::Error> {
+    async fn flush_to_db(&self, tracker: &Arc<Tracker>) -> Result<u64, sqlx::Error> {
         if self.is_empty() {
             return Ok(0);
         }
@@ -131,7 +125,7 @@ impl Flushable<HistoryUpdate> for super::Batch<Index, HistoryUpdate> {
                             DATE_ADD(updated_at, INTERVAL
             "#,
             )
-            .push_bind(extra_bindings.seedtime_ttl)
+            .push_bind(tracker.config.read().active_peer_ttl + tracker.config.read().peer_expiry_interval)
             .push(
                 r#"
                                                                 SECOND) > VALUES(updated_at) AND seeder = 1 AND active = 1 AND VALUES(seeder) = 1,
@@ -149,7 +143,7 @@ impl Flushable<HistoryUpdate> for super::Batch<Index, HistoryUpdate> {
         query_builder
             .build()
             .persistent(false)
-            .execute(db)
+            .execute(&tracker.pool)
             .await
             .map(|result| result.rows_affected())
     }

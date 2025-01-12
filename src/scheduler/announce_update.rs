@@ -1,11 +1,15 @@
 use std::{
     cmp::min,
     ops::{Deref, DerefMut},
+    sync::Arc,
 };
 
-use sqlx::{MySql, MySqlPool, QueryBuilder};
+use sqlx::{MySql, QueryBuilder};
 
-use crate::{announce::Event, tracker::peer::PeerId};
+use crate::{
+    announce::Event,
+    tracker::{peer::PeerId, Tracker},
+};
 
 pub struct Queue(pub Vec<AnnounceUpdate>);
 
@@ -61,7 +65,7 @@ impl Queue {
     }
 
     /// Flushes announce updates to the mysql db
-    pub async fn flush_to_db(&self, db: &MySqlPool) -> Result<u64, sqlx::Error> {
+    pub async fn flush_to_db(&self, tracker: &Arc<Tracker>) -> Result<u64, sqlx::Error> {
         let len = self.len();
 
         if len == 0 {
@@ -111,7 +115,7 @@ impl Queue {
         query_builder
             .build()
             .persistent(false)
-            .execute(db)
+            .execute(&tracker.pool)
             .await
             .map(|result| result.rows_affected())
     }

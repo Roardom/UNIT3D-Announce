@@ -10,12 +10,9 @@ pub mod user_update;
 use crate::tracker::Tracker;
 use chrono::{Duration, Utc};
 use indexmap::{map::Values, IndexMap};
-use sqlx::MySqlPool;
 use tokio::{join, time::Instant};
 use torrent_update::TorrentUpdate;
 use tracing::info;
-
-use self::history_update::HistoryUpdateExtraBindings;
 
 pub async fn handle(tracker: &Arc<Tracker>) {
     let mut interval = tokio::time::interval(std::time::Duration::from_millis(1));
@@ -52,11 +49,7 @@ async fn flush_history_updates(tracker: &Arc<Tracker>) {
     let history_update_batch = tracker.history_updates.lock().take_batch();
     let start = Instant::now();
     let len = history_update_batch.len();
-    let seedtime_ttl =
-        tracker.config.read().active_peer_ttl + tracker.config.read().peer_expiry_interval;
-    let result = history_update_batch
-        .flush_to_db(&tracker.pool, HistoryUpdateExtraBindings { seedtime_ttl })
-        .await;
+    let result = history_update_batch.flush_to_db(&tracker).await;
     let elapsed = start.elapsed().as_millis();
 
     match result {
@@ -78,7 +71,7 @@ async fn flush_peer_updates(tracker: &Arc<Tracker>) {
     let peer_update_batch = tracker.peer_updates.lock().take_batch();
     let start = Instant::now();
     let len = peer_update_batch.len();
-    let result = peer_update_batch.flush_to_db(&tracker.pool, ()).await;
+    let result = peer_update_batch.flush_to_db(&tracker).await;
     let elapsed = start.elapsed().as_millis();
 
     match result {
@@ -97,7 +90,7 @@ async fn flush_torrent_updates(tracker: &Arc<Tracker>) {
     let torrent_update_batch = tracker.torrent_updates.lock().take_batch();
     let start = Instant::now();
     let len = torrent_update_batch.len();
-    let result = torrent_update_batch.flush_to_db(&tracker.pool, ()).await;
+    let result = torrent_update_batch.flush_to_db(&tracker).await;
     let elapsed = start.elapsed().as_millis();
 
     match result {
@@ -119,7 +112,7 @@ async fn flush_user_updates(tracker: &Arc<Tracker>) {
     let user_update_batch = tracker.user_updates.lock().take_batch();
     let start = Instant::now();
     let len = user_update_batch.len();
-    let result = user_update_batch.flush_to_db(&tracker.pool, ()).await;
+    let result = user_update_batch.flush_to_db(&tracker).await;
     let elapsed = start.elapsed().as_millis();
 
     match result {
@@ -138,7 +131,7 @@ async fn flush_announce_updates(tracker: &Arc<Tracker>) {
     let announce_update_batch = tracker.announce_updates.lock().take_batch();
     let start = Instant::now();
     let len = announce_update_batch.len();
-    let result = announce_update_batch.flush_to_db(&tracker.pool).await;
+    let result = announce_update_batch.flush_to_db(&tracker).await;
     let elapsed = start.elapsed().as_millis();
 
     match result {
@@ -162,7 +155,7 @@ async fn flush_unregistered_info_hash_updates(tracker: &Arc<Tracker>) {
     let start = Instant::now();
     let len = unregistered_info_hash_update_batch.len();
     let result = unregistered_info_hash_update_batch
-        .flush_to_db(&tracker.pool, ())
+        .flush_to_db(&tracker)
         .await;
     let elapsed = start.elapsed().as_millis();
 
@@ -321,17 +314,9 @@ impl<'a, K, V> Batch<K, V> {
 }
 
 pub trait Flushable<T> {
-    /// Used to store extra bindings used in the query when the record already
-    /// exists in the database
-    type ExtraBindings;
-
     /// Flushes batch of updates to MySQL database
     ///
     /// **Warning**: this function does not make sure that the query isn't too long
     /// or doesn't use too many bindings
-    async fn flush_to_db(
-        &self,
-        db: &MySqlPool,
-        extra_bindings: Self::ExtraBindings,
-    ) -> Result<u64, sqlx::Error>;
+    async fn flush_to_db(&self, tracker: &Arc<Tracker>) -> Result<u64, sqlx::Error>;
 }

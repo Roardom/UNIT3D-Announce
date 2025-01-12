@@ -1,6 +1,8 @@
-use crate::tracker::torrent::InfoHash;
+use std::sync::Arc;
+
+use crate::tracker::{torrent::InfoHash, Tracker};
 use chrono::{DateTime, Utc};
-use sqlx::{MySql, MySqlPool, QueryBuilder};
+use sqlx::{MySql, QueryBuilder};
 
 use super::{Flushable, Mergeable, Upsertable};
 
@@ -40,9 +42,7 @@ impl Upsertable<UnregisteredInfoHashUpdate> for super::Queue<Index, Unregistered
 }
 
 impl Flushable<UnregisteredInfoHashUpdate> for super::Batch<Index, UnregisteredInfoHashUpdate> {
-    type ExtraBindings = ();
-
-    async fn flush_to_db(&self, db: &MySqlPool, _extra_bindings: ()) -> Result<u64, sqlx::Error> {
+    async fn flush_to_db(&self, tracker: &Arc<Tracker>) -> Result<u64, sqlx::Error> {
         if self.is_empty() {
             return Ok(0);
         }
@@ -76,7 +76,7 @@ impl Flushable<UnregisteredInfoHashUpdate> for super::Batch<Index, UnregisteredI
         query_builder
             .build()
             .persistent(false)
-            .execute(db)
+            .execute(&tracker.pool)
             .await
             .map(|result| result.rows_affected())
     }
