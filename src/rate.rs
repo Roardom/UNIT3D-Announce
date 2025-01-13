@@ -106,8 +106,7 @@ impl RateCollection {
                     ))
                 })
                 .collect::<Result<Vec<Rate>, anyhow::Error>>()
-                .context("Failed to parse rate limit string.")?
-                .into(),
+                .context("Failed to parse rate limit string.")?,
         })
     }
 

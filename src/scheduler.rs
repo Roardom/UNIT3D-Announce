@@ -55,7 +55,7 @@ async fn flush_announce_updates(tracker: &Arc<Tracker>) {
     let announce_update_batch = tracker.announce_updates.lock().take_batch();
     let start = Instant::now();
     let len = announce_update_batch.len();
-    let result = announce_update_batch.flush_to_db(&tracker).await;
+    let result = announce_update_batch.flush_to_db(tracker).await;
     let elapsed = start.elapsed().as_millis();
 
     match result {

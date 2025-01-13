@@ -312,7 +312,7 @@ impl Config {
     pub async fn reload(State(tracker): State<Arc<Tracker>>) -> Response {
         info!("Reloading config.",);
 
-        if let Ok(_) = dotenv_override() {
+        if dotenv_override().is_ok() {
             let mut config = tracker.config.write();
 
             match Config::from_env() {
@@ -321,22 +321,22 @@ impl Config {
 
                     info!("Successfully reloaded config.");
 
-                    return (StatusCode::OK, "Successfully reloaded config.").into_response();
+                    (StatusCode::OK, "Successfully reloaded config.").into_response()
                 }
                 Err(e) => {
                     error!("Ignoring config reload. Failed to parse config: {e}");
 
-                    return (
+                    (
                         StatusCode::INTERNAL_SERVER_ERROR,
                         format!("Ignoring config reload. Failed to parse config: {e}"),
                     )
-                        .into_response();
+                        .into_response()
                 }
             }
         } else {
             error!(".env file not found.");
 
-            return (StatusCode::INTERNAL_SERVER_ERROR, ".env file not found.").into_response();
+            (StatusCode::INTERNAL_SERVER_ERROR, ".env file not found.").into_response()
         }
     }
 }
