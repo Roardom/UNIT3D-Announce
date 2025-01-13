@@ -59,9 +59,7 @@ impl Queue {
 
     /// Merge a announce update batch into this announce update batch
     pub fn upsert_batch(&mut self, batch: Queue) {
-        for announce_update in batch.iter() {
-            self.upsert(announce_update.clone());
-        }
+        self.extend(batch.0);
     }
 
     /// Flushes announce updates to the mysql db

@@ -9,7 +9,10 @@ pub mod user_update;
 
 use crate::tracker::Tracker;
 use chrono::{Duration, Utc};
-use indexmap::{map::Values, IndexMap};
+use indexmap::{
+    map::{IntoValues, Values},
+    IndexMap,
+};
 use parking_lot::Mutex;
 use tokio::{join, time::Instant};
 use torrent_update::TorrentUpdate;
@@ -174,8 +177,8 @@ where
 
     /// Bulk upsert a batch into the end of the queue
     fn upsert_batch(&mut self, batch: Batch<K, V>) {
-        for record in batch.values() {
-            self.upsert(record.clone());
+        for record in batch.into_values() {
+            self.upsert(record);
         }
     }
 
@@ -232,6 +235,10 @@ impl<'a, K, V> Batch<K, V> {
 
     fn values(&'a self) -> Values<'a, K, V> {
         self.0.values()
+    }
+
+    fn into_values(self) -> IntoValues<K, V> {
+        self.0.into_values()
     }
 
     fn len(&self) -> usize {
