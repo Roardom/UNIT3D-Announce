@@ -177,25 +177,26 @@ where
     /// Take a portion of the updates from the start of the queue with a max
     /// size defined by the buffer config
     fn take_batch(&mut self) -> Batch<K, V> {
-        let len = self.records.len();
-
         Batch(
             self.records
-                .drain(0..min(len, self.config.max_batch_size()))
+                .drain(0..min(self.records.len(), self.config.max_batch_size()))
                 .collect(),
         )
     }
 
     /// Bulk upsert a batch into the end of the queue
     fn upsert_batch(&mut self, batch: Batch<K, V>) {
-        for (key, value) in batch.into_iter() {
-            self.upsert(key, value);
-        }
+        batch.into_iter().for_each(|(k, v)| self.upsert(k, v));
     }
 
     pub fn is_not_empty(&self) -> bool {
         !self.records.is_empty()
     }
+}
+
+pub trait Mergeable {
+    /// Merge an existing record with a new record
+    fn merge(&mut self, new: &Self);
 }
 
 trait MutexQueueExt {
@@ -225,11 +226,6 @@ where
             }
         }
     }
-}
-
-pub trait Mergeable {
-    /// Merge a record with a new record
-    fn merge(&mut self, new: &Self);
 }
 
 pub struct Batch<K, V>(IndexMap<K, V>);
