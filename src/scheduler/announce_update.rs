@@ -4,6 +4,7 @@ use std::{
     sync::Arc,
 };
 
+use chrono::{DateTime, Utc};
 use sqlx::{MySql, QueryBuilder};
 
 use crate::{
@@ -24,6 +25,7 @@ pub struct AnnounceUpdate {
     pub peer_id: PeerId,
     pub port: u16,
     pub numwant: u16,
+    pub created_at: DateTime<Utc>,
     pub event: Event,
     pub key: Option<String>,
 }
@@ -44,7 +46,7 @@ impl Queue {
         const BIND_LIMIT: usize = 65535;
 
         /// Number of columns being updated in the announce table
-        const ANNOUNCE_COLUMN_COUNT: usize = 11;
+        const ANNOUNCE_COLUMN_COUNT: usize = 12;
 
         BIND_LIMIT / ANNOUNCE_COLUMN_COUNT
     }
@@ -85,6 +87,7 @@ impl Queue {
                         peer_id,
                         port,
                         numwant,
+                        created_at,
                         event,
                         `key`
                     )
@@ -101,6 +104,7 @@ impl Queue {
                 .push_bind(announce_update.peer_id.to_vec())
                 .push_bind(announce_update.port)
                 .push_bind(announce_update.numwant)
+                .push_bind(announce_update.created_at)
                 .push_bind(announce_update.event.to_string());
 
             if let Some(key) = &announce_update.key {

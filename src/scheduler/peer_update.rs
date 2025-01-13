@@ -27,6 +27,7 @@ pub struct PeerUpdate {
     pub left: u64,
     pub torrent_id: u32,
     pub user_id: u32,
+    pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub connectable: bool,
 }
@@ -46,6 +47,8 @@ impl Mergeable for PeerUpdate {
             self.updated_at = new.updated_at;
             self.connectable = new.connectable;
         }
+
+        self.created_at = std::cmp::min(self.created_at, new.created_at);
     }
 }
 
@@ -107,7 +110,7 @@ impl Flushable<PeerUpdate> for super::Batch<Index, PeerUpdate> {
                         .push_bind(peer_update.is_active)
                         .push_bind(peer_update.is_seeder)
                         .push_bind(peer_update.is_visible)
-                        .push_bind(peer_update.updated_at)
+                        .push_bind(peer_update.created_at)
                         .push_bind(peer_update.updated_at)
                         .push_bind(peer_update.torrent_id)
                         .push_bind(peer_update.user_id)
@@ -123,7 +126,7 @@ impl Flushable<PeerUpdate> for super::Batch<Index, PeerUpdate> {
                         .push_bind(peer_update.is_active)
                         .push_bind(peer_update.is_seeder)
                         .push_bind(peer_update.is_visible)
-                        .push_bind(peer_update.updated_at)
+                        .push_bind(peer_update.created_at)
                         .push_bind(peer_update.updated_at)
                         .push_bind(peer_update.torrent_id)
                         .push_bind(peer_update.user_id)

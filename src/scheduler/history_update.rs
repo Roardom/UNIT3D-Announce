@@ -28,6 +28,8 @@ pub struct HistoryUpdate {
     pub credited_uploaded_delta: u64,
     pub credited_downloaded_delta: u64,
     pub completed_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl Mergeable for HistoryUpdate {
@@ -42,6 +44,8 @@ impl Mergeable for HistoryUpdate {
         self.credited_uploaded_delta += new.credited_uploaded_delta;
         self.credited_downloaded_delta += new.credited_downloaded_delta;
         self.completed_at = new.completed_at;
+        self.created_at = std::cmp::min(self.created_at, new.created_at);
+        self.updated_at = std::cmp::max(self.updated_at, new.updated_at);
     }
 }
 
@@ -64,8 +68,6 @@ impl Flushable<HistoryUpdate> for super::Batch<Index, HistoryUpdate> {
         if self.is_empty() {
             return Ok(0);
         }
-
-        let now = Utc::now();
 
         let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
             r#"INSERT INTO
@@ -107,8 +109,8 @@ impl Flushable<HistoryUpdate> for super::Batch<Index, HistoryUpdate> {
                     .push_bind(history_update.is_active)
                     .push_bind(0)
                     .push_bind(history_update.is_immune)
-                    .push_bind(now)
-                    .push_bind(now)
+                    .push_bind(history_update.created_at)
+                    .push_bind(history_update.updated_at)
                     .push_bind(history_update.completed_at);
             })
             .push(

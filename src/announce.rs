@@ -332,6 +332,8 @@ pub async fn announce(
         .ok_or(InfoHashNotFound)
         .cloned();
 
+    let now = Utc::now();
+
     if let Ok(user) = &user {
         if let Err(InfoHashNotFound) = torrent_id_res {
             tracker
@@ -340,7 +342,8 @@ pub async fn announce(
                 .upsert(UnregisteredInfoHashUpdate {
                     user_id: user.id,
                     info_hash: queries.info_hash,
-                    updated_at: Utc::now(),
+                    created_at: now,
+                    updated_at: now,
                 });
         }
     }
@@ -484,7 +487,7 @@ pub async fn announce(
                     peer.is_visible =
                         peer.is_included_in_leech_list(&config) || !has_hit_download_slot_limit;
                     peer.is_active = true;
-                    peer.updated_at = Utc::now();
+                    peer.updated_at = now;
                     peer.uploaded = queries.uploaded;
                     peer.downloaded = queries.downloaded;
                 })
@@ -497,7 +500,7 @@ pub async fn announce(
                     is_active: true,
                     is_visible: !has_hit_download_slot_limit,
                     is_connectable,
-                    updated_at: Utc::now(),
+                    updated_at: now,
                     uploaded: queries.uploaded,
                     downloaded: queries.downloaded,
                 });
@@ -539,7 +542,7 @@ pub async fn announce(
                     if old_peer
                         .updated_at
                         .checked_add_signed(Duration::seconds(config.announce_min_enforced.into()))
-                        .is_some_and(|blocked_until| blocked_until > Utc::now())
+                        .is_some_and(|blocked_until| blocked_until > now)
                     {
                         warnings.push(AnnounceWarning::RateLimitExceeded);
                     }
@@ -807,7 +810,7 @@ pub async fn announce(
     let credited_downloaded_delta = download_factor as u64 * downloaded_delta / 100;
 
     let completed_at = if queries.event == Event::Completed {
-        Some(Utc::now())
+        Some(now)
     } else {
         None
     };
@@ -844,7 +847,8 @@ pub async fn announce(
         left: queries.left,
         torrent_id,
         user_id,
-        updated_at: Utc::now(),
+        created_at: now,
+        updated_at: now,
         connectable: is_connectable,
     });
 
@@ -870,6 +874,8 @@ pub async fn announce(
         credited_uploaded_delta,
         credited_downloaded_delta,
         completed_at,
+        created_at: now,
+        updated_at: now,
     });
 
     if credited_uploaded_delta != 0 || credited_downloaded_delta != 0 {
@@ -907,6 +913,7 @@ pub async fn announce(
             peer_id: queries.peer_id,
             port: queries.port,
             numwant: queries.numwant.try_into().unwrap_or(u16::MAX),
+            created_at: now,
             event: queries.event,
             key: queries.key,
         });
