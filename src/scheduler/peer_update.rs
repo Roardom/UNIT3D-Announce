@@ -98,40 +98,24 @@ impl Flushable<PeerUpdate> for super::Batch<Index, PeerUpdate> {
 
         query_builder
             .push_values(self.values(), |mut bind, peer_update| {
-                match peer_update.ip {
-                    IpAddr::V4(ip) => bind
-                        .push_bind(peer_update.peer_id.to_vec())
-                        .push_bind(ip.octets().to_vec())
-                        .push_bind(peer_update.port)
-                        .push_bind(peer_update.agent.as_str())
-                        .push_bind(peer_update.uploaded)
-                        .push_bind(peer_update.downloaded)
-                        .push_bind(peer_update.left)
-                        .push_bind(peer_update.is_active)
-                        .push_bind(peer_update.is_seeder)
-                        .push_bind(peer_update.is_visible)
-                        .push_bind(peer_update.created_at)
-                        .push_bind(peer_update.updated_at)
-                        .push_bind(peer_update.torrent_id)
-                        .push_bind(peer_update.user_id)
-                        .push_bind(peer_update.connectable),
-                    IpAddr::V6(ip) => bind
-                        .push_bind(peer_update.peer_id.to_vec())
-                        .push_bind(ip.octets().to_vec())
-                        .push_bind(peer_update.port)
-                        .push_bind(peer_update.agent.as_str())
-                        .push_bind(peer_update.uploaded)
-                        .push_bind(peer_update.downloaded)
-                        .push_bind(peer_update.left)
-                        .push_bind(peer_update.is_active)
-                        .push_bind(peer_update.is_seeder)
-                        .push_bind(peer_update.is_visible)
-                        .push_bind(peer_update.created_at)
-                        .push_bind(peer_update.updated_at)
-                        .push_bind(peer_update.torrent_id)
-                        .push_bind(peer_update.user_id)
-                        .push_bind(peer_update.connectable),
-                };
+                bind.push_bind(peer_update.peer_id.to_vec())
+                    .push_bind(match peer_update.ip {
+                        IpAddr::V4(ip) => ip.octets().to_vec(),
+                        IpAddr::V6(ip) => ip.octets().to_vec(),
+                    })
+                    .push_bind(peer_update.port)
+                    .push_bind(peer_update.agent.as_str())
+                    .push_bind(peer_update.uploaded)
+                    .push_bind(peer_update.downloaded)
+                    .push_bind(peer_update.left)
+                    .push_bind(peer_update.is_active)
+                    .push_bind(peer_update.is_seeder)
+                    .push_bind(peer_update.is_visible)
+                    .push_bind(peer_update.created_at)
+                    .push_bind(peer_update.updated_at)
+                    .push_bind(peer_update.torrent_id)
+                    .push_bind(peer_update.user_id)
+                    .push_bind(peer_update.connectable);
             })
             .push(
                 r#"
