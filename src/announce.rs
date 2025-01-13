@@ -561,7 +561,7 @@ pub async fn announce(
                         if peer.user_id == user_id && peer.is_active {
                             peer_count += 1;
 
-                            if peer_count >= config.max_peers_per_torrent_per_user {
+                            if peer_count > config.max_peers_per_torrent_per_user {
                                 torrent.peers.swap_remove(&tracker::peer::Index {
                                     user_id,
                                     peer_id: queries.peer_id,
