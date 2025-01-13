@@ -15,7 +15,6 @@ pub struct Index {
 
 #[derive(Clone)]
 pub struct PeerUpdate {
-    pub peer_id: PeerId,
     pub ip: std::net::IpAddr,
     pub port: u16,
     pub agent: String,
@@ -25,8 +24,6 @@ pub struct PeerUpdate {
     pub is_seeder: bool,
     pub is_visible: bool,
     pub left: u64,
-    pub torrent_id: u32,
-    pub user_id: u32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub connectable: bool,
@@ -49,16 +46,6 @@ impl Mergeable for PeerUpdate {
         }
 
         self.created_at = std::cmp::min(self.created_at, new.created_at);
-    }
-}
-
-impl<'a> From<&'a PeerUpdate> for Index {
-    fn from(value: &'a PeerUpdate) -> Self {
-        Self {
-            torrent_id: value.torrent_id,
-            user_id: value.user_id,
-            peer_id: value.peer_id,
-        }
     }
 }
 
@@ -92,8 +79,8 @@ impl Flushable<PeerUpdate> for super::Batch<Index, PeerUpdate> {
         );
 
         query_builder
-            .push_values(self.values(), |mut bind, peer_update| {
-                bind.push_bind(peer_update.peer_id.to_vec())
+            .push_values(self.iter(), |mut bind, (index, peer_update)| {
+                bind.push_bind(index.peer_id.to_vec())
                     .push_bind(match peer_update.ip {
                         IpAddr::V4(ip) => ip.octets().to_vec(),
                         IpAddr::V6(ip) => ip.octets().to_vec(),
@@ -108,8 +95,8 @@ impl Flushable<PeerUpdate> for super::Batch<Index, PeerUpdate> {
                     .push_bind(peer_update.is_visible)
                     .push_bind(peer_update.created_at)
                     .push_bind(peer_update.updated_at)
-                    .push_bind(peer_update.torrent_id)
-                    .push_bind(peer_update.user_id)
+                    .push_bind(index.torrent_id)
+                    .push_bind(index.user_id)
                     .push_bind(peer_update.connectable);
             })
             .push(

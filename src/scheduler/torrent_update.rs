@@ -14,7 +14,6 @@ pub struct Index {
 
 #[derive(Clone)]
 pub struct TorrentUpdate {
-    pub torrent_id: u32,
     pub seeder_delta: i32,
     pub leecher_delta: i32,
     pub times_completed_delta: u32,
@@ -29,14 +28,6 @@ impl Mergeable for TorrentUpdate {
             .times_completed_delta
             .saturating_add(new.times_completed_delta);
         self.balance_delta = self.balance_delta.saturating_add(new.balance_delta);
-    }
-}
-
-impl<'a> From<&'a TorrentUpdate> for Index {
-    fn from(value: &'a TorrentUpdate) -> Self {
-        Self {
-            torrent_id: value.torrent_id,
-        }
     }
 }
 
@@ -74,8 +65,8 @@ impl Flushable<TorrentUpdate> for super::Batch<Index, TorrentUpdate> {
         );
 
         query_builder
-            .push_values(self.values(), |mut bind, torrent_update| {
-                bind.push_bind(torrent_update.torrent_id)
+            .push_values(self.iter(), |mut bind, (index, torrent_update)| {
+                bind.push_bind(index.torrent_id)
                     .push_bind("")
                     .push_bind("")
                     .push_bind("")

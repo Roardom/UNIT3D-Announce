@@ -10,12 +10,12 @@ pub mod user_update;
 use crate::tracker::Tracker;
 use chrono::{Duration, Utc};
 use indexmap::{
-    map::{IntoValues, Values},
+    map::{IntoIter, Iter},
     IndexMap,
 };
 use parking_lot::Mutex;
 use tokio::{join, time::Instant};
-use torrent_update::TorrentUpdate;
+use torrent_update::{Index, TorrentUpdate};
 use tracing::info;
 
 pub async fn handle(tracker: &Arc<Tracker>) {
@@ -121,13 +121,17 @@ pub async fn reap(tracker: &Arc<Tracker>) {
             torrent.seeders = torrent.seeders.saturating_add_signed(seeder_delta);
             torrent.leechers = torrent.leechers.saturating_add_signed(leecher_delta);
 
-            tracker.torrent_updates.lock().upsert(TorrentUpdate {
-                torrent_id: torrent.id,
-                seeder_delta,
-                leecher_delta,
-                times_completed_delta: 0,
-                balance_delta: 0,
-            });
+            tracker.torrent_updates.lock().upsert(
+                Index {
+                    torrent_id: torrent.id,
+                },
+                TorrentUpdate {
+                    seeder_delta,
+                    leecher_delta,
+                    times_completed_delta: 0,
+                    balance_delta: 0,
+                },
+            );
         }
     }
 }
@@ -153,7 +157,6 @@ impl<K, V> Queue<K, V>
 where
     K: Hash + Eq,
     V: Clone + Mergeable,
-    for<'a> &'a V: Into<K>,
 {
     /// Initialize a new queue
     pub fn new(config: QueueConfig) -> Queue<K, V> {
@@ -164,11 +167,11 @@ where
     }
 
     /// Upsert a single update into the queue
-    pub fn upsert(&mut self, new: V) {
+    pub fn upsert(&mut self, key: K, value: V) {
         self.records
-            .entry((&new).into())
-            .and_modify(|update| update.merge(&new))
-            .or_insert(new);
+            .entry(key)
+            .and_modify(|update| update.merge(&value))
+            .or_insert(value);
     }
 
     /// Take a portion of the updates from the start of the queue with a max
@@ -185,8 +188,8 @@ where
 
     /// Bulk upsert a batch into the end of the queue
     fn upsert_batch(&mut self, batch: Batch<K, V>) {
-        for record in batch.into_values() {
-            self.upsert(record);
+        for (key, value) in batch.into_iter() {
+            self.upsert(key, value);
         }
     }
 
@@ -203,7 +206,6 @@ impl<K, V> MutexQueueExt for Mutex<Queue<K, V>>
 where
     K: Hash + Eq,
     V: Clone + Mergeable,
-    for<'a> &'a V: Into<K>,
     Batch<K, V>: Flushable<V>,
 {
     async fn flush<'a>(&self, tracker: &Arc<Tracker>, record_type: &'a str) {
@@ -237,12 +239,12 @@ impl<'a, K, V> Batch<K, V> {
         self.0.len() == 0
     }
 
-    fn values(&'a self) -> Values<'a, K, V> {
-        self.0.values()
+    fn iter(&'a self) -> Iter<'a, K, V> {
+        self.0.iter()
     }
 
-    fn into_values(self) -> IntoValues<K, V> {
-        self.0.into_values()
+    fn into_iter(self) -> IntoIter<K, V> {
+        self.0.into_iter()
     }
 
     fn len(&self) -> usize {

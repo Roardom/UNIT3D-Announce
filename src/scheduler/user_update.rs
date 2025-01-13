@@ -16,7 +16,6 @@ pub struct Index {
 // If those columns existed, they should be updated too.
 #[derive(Clone)]
 pub struct UserUpdate {
-    pub user_id: u32,
     pub uploaded_delta: u64,
     pub downloaded_delta: u64,
 }
@@ -25,14 +24,6 @@ impl Mergeable for UserUpdate {
     fn merge(&mut self, new: &Self) {
         self.uploaded_delta = self.uploaded_delta.saturating_add(new.uploaded_delta);
         self.downloaded_delta = self.downloaded_delta.saturating_add(new.downloaded_delta);
-    }
-}
-
-impl<'a> From<&'a UserUpdate> for Index {
-    fn from(value: &'a UserUpdate) -> Self {
-        Self {
-            user_id: value.user_id,
-        }
     }
 }
 
@@ -62,8 +53,8 @@ impl Flushable<UserUpdate> for super::Batch<Index, UserUpdate> {
         );
 
         query_builder
-            .push_values(self.values(), |mut bind, user_update| {
-                bind.push_bind(user_update.user_id)
+            .push_values(self.iter(), |mut bind, (index, user_update)| {
+                bind.push_bind(index.user_id)
                     .push_bind("")
                     .push_bind("")
                     .push_bind("")

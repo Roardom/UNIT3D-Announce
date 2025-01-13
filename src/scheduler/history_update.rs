@@ -15,8 +15,6 @@ pub struct Index {
 
 #[derive(Clone)]
 pub struct HistoryUpdate {
-    pub user_id: u32,
-    pub torrent_id: u32,
     pub user_agent: String,
     pub is_active: bool,
     pub is_seeder: bool,
@@ -46,15 +44,6 @@ impl Mergeable for HistoryUpdate {
         self.completed_at = new.completed_at;
         self.created_at = std::cmp::min(self.created_at, new.created_at);
         self.updated_at = std::cmp::max(self.updated_at, new.updated_at);
-    }
-}
-
-impl<'a> From<&'a HistoryUpdate> for Index {
-    fn from(value: &'a HistoryUpdate) -> Self {
-        Self {
-            torrent_id: value.torrent_id,
-            user_id: value.user_id,
-        }
     }
 }
 
@@ -90,9 +79,9 @@ impl Flushable<HistoryUpdate> for super::Batch<Index, HistoryUpdate> {
         // Mysql 8.0.20 deprecates use of VALUES() so will have to update it eventually to use aliases instead
         query_builder
             // .push_values(history_updates., |mut bind, (index, history_update)| {
-            .push_values(self.values(), |mut bind, history_update| {
-                bind.push_bind(history_update.user_id)
-                    .push_bind(history_update.torrent_id)
+            .push_values(self.iter(), |mut bind, (index, history_update)| {
+                bind.push_bind(index.user_id)
+                    .push_bind(index.torrent_id)
                     .push_bind(history_update.user_agent.as_str())
                     .push_bind(history_update.credited_uploaded_delta)
                     .push_bind(history_update.uploaded_delta)

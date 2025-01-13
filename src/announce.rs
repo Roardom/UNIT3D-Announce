@@ -30,9 +30,12 @@ use crate::{
         UnsupportedEvent, UserAgentTooLong, UserNotFound,
     },
     scheduler::{
-        announce_update::AnnounceUpdate, history_update::HistoryUpdate, peer_update::PeerUpdate,
-        torrent_update::TorrentUpdate, unregistered_info_hash_update::UnregisteredInfoHashUpdate,
-        user_update::UserUpdate,
+        announce_update::AnnounceUpdate,
+        history_update::{self, HistoryUpdate},
+        peer_update::{self, PeerUpdate},
+        torrent_update::{self, TorrentUpdate},
+        unregistered_info_hash_update::{self, UnregisteredInfoHashUpdate},
+        user_update::{self, UserUpdate},
     },
     warning::AnnounceWarning,
 };
@@ -336,15 +339,16 @@ pub async fn announce(
 
     if let Ok(user) = &user {
         if let Err(InfoHashNotFound) = torrent_id_res {
-            tracker
-                .unregistered_info_hash_updates
-                .lock()
-                .upsert(UnregisteredInfoHashUpdate {
+            tracker.unregistered_info_hash_updates.lock().upsert(
+                unregistered_info_hash_update::Index {
                     user_id: user.id,
                     info_hash: queries.info_hash,
+                },
+                UnregisteredInfoHashUpdate {
                     created_at: now,
                     updated_at: now,
-                });
+                },
+            );
         }
     }
 
@@ -834,56 +838,66 @@ pub async fn announce(
         });
     }
 
-    tracker.peer_updates.lock().upsert(PeerUpdate {
-        peer_id: queries.peer_id,
-        ip: client_ip,
-        port: queries.port,
-        agent: String::from(user_agent),
-        uploaded: queries.uploaded,
-        downloaded: queries.downloaded,
-        is_active: queries.event != Event::Stopped,
-        is_seeder: queries.left == 0,
-        is_visible,
-        left: queries.left,
-        torrent_id,
-        user_id,
-        created_at: now,
-        updated_at: now,
-        connectable: is_connectable,
-    });
-
-    tracker.history_updates.lock().upsert(HistoryUpdate {
-        user_id,
-        torrent_id,
-        user_agent: String::from(user_agent),
-        is_active: queries.event != Event::Stopped,
-        is_seeder: queries.left == 0,
-        is_immune: if user.is_lifetime {
-            config
-                .lifetime_donor_immunity_override
-                .unwrap_or(group.is_immune)
-        } else if user.is_donor {
-            config.donor_immunity_override.unwrap_or(group.is_immune)
-        } else {
-            group.is_immune
+    tracker.peer_updates.lock().upsert(
+        peer_update::Index {
+            peer_id: queries.peer_id,
+            torrent_id,
+            user_id,
         },
-        uploaded: queries.uploaded,
-        downloaded: queries.downloaded,
-        uploaded_delta,
-        downloaded_delta,
-        credited_uploaded_delta,
-        credited_downloaded_delta,
-        completed_at,
-        created_at: now,
-        updated_at: now,
-    });
+        PeerUpdate {
+            ip: client_ip,
+            port: queries.port,
+            agent: String::from(user_agent),
+            uploaded: queries.uploaded,
+            downloaded: queries.downloaded,
+            is_active: queries.event != Event::Stopped,
+            is_seeder: queries.left == 0,
+            is_visible,
+            left: queries.left,
+            created_at: now,
+            updated_at: now,
+            connectable: is_connectable,
+        },
+    );
+
+    tracker.history_updates.lock().upsert(
+        history_update::Index {
+            user_id,
+            torrent_id,
+        },
+        HistoryUpdate {
+            user_agent: String::from(user_agent),
+            is_active: queries.event != Event::Stopped,
+            is_seeder: queries.left == 0,
+            is_immune: if user.is_lifetime {
+                config
+                    .lifetime_donor_immunity_override
+                    .unwrap_or(group.is_immune)
+            } else if user.is_donor {
+                config.donor_immunity_override.unwrap_or(group.is_immune)
+            } else {
+                group.is_immune
+            },
+            uploaded: queries.uploaded,
+            downloaded: queries.downloaded,
+            uploaded_delta,
+            downloaded_delta,
+            credited_uploaded_delta,
+            credited_downloaded_delta,
+            completed_at,
+            created_at: now,
+            updated_at: now,
+        },
+    );
 
     if credited_uploaded_delta != 0 || credited_downloaded_delta != 0 {
-        tracker.user_updates.lock().upsert(UserUpdate {
-            user_id,
-            uploaded_delta: credited_uploaded_delta,
-            downloaded_delta: credited_downloaded_delta,
-        });
+        tracker.user_updates.lock().upsert(
+            user_update::Index { user_id },
+            UserUpdate {
+                uploaded_delta: credited_uploaded_delta,
+                downloaded_delta: credited_downloaded_delta,
+            },
+        );
     }
 
     if seeder_delta != 0
@@ -892,14 +906,16 @@ pub async fn announce(
         || uploaded_delta != 0
         || downloaded_delta != 0
     {
-        tracker.torrent_updates.lock().upsert(TorrentUpdate {
-            torrent_id,
-            seeder_delta,
-            leecher_delta,
-            times_completed_delta,
-            balance_delta: uploaded_delta.try_into().unwrap_or(i64::MAX)
-                - downloaded_delta.try_into().unwrap_or(i64::MAX),
-        });
+        tracker.torrent_updates.lock().upsert(
+            torrent_update::Index { torrent_id },
+            TorrentUpdate {
+                seeder_delta,
+                leecher_delta,
+                times_completed_delta,
+                balance_delta: uploaded_delta.try_into().unwrap_or(i64::MAX)
+                    - downloaded_delta.try_into().unwrap_or(i64::MAX),
+            },
+        );
     }
 
     if config.is_announce_logging_enabled {

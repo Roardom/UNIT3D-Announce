@@ -14,8 +14,6 @@ pub struct Index {
 
 #[derive(Clone)]
 pub struct UnregisteredInfoHashUpdate {
-    pub user_id: u32,
-    pub info_hash: InfoHash,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -27,15 +25,6 @@ impl Mergeable for UnregisteredInfoHashUpdate {
         }
 
         self.created_at = std::cmp::min(self.created_at, new.created_at);
-    }
-}
-
-impl<'a> From<&'a UnregisteredInfoHashUpdate> for Index {
-    fn from(value: &'a UnregisteredInfoHashUpdate) -> Self {
-        Self {
-            user_id: value.user_id,
-            info_hash: value.info_hash,
-        }
     }
 }
 
@@ -58,12 +47,15 @@ impl Flushable<UnregisteredInfoHashUpdate> for super::Batch<Index, UnregisteredI
         );
 
         query_builder
-            .push_values(self.values(), |mut bind, unregistered_info_hash_update| {
-                bind.push_bind(unregistered_info_hash_update.user_id)
-                    .push_bind(unregistered_info_hash_update.info_hash.to_vec())
-                    .push_bind(unregistered_info_hash_update.created_at)
-                    .push_bind(unregistered_info_hash_update.updated_at);
-            })
+            .push_values(
+                self.iter(),
+                |mut bind, (index, unregistered_info_hash_update)| {
+                    bind.push_bind(index.user_id)
+                        .push_bind(index.info_hash.to_vec())
+                        .push_bind(unregistered_info_hash_update.created_at)
+                        .push_bind(unregistered_info_hash_update.updated_at);
+                },
+            )
             .push(
                 r#"
                 ON DUPLICATE KEY UPDATE
