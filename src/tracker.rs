@@ -31,6 +31,7 @@ use dotenvy::dotenv;
 use parking_lot::{Mutex, RwLock};
 use sqlx::mysql::MySqlPoolOptions;
 use sqlx::Connection;
+use std::io::{self, Write};
 use std::{env, sync::Arc, time::Duration};
 
 pub struct Tracker {
@@ -62,89 +63,83 @@ impl Tracker {
     /// data into this shared tracker context. This is then passed to all
     /// handlers.
     pub async fn default() -> Result<Arc<Tracker>> {
-        println!(".env file: verifying file exists...");
+        print!(".env file: verifying file exists                       ... ");
+        io::stdout().flush().unwrap();
         dotenv().context(".env file not found.")?;
-        println!("\x1B[1F\x1B[2KFound .env file");
+        println!("[Finished]");
 
-        println!("Loading from database into memory: config...");
+        print!("Loading config from env                                ... ");
+        io::stdout().flush().unwrap();
         let config = config::Config::from_env()?;
-        println!("\x1B[1F\x1B[2KLoaded config parameters");
+        println!("[Finished]");
 
-        println!("Connecting to database...");
+        print!("Connecting to database                                 ... ");
+        io::stdout().flush().unwrap();
         let pool = connect_to_database().await;
-        println!("\x1B[1F\x1B[2KConnected to database");
+        println!("[Finished]");
 
-        println!("Synchronizing peer counts...");
+        print!("Synchronizing peer counts                              ... ");
+        io::stdout().flush().unwrap();
         sync_peer_count_aggregates(&pool, &config).await?;
-        println!("\x1B[1F\x1B[2KSynchronized peer counts");
+        println!("[Finished]");
 
-        println!("Loading from database into memory: blacklisted ports...");
+        println!("Loading entities from database into memory...");
+        print!("Starting to load  1/11: blacklisted ports              ... ");
+        io::stdout().flush().unwrap();
         let port_blacklist = blacklisted_port::Set::default();
-        println!(
-            "\x1B[1F\x1B[2KLoaded {:?} blacklisted ports",
-            port_blacklist.len()
-        );
+        println!("[Finished] Records: {:?}", port_blacklist.len());
 
-        println!("Loading from database into memory: blacklisted user agents...");
+        print!("Starting to load  2/11: blacklisted user agents        ... ");
+        io::stdout().flush().unwrap();
         let agent_blacklist = blacklisted_agent::Set::from_db(&pool).await?;
-        println!(
-            "\x1B[1F\x1B[2KLoaded {:?} blacklisted agents",
-            agent_blacklist.len()
-        );
+        println!("[Finished] Records: {:?}", agent_blacklist.len());
 
-        println!("Loading from database into memory: torrents...");
+        print!("Starting to load  3/11: torrents                       ... ");
+        io::stdout().flush().unwrap();
         let torrents = torrent::Map::from_db(&pool).await?;
-        println!("\x1B[1F\x1B[2KLoaded {:?} torrents", torrents.len());
+        println!("[Finished] Records: {:?}", torrents.len());
 
-        println!("Loading from database into memory: infohash to torrent id mapping...");
+        print!("Starting to load  4/11: infohash to torrent id mappings... ");
+        io::stdout().flush().unwrap();
         let infohash2id = torrent::infohash2id::Map::from_db(&pool).await?;
-        println!(
-            "\x1B[1F\x1B[2KLoaded {:?} torrent infohash to id mappings",
-            infohash2id.len()
-        );
+        println!("[Finished] Records: {:?}", infohash2id.len());
 
-        println!("Loading from database into memory: users...");
+        print!("Starting to load  5/11: users                          ... ");
+        io::stdout().flush().unwrap();
         let users = user::Map::from_db(&pool, &config).await?;
-        println!("\x1B[1F\x1B[2KLoaded {:?} users", users.len());
+        println!("[Finished] Records: {:?}", users.len());
 
-        println!("Loading from database into memory: passkey to user id mapping...");
+        print!("Starting to load  6/11: passkey to user id mappings    ... ");
+        io::stdout().flush().unwrap();
         let passkey2id = user::passkey2id::Map::from_db(&pool).await?;
-        println!(
-            "\x1B[1F\x1B[2KLoaded {:?} user passkey to id mappings",
-            passkey2id.len()
-        );
+        println!("[Finished] Records: {:?}", passkey2id.len());
 
-        println!("Loading from database into memory: connectable ports...");
+        print!("Starting to load  7/11: connectable ports              ... ");
+        io::stdout().flush().unwrap();
         let connectable_ports = connectable_port::Map::from_db(&pool).await?;
-        println!(
-            "\x1B[1F\x1B[2KLoaded {:?} connectable ports",
-            connectable_ports.len()
-        );
+        println!("[Finished] Records: {:?}", connectable_ports.len());
 
-        println!("Loading from database into memory: freeleech tokens...");
+        print!("Starting to load  8/11: freeleech tokens               ... ");
+        io::stdout().flush().unwrap();
         let freeleech_tokens = freeleech_token::Set::from_db(&pool).await?;
-        println!(
-            "\x1B[1F\x1B[2KLoaded {:?} freeleech tokens",
-            freeleech_tokens.len()
-        );
+        println!("[Finished] Records: {:?}", freeleech_tokens.len());
 
-        println!("Loading from database into memory: personal freeleeches...");
+        print!("Starting to load  9/11: personal freeleeches           ... ");
+        io::stdout().flush().unwrap();
         let personal_freeleeches = personal_freeleech::Set::from_db(&pool).await?;
-        println!(
-            "\x1B[1F\x1B[2KLoaded {:?} personal freeleeches",
-            personal_freeleeches.len()
-        );
+        println!("[Finished] Records: {:?}", personal_freeleeches.len());
 
-        println!("Loading from database into memory: featured_torrents...");
+        print!("Starting to load 10/11: featured torrents              ... ");
+        io::stdout().flush().unwrap();
         let featured_torrents = featured_torrent::Set::from_db(&pool).await?;
-        println!(
-            "\x1B[1F\x1B[2KLoaded {:?} featured torrents",
-            featured_torrents.len()
-        );
+        println!("[Finished] Records: {:?}", featured_torrents.len());
 
-        println!("Loading from database into memory: groups...");
+        print!("Starting to load 11/11: groups                         ... ");
+        io::stdout().flush().unwrap();
         let groups = group::Map::from_db(&pool).await?;
-        println!("\x1B[1F\x1B[2KLoaded {:?} groups", groups.len());
+        println!("[Finished] Records: {:?}", groups.len());
+
+        println!("All entities loaded into memory.");
 
         let stats = Stats::default();
 
