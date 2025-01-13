@@ -704,10 +704,12 @@ pub async fn announce(
         if !warnings.is_empty() {
             let mut warning_message: Vec<u8> = Vec::with_capacity((64 + 2) * warnings.len());
 
-            for warning in &warnings {
-                warning_message.extend(warning.to_string().as_bytes());
+            for i in 0..(warnings.len() - 1) {
+                warning_message.extend(warnings.get(i).expect("in range").to_string().as_bytes());
                 warning_message.extend(b"; ")
             }
+
+            warning_message.extend(warnings.last().expect("not empty").to_string().as_bytes());
 
             response.extend(b"15:warning message");
             response.extend(warning_message.len().to_string().as_bytes());
