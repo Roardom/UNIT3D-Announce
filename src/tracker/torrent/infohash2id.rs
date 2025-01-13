@@ -28,6 +28,9 @@ impl Map {
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Map> {
+        // Load one torrent per info hash. If multiple are found, prefer
+        // undeleted torrents. If multiple are still found, prefer approved
+        // torrents. If multiple are still found, prefer the oldest.
         let info_hash2ids = sqlx::query_as!(
             InfoHash2Id,
             r#"
@@ -36,8 +39,19 @@ impl Map {
                     torrents.info_hash as `info_hash: InfoHash`
                 FROM
                     torrents
-                WHERE
-                    torrents.deleted_at IS NULL
+                JOIN (
+                    SELECT
+                        COALESCE(
+                            MIN(CASE WHEN deleted_at IS NULL AND status = 1 THEN id END),
+                            MIN(CASE WHEN deleted_at IS NULL AND status != 1 THEN id END),
+                            MIN(CASE WHEN deleted_at IS NOT NULL THEN id END)
+                        ) AS id
+                    FROM
+                        torrents
+                    GROUP BY
+                        info_hash
+                ) AS distinct_torrents
+                    ON distinct_torrents.id = torrents.id
             "#
         )
         .fetch_all(db)

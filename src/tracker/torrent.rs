@@ -55,8 +55,9 @@ impl Map {
                 });
         });
 
-        // TODO: deleted_at column still needs added to unit3d. Until then, no
-        // torrents are considered deleted.
+        // Load one torrent per info hash. If multiple are found, prefer
+        // undeleted torrents. If multiple are still found, prefer approved
+        // torrents. If multiple are still found, prefer the oldest.
         let torrents: Vec<DBImportTorrent> = sqlx::query_as!(
             DBImportTorrent,
             r#"
@@ -67,12 +68,23 @@ impl Map {
                     torrents.leechers as `leechers: u32`,
                     torrents.times_completed as `times_completed: u32`,
                     100 - LEAST(torrents.free, 100) as `download_factor: u8`,
-                    IF(doubleup, 200, 100) as `upload_factor: u8`,
-                    0 as `is_deleted: bool`
+                    IF(torrents.doubleup, 200, 100) as `upload_factor: u8`,
+                    torrents.deleted_at IS NOT NULL as `is_deleted: bool`
                 FROM
                     torrents
-                WHERE
-                    torrents.deleted_at IS NULL
+                JOIN (
+                    SELECT
+                        COALESCE(
+                            MIN(CASE WHEN deleted_at IS NULL AND status = 1 THEN id END),
+                            MIN(CASE WHEN deleted_at IS NULL AND status != 1 THEN id END),
+                            MIN(CASE WHEN deleted_at IS NOT NULL THEN id END)
+                        ) AS id
+                    FROM
+                        torrents
+                    GROUP BY
+                        info_hash
+                ) AS distinct_torrents
+                    ON distinct_torrents.id = torrents.id
             "#
         )
         .fetch_all(db)
