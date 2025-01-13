@@ -87,6 +87,7 @@ impl RateCollection {
         Ok(Self {
             rates: s
                 .split(';')
+                .filter(|&s| !s.is_empty())
                 .map(|pair| {
                     let mut split = pair.splitn(2, '=');
                     let window: f64 = split
