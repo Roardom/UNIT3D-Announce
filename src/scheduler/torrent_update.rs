@@ -39,8 +39,6 @@ impl Flushable<TorrentUpdate> for super::Batch<Index, TorrentUpdate> {
 
         let now = Utc::now();
 
-        // Trailing space required before the push values function
-        // Leading space required after the push values function
         let mut query_builder: QueryBuilder<MySql> = QueryBuilder::new(
             r#"
                 INSERT INTO
@@ -65,6 +63,8 @@ impl Flushable<TorrentUpdate> for super::Batch<Index, TorrentUpdate> {
         );
 
         query_builder
+            // Trailing space required before the push values function
+            // Leading space required after the push values function
             .push_values(self.iter(), |mut bind, (index, torrent_update)| {
                 bind.push_bind(index.torrent_id)
                     .push_bind("")
@@ -82,6 +82,8 @@ impl Flushable<TorrentUpdate> for super::Batch<Index, TorrentUpdate> {
                     .push_bind(torrent_update.balance_delta)
                     .push_bind(0);
             })
+            // Mysql 8.0.20 deprecates use of VALUES() so will have to update it eventually to use aliases instead
+            // However, Mariadb doesn't yet support aliases
             .push(
                 r#"
                     ON DUPLICATE KEY UPDATE

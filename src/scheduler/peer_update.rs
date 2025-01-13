@@ -79,6 +79,8 @@ impl Flushable<PeerUpdate> for super::Batch<Index, PeerUpdate> {
         );
 
         query_builder
+            // Trailing space required before the push values function
+            // Leading space required after the push values function
             .push_values(self.iter(), |mut bind, (index, peer_update)| {
                 bind.push_bind(index.peer_id.to_vec())
                     .push_bind(match peer_update.ip {
@@ -99,6 +101,8 @@ impl Flushable<PeerUpdate> for super::Batch<Index, PeerUpdate> {
                     .push_bind(index.user_id)
                     .push_bind(peer_update.connectable);
             })
+            // Mysql 8.0.20 deprecates use of VALUES() so will have to update it eventually to use aliases instead
+            // However, Mariadb doesn't yet support aliases
             .push(
                 r#"
                 ON DUPLICATE KEY UPDATE

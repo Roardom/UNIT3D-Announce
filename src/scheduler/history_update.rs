@@ -76,9 +76,9 @@ impl Flushable<HistoryUpdate> for super::Batch<Index, HistoryUpdate> {
             "#,
         );
 
-        // Mysql 8.0.20 deprecates use of VALUES() so will have to update it eventually to use aliases instead
         query_builder
-            // .push_values(history_updates., |mut bind, (index, history_update)| {
+            // Trailing space required before the push values function
+            // Leading space required after the push values function
             .push_values(self.iter(), |mut bind, (index, history_update)| {
                 bind.push_bind(index.user_id)
                     .push_bind(index.torrent_id)
@@ -97,6 +97,8 @@ impl Flushable<HistoryUpdate> for super::Batch<Index, HistoryUpdate> {
                     .push_bind(history_update.updated_at)
                     .push_bind(history_update.completed_at);
             })
+            // Mysql 8.0.20 deprecates use of VALUES() so will have to update it eventually to use aliases instead
+            // However, Mariadb doesn't yet support aliases
             .push(
                 r#"
                     ON DUPLICATE KEY UPDATE
