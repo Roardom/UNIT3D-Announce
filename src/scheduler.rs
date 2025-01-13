@@ -211,9 +211,9 @@ where
 {
     async fn flush<'a>(&self, tracker: &Arc<Tracker>, record_type: &'a str) {
         let batch = self.lock().take_batch();
+        let start = Instant::now();
         let len = batch.len();
         let result = batch.flush_to_db(tracker).await;
-        let start = Instant::now();
         let elapsed = start.elapsed().as_millis();
 
         match result {
