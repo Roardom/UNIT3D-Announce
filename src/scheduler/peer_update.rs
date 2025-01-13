@@ -4,7 +4,7 @@ use crate::tracker::{peer::PeerId, Tracker};
 use chrono::{DateTime, Utc};
 use sqlx::{MySql, QueryBuilder};
 
-use super::{Flushable, Mergeable, Upsertable};
+use super::{Flushable, Mergeable};
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Index {
@@ -52,18 +52,13 @@ impl Mergeable for PeerUpdate {
     }
 }
 
-impl Upsertable<PeerUpdate> for super::Queue<Index, PeerUpdate> {
-    fn upsert(&mut self, new: PeerUpdate) {
-        self.records
-            .entry(Index {
-                torrent_id: new.torrent_id,
-                user_id: new.user_id,
-                peer_id: new.peer_id,
-            })
-            .and_modify(|peer_update| {
-                peer_update.merge(&new);
-            })
-            .or_insert(new);
+impl<'a> From<&'a PeerUpdate> for Index {
+    fn from(value: &'a PeerUpdate) -> Self {
+        Self {
+            torrent_id: value.torrent_id,
+            user_id: value.user_id,
+            peer_id: value.peer_id,
+        }
     }
 }
 

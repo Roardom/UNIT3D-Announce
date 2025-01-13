@@ -4,7 +4,7 @@ use crate::tracker::{torrent::InfoHash, Tracker};
 use chrono::{DateTime, Utc};
 use sqlx::{MySql, QueryBuilder};
 
-use super::{Flushable, Mergeable, Upsertable};
+use super::{Flushable, Mergeable};
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Index {
@@ -30,17 +30,12 @@ impl Mergeable for UnregisteredInfoHashUpdate {
     }
 }
 
-impl Upsertable<UnregisteredInfoHashUpdate> for super::Queue<Index, UnregisteredInfoHashUpdate> {
-    fn upsert(&mut self, new: UnregisteredInfoHashUpdate) {
-        self.records
-            .entry(Index {
-                user_id: new.user_id,
-                info_hash: new.info_hash,
-            })
-            .and_modify(|unregistered_info_hash_update| {
-                unregistered_info_hash_update.merge(&new);
-            })
-            .or_insert(new);
+impl<'a> From<&'a UnregisteredInfoHashUpdate> for Index {
+    fn from(value: &'a UnregisteredInfoHashUpdate) -> Self {
+        Self {
+            user_id: value.user_id,
+            info_hash: value.info_hash,
+        }
     }
 }
 

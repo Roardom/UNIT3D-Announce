@@ -153,7 +153,7 @@ impl<K, V> Queue<K, V>
 where
     K: Hash + Eq,
     V: Clone + Mergeable,
-    Queue<K, V>: Upsertable<V>,
+    for<'a> &'a V: Into<K>,
 {
     /// Initialize a new queue
     pub fn new(config: QueueConfig) -> Queue<K, V> {
@@ -161,6 +161,14 @@ where
             records: IndexMap::new(),
             config,
         }
+    }
+
+    /// Upsert a single update into the queue
+    pub fn upsert(&mut self, new: V) {
+        self.records
+            .entry((&new).into())
+            .and_modify(|update| update.merge(&new))
+            .or_insert(new);
     }
 
     /// Take a portion of the updates from the start of the queue with a max
@@ -195,7 +203,7 @@ impl<K, V> MutexQueueExt for Mutex<Queue<K, V>>
 where
     K: Hash + Eq,
     V: Clone + Mergeable,
-    Queue<K, V>: Upsertable<V>,
+    for<'a> &'a V: Into<K>,
     Batch<K, V>: Flushable<V>,
 {
     async fn flush<'a>(&self, tracker: &Arc<Tracker>, record_type: &'a str) {
@@ -220,10 +228,6 @@ where
 pub trait Mergeable {
     /// Merge a record with a new record
     fn merge(&mut self, new: &Self);
-}
-
-pub trait Upsertable<T> {
-    fn upsert(&mut self, new: T);
 }
 
 pub struct Batch<K, V>(IndexMap<K, V>);

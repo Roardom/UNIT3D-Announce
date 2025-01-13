@@ -5,7 +5,7 @@ use sqlx::{MySql, QueryBuilder};
 
 use crate::tracker::Tracker;
 
-use super::{Flushable, Mergeable, Upsertable};
+use super::{Flushable, Mergeable};
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Index {
@@ -32,18 +32,14 @@ impl Mergeable for TorrentUpdate {
     }
 }
 
-impl Upsertable<TorrentUpdate> for super::Queue<Index, TorrentUpdate> {
-    fn upsert(&mut self, new: TorrentUpdate) {
-        self.records
-            .entry(Index {
-                torrent_id: new.torrent_id,
-            })
-            .and_modify(|torrent_update| {
-                torrent_update.merge(&new);
-            })
-            .or_insert(new);
+impl<'a> From<&'a TorrentUpdate> for Index {
+    fn from(value: &'a TorrentUpdate) -> Self {
+        Self {
+            torrent_id: value.torrent_id,
+        }
     }
 }
+
 impl Flushable<TorrentUpdate> for super::Batch<Index, TorrentUpdate> {
     async fn flush_to_db(&self, tracker: &Arc<Tracker>) -> Result<u64, sqlx::Error> {
         if self.is_empty() {
