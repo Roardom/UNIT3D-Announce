@@ -1,0 +1,34 @@
+{
+  "db_name": "MySQL",
+  "query": "\n                SELECT\n                    torrents.id as `id: u32`,\n                    torrents.info_hash as `info_hash: InfoHash`\n                FROM\n                    torrents\n                JOIN (\n                    SELECT\n                        COALESCE(\n                            MIN(CASE WHEN deleted_at IS NULL AND status = 1 THEN id END),\n                            MIN(CASE WHEN deleted_at IS NULL AND status != 1 THEN id END),\n                            MIN(CASE WHEN deleted_at IS NOT NULL THEN id END)\n                        ) AS id\n                    FROM\n                        torrents\n                    GROUP BY\n                        info_hash\n                ) AS distinct_torrents\n                    ON distinct_torrents.id = torrents.id\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: u32",
+        "type_info": {
+          "type": "Long",
+          "flags": "NOT_NULL | PRIMARY_KEY | MULTIPLE_KEY | UNSIGNED | AUTO_INCREMENT",
+          "max_size": 10
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "info_hash: InfoHash",
+        "type_info": {
+          "type": "String",
+          "flags": "NOT_NULL | MULTIPLE_KEY | BINARY | NO_DEFAULT_VALUE",
+          "max_size": 20
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "562c19946e09a73b073b628551cf8427ef9fcc9cc7e1a3c9cc2529c59e5fb089"
+}
