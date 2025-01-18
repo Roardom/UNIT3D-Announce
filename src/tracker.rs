@@ -65,8 +65,8 @@ impl Tracker {
     pub async fn default() -> Result<Arc<Tracker>> {
         print!(".env file: verifying file exists                       ... ");
         io::stdout().flush().unwrap();
-        dotenv().context(".env file not found.")?;
-        println!("[Finished]");
+        let env_path = dotenv().context(".env file not found.")?;
+        println!("[Finished] Path: {:?}", env_path);
 
         print!("Loading config from env                                ... ");
         io::stdout().flush().unwrap();
