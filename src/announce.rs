@@ -20,12 +20,12 @@ use tokio::net::TcpStream;
 use crate::{
     error::AnnounceError::{
         self, AbnormalAccess, BlacklistedClient, BlacklistedPort, DownloadPrivilegesRevoked,
-        GroupBanned, GroupDisabled, GroupNotFound, GroupValidating, InfoHashNotFound,
-        InternalTrackerError, InvalidCompact, InvalidDownloaded, InvalidInfoHash, InvalidLeft,
-        InvalidNumwant, InvalidPasskey, InvalidPeerId, InvalidPort, InvalidQueryStringKey,
-        InvalidQueryStringValue, InvalidUploaded, InvalidUserAgent, MissingDownloaded,
-        MissingInfoHash, MissingLeft, MissingPeerId, MissingPort, MissingUploaded, NotAClient,
-        PasskeyNotFound, PeersPerTorrentPerUserLimit, TorrentIsDeleted, TorrentIsPendingModeration,
+        GroupNotEnabled, GroupNotFound, InfoHashNotFound, InternalTrackerError, InvalidCompact,
+        InvalidDownloaded, InvalidInfoHash, InvalidLeft, InvalidNumwant, InvalidPasskey,
+        InvalidPeerId, InvalidPort, InvalidQueryStringKey, InvalidQueryStringValue,
+        InvalidUploaded, InvalidUserAgent, MissingDownloaded, MissingInfoHash, MissingLeft,
+        MissingPeerId, MissingPort, MissingUploaded, NotAClient, PasskeyNotFound,
+        PeersPerTorrentPerUserLimit, TorrentIsDeleted, TorrentIsPendingModeration,
         TorrentIsPostponed, TorrentIsRejected, TorrentNotFound, TorrentUnknownModerationStatus,
         UnsupportedEvent, UserAgentTooLong, UserNotFound,
     },
@@ -416,11 +416,8 @@ pub async fn announce(
             .ok_or(GroupNotFound)?
             .clone();
 
-        match group.slug.as_str() {
-            "banned" => return Err(GroupBanned),
-            "validating" => return Err(GroupValidating),
-            "disabled" => return Err(GroupDisabled),
-            _ => (),
+        if ["banned", "validating", "disabled"].contains(&group.slug.as_str()) {
+            return Err(GroupNotEnabled(group.slug));
         }
 
         // Make sure user isn't leeching more torrents than their group allows

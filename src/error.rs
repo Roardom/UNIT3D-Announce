@@ -5,7 +5,7 @@ use axum::{
 
 use thiserror::Error;
 
-#[derive(Error, Debug, Clone, Copy)]
+#[derive(Error, Debug, Clone)]
 pub enum AnnounceError {
     #[error("Internal tracker error.")]
     InternalTrackerError,
@@ -79,12 +79,8 @@ pub enum AnnounceError {
     TorrentUnknownModerationStatus,
     #[error("Group not found.")]
     GroupNotFound,
-    #[error("Your account is not enabled. (Current: Banned).")]
-    GroupBanned,
-    #[error("Your account is not enabled. (Current: Validating).")]
-    GroupValidating,
-    #[error("Your account is not enabled. (Current: Disabled).")]
-    GroupDisabled,
+    #[error("Your account is not enabled. (Current: {0}).")]
+    GroupNotEnabled(String),
     #[error("You already have {0} peers on this torrent. Ignoring.")]
     PeersPerTorrentPerUserLimit(u16),
 }
