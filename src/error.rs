@@ -61,8 +61,8 @@ pub enum AnnounceError {
     UserNotFound,
     #[error("Your downloading privileges have been disabled.")]
     DownloadPrivilegesRevoked,
-    #[error("Illegal port. Port should be between 6881-64999.")]
-    BlacklistedPort,
+    #[error("Illegal port: {0}. Port should be between 6881-64999.")]
+    BlacklistedPort(u16),
     #[error("InfoHash not found.")]
     InfoHashNotFound,
     #[error("Torrent not found.")]

@@ -308,7 +308,7 @@ pub async fn announce(
     // Validate port
     // Some clients send port 0 on the stopped event
     if tracker.port_blacklist.read().contains(&queries.port) && queries.event != Event::Stopped {
-        return Err(BlacklistedPort);
+        return Err(BlacklistedPort(queries.port));
     }
 
     let passkey: Passkey = Passkey::from_str(&passkey).or(Err(InvalidPasskey))?;
