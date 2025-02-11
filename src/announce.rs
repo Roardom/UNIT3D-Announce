@@ -320,12 +320,17 @@ pub async fn announce(
         .get(&passkey)
         .ok_or(PasskeyNotFound)
         .cloned();
-    let user = tracker
-        .users
-        .read()
-        .get(&user_id.unwrap_or(0))
-        .ok_or(UserNotFound)
-        .cloned();
+
+    let user = if let Ok(user_id) = user_id {
+        tracker
+            .users
+            .read()
+            .get(&user_id)
+            .ok_or(UserNotFound)
+            .cloned()
+    } else {
+        Err(UserNotFound)
+    };
 
     // Validate torrent
     let torrent_id_res = tracker
