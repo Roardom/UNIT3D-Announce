@@ -23,3 +23,7 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.5"
+
+[profile.release]
+lto = true
+codegen-units = 1
