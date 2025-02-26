@@ -155,7 +155,7 @@ impl QueueConfig {
 
 impl<K, V> Queue<K, V>
 where
-    K: Hash + Eq,
+    K: Hash + Eq + Ord,
     V: Clone + Mergeable,
 {
     /// Initialize a new queue
@@ -177,11 +177,14 @@ where
     /// Take a portion of the updates from the start of the queue with a max
     /// size defined by the buffer config
     fn take_batch(&mut self) -> Batch<K, V> {
-        Batch(
-            self.records
-                .drain(0..min(self.records.len(), self.config.max_batch_size()))
-                .collect(),
-        )
+        let mut batch = self
+            .records
+            .drain(0..min(self.records.len(), self.config.max_batch_size()))
+            .collect::<IndexMap<K, V>>();
+
+        batch.sort_unstable_keys();
+
+        Batch(batch)
     }
 
     /// Bulk upsert a batch into the end of the queue
@@ -205,7 +208,7 @@ trait MutexQueueExt {
 
 impl<K, V> MutexQueueExt for Mutex<Queue<K, V>>
 where
-    K: Hash + Eq,
+    K: Hash + Eq + Ord,
     V: Clone + Mergeable,
     Batch<K, V>: Flushable<V>,
 {

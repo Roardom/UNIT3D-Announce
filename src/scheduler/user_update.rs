@@ -6,7 +6,8 @@ use crate::tracker::Tracker;
 
 use super::{Flushable, Mergeable};
 
-#[derive(Eq, Hash, PartialEq)]
+// Fields must be in same order as database primary key
+#[derive(Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct Index {
     pub user_id: u32,
 }

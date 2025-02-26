@@ -7,7 +7,7 @@ use crate::utils::{hex_decode, hex_encode};
 
 use anyhow::{bail, Context, Result};
 
-#[derive(Clone, Copy, Deserialize, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Deserialize, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct InfoHash(pub [u8; 20]);
 
 impl FromStr for InfoHash {

@@ -8,7 +8,7 @@ use sqlx::{Database, Decode};
 
 use crate::utils::hex_encode;
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct PeerId(pub [u8; 20]);
 
 impl Deref for PeerId {
