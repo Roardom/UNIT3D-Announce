@@ -1,6 +1,6 @@
 use std::{env, net::IpAddr, num::NonZeroU64, sync::Arc};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 use axum::{
     extract::State,
     http::StatusCode,
@@ -141,10 +141,20 @@ impl Config {
             .parse()
             .context("ANNOUNCE_MIN_ENFORCED must be a number between 0 and 2^32 - 1")?;
 
+        ensure!(
+            announce_min_enforced <= announce_min,
+            "ANNOUNCE_MIN_ENFORCED must be less than or equal to ANNOUNCE_MIN",
+        );
+
         let announce_max = env::var("ANNOUNCE_MAX")
             .context("ANNOUNCE_MAX not found in .env file.")?
             .parse()
             .context("ANNOUNCE_MAX must be a number between 0 and 2^32 - 1")?;
+
+        ensure!(
+            announce_max >= announce_min,
+            "ANNOUNCE_MAX must be greater than or equal to ANNOUNCE_MIN",
+        );
 
         let upload_factor = env::var("UPLOAD_FACTOR")
             .context("UPLOAD_FACTOR not found in .env file.")?
@@ -165,6 +175,11 @@ impl Config {
             .context("ACTIVE_PEER_TTL not found in .env file.")?
             .parse()
             .context("ACTIVE_PEER_TTL must be a number between 0 and 2^64 - 1")?;
+
+        ensure!(
+            active_peer_ttl > announce_max as u64,
+            "ACTIVE_PEER_TTL must be greater than ANNOUNCE_MAX",
+        );
 
         let inactive_peer_ttl = env::var("INACTIVE_PEER_TTL")
             .context("INACTIVE_PEER_TTL not found in .env file.")?
