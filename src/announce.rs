@@ -602,6 +602,8 @@ pub async fn announce(
 
         let mut has_requested_seed_list = false;
         let mut has_requested_leech_list = false;
+        let mut is_over_seed_list_rate_limit = false;
+        let mut is_over_leech_list_rate_limit = false;
 
         // Only provide peer list if
         // - it is not a stopped event,
@@ -629,6 +631,8 @@ pub async fn announce(
                             .filter(|(_index, peer)| peer.is_seeder)
                             .choose_multiple(&mut thread_rng(), queries.numwant),
                     );
+                } else {
+                    is_over_seed_list_rate_limit = true;
                 }
             }
 
@@ -645,6 +649,8 @@ pub async fn announce(
                                 queries.numwant.saturating_sub(peers.len()),
                             ),
                     );
+                } else {
+                    is_over_leech_list_rate_limit = true;
                 }
             }
 
@@ -676,12 +682,25 @@ pub async fn announce(
                 + peers_ipv6.len() * 18 + 5 // bytes per ipv6 plus estimated length prefix
                 + warnings.len() * (64 + 2), // max bytes per warning message plus separator
         );
+
         response.extend(b"d8:completei");
-        response.extend(torrent.seeders.to_string().as_bytes());
+
+        if is_over_seed_list_rate_limit || !warnings.is_empty() {
+            response.extend(b"0")
+        } else {
+            response.extend(torrent.seeders.to_string().as_bytes());
+        }
+
         response.extend(b"e10:downloadedi");
         response.extend(torrent.times_completed.to_string().as_bytes());
         response.extend(b"e10:incompletei");
-        response.extend(torrent.leechers.to_string().as_bytes());
+
+        if is_over_leech_list_rate_limit || !warnings.is_empty() {
+            response.extend(b"0");
+        } else {
+            response.extend(torrent.leechers.to_string().as_bytes());
+        }
+
         response.extend(b"e8:intervali");
         response.extend(interval.to_string().as_bytes());
         response.extend(b"e12:min intervali");
