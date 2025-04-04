@@ -98,12 +98,23 @@ impl Map {
                     )
                 });
 
+            let new_passkey = if let Some(new_passkey) = &user.new_passkey {
+                if let Ok(new_passkey) = Passkey::from_str(new_passkey) {
+                    tracker.passkey2id.write().swap_remove(&passkey);
+                    new_passkey
+                } else {
+                    return StatusCode::BAD_REQUEST;
+                }
+            } else {
+                passkey
+            };
+
             tracker.users.write().insert(
                 user.id,
                 User {
                     id: user.id,
                     group_id: user.group_id,
-                    passkey,
+                    passkey: new_passkey,
                     can_download: user.can_download,
                     num_seeding: user.num_seeding,
                     num_leeching: user.num_leeching,
@@ -114,7 +125,7 @@ impl Map {
                 },
             );
 
-            tracker.passkey2id.write().insert(passkey, user.id);
+            tracker.passkey2id.write().insert(new_passkey, user.id);
 
             return StatusCode::OK;
         }
@@ -196,6 +207,7 @@ pub struct APIInsertUser {
     pub id: u32,
     pub group_id: i32,
     pub passkey: String,
+    pub new_passkey: Option<String>,
     pub can_download: bool,
     pub num_seeding: u32,
     pub num_leeching: u32,
