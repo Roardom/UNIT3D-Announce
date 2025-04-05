@@ -9,7 +9,7 @@ High-performance backend BitTorrent tracker compatible with UNIT3D tracker softw
 | v8.3.4 - v9.0.4 | v0.1                    |
 | v9.0.5+         | v0.2                    |
 
-## Usage
+## Installation
 
 ```sh
 # Go to where UNIT3D is already installed
@@ -42,6 +42,27 @@ $ sudo nano .env
 # Enable the external tracker in UNIT3D's config
 $ sudo nano config/announce.php
 ```
+
+## Update
+
+```sh
+# Go to where UNIT3D-Announce is already installed
+$ cd /var/www/html/unit3d-announce
+
+# Pull the new updates
+$ git pull origin v0.2
+
+# Review changes to the configuration
+$ diff -u .env .env.example
+
+# Add/update any new configuration values
+$ sudo nano .env
+
+# Build the tracker
+$ cargo build --release
+```
+
+Remember to [restart the tracker](#startingrestarting-unit3d-announce).
 
 ## Reverse proxy
 
