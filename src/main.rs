@@ -1,8 +1,11 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use axum::Router;
 use dotenvy::dotenv;
 use std::net::SocketAddr;
-use tokio::signal;
+use tokio::{
+    net::{TcpListener, UnixListener},
+    signal,
+};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[cfg(not(target_env = "msvc"))]
@@ -58,24 +61,42 @@ async fn main() -> Result<()> {
         .merge(routes::routes(tracker.clone()))
         .with_state(tracker.clone());
 
-    // Listening socket address.
-    let addr = SocketAddr::from((
-        tracker.config.read().listening_ip_address,
-        tracker.config.read().listening_port,
-    ));
+    // Ensure lock is dropped before axum::serve() is called otherwise
+    // reloading config triggers a deadlock
+    let config = tracker.config.read().clone();
 
-    // Start handling announces.
-    println!("UNIT3D Announce has started.");
+    if let Some(path) = config.listening_unix_socket.to_owned() {
+        // Create unix domain socket.
+        let _ = tokio::fs::remove_file(&path).await;
+        tokio::fs::create_dir_all(path.parent().unwrap()).await?;
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        let listener = UnixListener::bind(path.clone())?;
 
-    axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .with_graceful_shutdown(shutdown_signal())
-    .await
-    .unwrap();
+        // Start handling announces.
+        println!("UNIT3D Announce has started.");
+
+        axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown_signal())
+            .await?;
+    } else if let Some(ip) = config.listening_ip_address
+        && let Some(port) = config.listening_port
+    {
+        // Create TCP socket.
+        let addr = SocketAddr::from((ip, port));
+
+        let listener = TcpListener::bind(addr).await?;
+
+        // Start handling announces.
+        println!("UNIT3D Announce has started.");
+
+        let app = app.into_make_service_with_connect_info::<SocketAddr>();
+
+        axum::serve(listener, app)
+            .with_graceful_shutdown(shutdown_signal())
+            .await?;
+    } else {
+        bail!("Listener not configured.");
+    }
 
     // Flush all remaining updates before shutting down.
     let max_flushes = 1000;
