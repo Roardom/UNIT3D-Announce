@@ -1,5 +1,5 @@
 use axum::{
-    extract::{ConnectInfo, FromRef, FromRequestParts, Path, State},
+    extract::{FromRef, FromRequestParts, Path, State},
     http::{
         header::{ACCEPT_CHARSET, ACCEPT_LANGUAGE, REFERER, USER_AGENT},
         request::Parts,
@@ -210,40 +210,27 @@ impl FromRequestParts<Arc<Tracker>> for ClientIp {
         parts: &mut Parts,
         state: &Arc<Tracker>,
     ) -> Result<Self, Self::Rejection> {
-        let header_name_opt = &state
-            .config
-            .read()
-            .reverse_proxy_client_ip_header_name
-            .to_owned();
+        let header_name_opt = &state.config.read().reverse_proxy_client_ip_header_name;
 
-        let ip = if let Some(header) = &header_name_opt {
-            // We need the right-most ip, which should be included in the last header
-            parts
-                .headers
-                .get_all(header)
-                .iter()
-                .last()
-                // Err: Missing the client ip header
-                .ok_or(InternalTrackerError)?
-                .to_str()
-                // Err: Client ip header is not UTF-8
-                .map_err(|_| InternalTrackerError)?
-                .split(',')
-                .last()
-                // Err: Client ip header is empty
-                .ok_or(InternalTrackerError)?
-                .trim()
-                .parse()
-                // Err: Client ip header does not contain a valid ip address
-                .map_err(|_| InternalTrackerError)?
-        } else {
-            // If the header isn't configured, use the connecting ip.
-            let ConnectInfo(addr) = ConnectInfo::<SocketAddr>::from_request_parts(parts, state)
-                .await
-                .or(Err(InternalTrackerError))?;
-
-            addr.ip()
-        };
+        // We need the right-most ip, which should be included in the last header
+        let ip = parts
+            .headers
+            .get_all(header_name_opt)
+            .iter()
+            .last()
+            // Err: Missing the client ip header
+            .ok_or(InternalTrackerError)?
+            .to_str()
+            // Err: Client ip header is not UTF-8
+            .map_err(|_| InternalTrackerError)?
+            .split(',')
+            .last()
+            // Err: Client ip header is empty
+            .ok_or(InternalTrackerError)?
+            .trim()
+            .parse()
+            // Err: Client ip header does not contain a valid ip address
+            .map_err(|_| InternalTrackerError)?;
 
         Ok(ClientIp(ip))
     }

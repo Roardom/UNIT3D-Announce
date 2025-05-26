@@ -1,4 +1,10 @@
-use std::{env, net::IpAddr, num::NonZeroU64, sync::Arc};
+use std::{
+    env,
+    net::{IpAddr, SocketAddr},
+    num::NonZeroU64,
+    path::PathBuf,
+    sync::Arc,
+};
 
 use anyhow::{bail, ensure, Context, Result};
 use axum::{
@@ -54,10 +60,12 @@ pub struct Config {
     /// Site password used by UNIT3D to send api requests to the tracker.
     /// Must be at least 32 characters long and should be properly randomized.
     pub apikey: String,
-    /// IP address for the tracker to listen from to receive announces.
-    pub listening_ip_address: IpAddr,
-    /// Port for the tracker to listen from to receive announces.
-    pub listening_port: u16,
+    /// Path to unix domain socket to listen from to receive announces from
+    /// reverse proxy.
+    pub listening_announce_socket: PathBuf,
+    /// TCP Socket for the tracker to listen from to handle api requests sent
+    /// by UNIT3D.
+    pub listening_api_socket_address: SocketAddr,
     /// Max amount of active peers a user is allowed to have on a torrent.
     /// Prevents abuse from malicious users causing the server to run out of ram,
     /// as well as keeps the peer lists from being filled with too many clients
@@ -79,9 +87,8 @@ pub struct Config {
     pub is_announce_logging_enabled: bool,
     /// The header provided by the reverse proxy that includes the bittorrent
     /// client's original ip address. The last address in the comma separated
-    /// list will be selected. Leave empty to select the connecting ip address
-    /// if not using a reverse proxy.
-    pub reverse_proxy_client_ip_header_name: Option<String>,
+    /// list will be selected. A reverse proxy is required.
+    pub reverse_proxy_client_ip_header_name: String,
     /// The max amount of peer lists containing seeds a user is allowed to
     /// receive per time window (in seconds). The rate is calculated using an
     /// exponential decay model. If a user requests peer lists faster than
@@ -186,15 +193,19 @@ impl Config {
             .parse()
             .context("INACTIVE_PEER_TTL must be a number between 0 and 2^64 - 1")?;
 
-        let listening_ip_address = env::var("LISTENING_IP_ADDRESS")
-            .context("LISTENING_IP_ADDRESS not found in .env file.")?
+        let listening_announce_socket = env::var("LISTENING_ANNOUNCE_SOCKET")
+            .context("LISTENING_ANNOUNCE_SOCKET not found in .env file.")?
             .parse()
-            .context("LISTENING_IP_ADDRESS in .env file could not be parsed.")?;
+            .context(
+                "LISTENING_ANNOUNCE_SOCKET could not be parsed into a unix domain socket path.",
+            )?;
 
-        let listening_port = env::var("LISTENING_PORT")
-            .context("LISTENING_PORT not found in .env file.")?
+        let listening_api_socket_address = env::var("LISTENING_API_SOCKET_ADDRESS")
+            .context("LISTENING_API_SOCKET_ADDRESS not found in .env file.")?
             .parse()
-            .context("LISTENING_PORT must be a number between 0 and 2^16 - 1")?;
+            .context(
+                "LISTENING_API_SOCKET_ADDRESS in .env file could not be parsed into a socket address.",
+            )?;
 
         let max_peers_per_torrent_per_user = env::var("MAX_PEERS_PER_TORRENT_PER_USER")
             .context("MAX_PEERS_PER_TORRENT_PER_USER not found in .env file.")?
@@ -222,7 +233,8 @@ impl Config {
             .context("IS_ANNOUNCE_LOGGING_ENABLED must be either `true` or `false`")?;
 
         let reverse_proxy_client_ip_header_name =
-            env::var("REVERSE_PROXY_CLIENT_IP_HEADER_NAME").ok();
+            env::var("REVERSE_PROXY_CLIENT_IP_HEADER_NAME")
+                .context("REVERSE_PROXY_CLIENT_IP_HEADER_NAME not found in .env file.")?;
 
         let user_receive_seed_list_rate_limits = RateCollection::new_from_string(
             &env::var("USER_RECEIVE_SEED_LIST_RATE_LIMITS")
@@ -305,8 +317,8 @@ impl Config {
             active_peer_ttl,
             inactive_peer_ttl,
             apikey,
-            listening_ip_address,
-            listening_port,
+            listening_announce_socket,
+            listening_api_socket_address,
             max_peers_per_torrent_per_user,
             is_connectivity_check_enabled,
             connectivity_check_interval,

@@ -1,8 +1,7 @@
 use anyhow::{Context, Result};
 use axum::Router;
 use dotenvy::dotenv;
-use std::net::SocketAddr;
-use tokio::signal;
+use tokio::{net::UnixListener, signal};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[cfg(not(target_env = "msvc"))]
@@ -53,29 +52,40 @@ async fn main() -> Result<()> {
         }
     });
 
-    // Create router.
-    let app = Router::new()
-        .merge(routes::routes(tracker.clone()))
-        .with_state(tracker.clone());
+    let api_server = {
+        // Create router.
+        let api = Router::new()
+            .merge(routes::api_routes(tracker.clone()))
+            .with_state(tracker.clone());
 
-    // Listening socket address.
-    let addr = SocketAddr::from((
-        tracker.config.read().listening_ip_address,
-        tracker.config.read().listening_port,
-    ));
+        let listener =
+            tokio::net::TcpListener::bind(tracker.config.read().listening_api_socket_address)
+                .await
+                .context("Unable to bind to unix socket.")?;
+
+        axum::serve(listener, api).with_graceful_shutdown(shutdown_signal())
+    };
+
+    let announce_server = {
+        // Create router.
+        let announce = Router::new()
+            .merge(routes::announce_routes(tracker.clone()))
+            .with_state(tracker.clone());
+
+        // Create unix domain socket.
+        let path = tracker.config.read().listening_announce_socket.clone();
+
+        let _ = tokio::fs::remove_file(&path).await;
+        tokio::fs::create_dir_all(path.parent().unwrap()).await?;
+        let uds = UnixListener::bind(path.clone())?;
+
+        axum::serve(uds, announce).with_graceful_shutdown(shutdown_signal())
+    };
 
     // Start handling announces.
     println!("UNIT3D Announce has started.");
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-
-    axum::serve(
-        listener,
-        app.into_make_service_with_connect_info::<SocketAddr>(),
-    )
-    .with_graceful_shutdown(shutdown_signal())
-    .await
-    .unwrap();
+    let _ = tokio::join!(api_server, announce_server);
 
     // Flush all remaining updates before shutting down.
     let max_flushes = 1000;

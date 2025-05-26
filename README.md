@@ -66,7 +66,7 @@ Remember to [restart the tracker](#startingrestarting-unit3d-announce).
 
 ## Reverse proxy
 
-If you serve both UNIT3D and UNIT3D-Announce on the same domain, add the following `location` block to your nginx configuration already used for UNIT3D.
+UNIT3D-Announce requires a reverse proxy to proxy the TCP HTTP announces to its unix domain socket. It also allows serving both UNIT3D and UNIT3D-Announce on the same domain. Add the following `location` block to your nginx configuration already used for UNIT3D.
 
 ```sh
 # Edit nginx config
@@ -80,15 +80,14 @@ Paste the following `location` block into the first `server` block immediately a
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header Host $host;
-        proxy_pass http://aaa.bbb.ccc.ddd:eeee$request_uri;
+        proxy_pass http://unix:/run/unit3d-announce/unit3d-announce.sock;
         real_ip_header X-Forwarded-For;
         real_ip_recursive on;
-        set_real_ip_from fff.ggg.hhh.iii;
+        set_real_ip_from aaa.bbb.ccc.ddd;
     }
 ```
 
-- `aaa.bbb.ccc.ddd:eeee` is the local listening IP address and port of UNIT3D-Announce. Set this to the `LISTENING_IP_ADDRESS` and `LISTENING_PORT` configured in the .env file.
-- `fff.ggg.hhh.iii` is the public listening IP address of the nginx proxy used for accessing the frontend website. You can add additional `set_real_ip_from jjj.kkk.lll.mmm/nn;` lines for each additional proxy used so long as the proxy appends the proper values to the `X-Forwarded-For` header. Replace this with your proxy IP address.
+- `aaa.bbb.ccc.ddd` is the public listening IP address of the nginx proxy used for accessing the frontend website. You can add additional `set_real_ip_from eee.fff.ggg.hhh/jj;` lines for each additional proxy used so long as the proxy appends the proper values to the `X-Forwarded-For` header. Replace this with your proxy IP address.
 
 Uncomment and set `REVERSE_PROXY_CLIENT_IP_HEADER_NAME` in the .env file to `X-Real-IP`.
 
