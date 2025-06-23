@@ -37,7 +37,7 @@ use crate::{
         unregistered_info_hash_update::{self, UnregisteredInfoHashUpdate},
         user_update::{self, UserUpdate},
     },
-    warning::AnnounceWarning,
+    warning::{AnnounceWarning, WarningCollection},
 };
 
 use crate::tracker::{
@@ -361,12 +361,12 @@ pub async fn announce(
 
     let is_connectable = check_connectivity(&tracker, client_ip, queries.port).await;
 
-    let mut warnings: Vec<AnnounceWarning> = Vec::new();
+    let mut warnings = WarningCollection::new();
 
     let config = tracker.config.read();
 
     if !is_connectable && config.require_peer_connectivity {
-        warnings.push(AnnounceWarning::ConnectivityIssueDetected);
+        warnings.add(AnnounceWarning::ConnectivityIssueDetected);
     }
 
     let (
@@ -465,7 +465,7 @@ pub async fn announce(
                 // of sending `stopped` events. To prevent this, we need to
                 // send a warning (i.e. succcessful announce) instead, so that
                 // the client can successfully restart its session.
-                warnings.push(AnnounceWarning::StoppedPeerDoesntExist);
+                warnings.add(AnnounceWarning::StoppedPeerDoesntExist);
                 leecher_delta = 0;
                 seeder_delta = 0;
                 uploaded_delta = 0;
@@ -515,7 +515,7 @@ pub async fn announce(
 
             // Warn user if download slots are full
             if !is_visible {
-                warnings.push(AnnounceWarning::HitDownloadSlotLimit);
+                warnings.add(AnnounceWarning::HitDownloadSlotLimit);
             };
 
             // Update the user and torrent seeding/leeching counts in the
@@ -550,7 +550,7 @@ pub async fn announce(
                         .checked_add_signed(Duration::seconds(config.announce_min_enforced.into()))
                         .is_some_and(|blocked_until| blocked_until > now)
                     {
-                        warnings.push(AnnounceWarning::RateLimitExceeded);
+                        warnings.add(AnnounceWarning::RateLimitExceeded);
                     }
                 }
                 None => {
@@ -680,7 +680,7 @@ pub async fn announce(
                 + 5 * 5 // numbers with estimated digit quantity for each
                 + peers_ipv4.len() * 6 + 5 // bytes per ipv4 plus estimated length prefix
                 + peers_ipv6.len() * 18 + 5 // bytes per ipv6 plus estimated length prefix
-                + warnings.len() * (64 + 2), // max bytes per warning message plus separator
+                + warnings.max_byte_length(), // max bytes per warning message plus separator
         );
 
         response.extend(b"d8:completei");
@@ -722,16 +722,7 @@ pub async fn announce(
             response.extend(peers_ipv6);
         }
 
-        if !warnings.is_empty() {
-            let mut warning_message: Vec<u8> = Vec::with_capacity((64 + 2) * warnings.len());
-
-            for i in 0..(warnings.len() - 1) {
-                warning_message.extend(warnings.get(i).expect("in range").to_string().as_bytes());
-                warning_message.extend(b"; ")
-            }
-
-            warning_message.extend(warnings.last().expect("not empty").to_string().as_bytes());
-
+        if let Some(warning_message) = warnings.message() {
             response.extend(b"15:warning message");
             response.extend(warning_message.len().to_string().as_bytes());
             response.extend(b":");
@@ -801,7 +792,7 @@ pub async fn announce(
 
     // Short circuit response for stopped peer doesn't exist error since we
     // can't do anything with it and don't want to update any data.
-    if warnings.contains(&AnnounceWarning::StoppedPeerDoesntExist) {
+    if warnings.should_early_return() {
         return Ok(response);
     }
 
