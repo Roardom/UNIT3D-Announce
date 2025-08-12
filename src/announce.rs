@@ -499,8 +499,6 @@ pub async fn announce(
                 })
                 .or_insert(tracker::Peer {
                     ip_address: client_ip,
-                    user_id,
-                    torrent_id,
                     port: queries.port,
                     is_seeder: queries.left == 0,
                     is_active: true,
@@ -559,8 +557,8 @@ pub async fn announce(
                     // Make sure user is only allowed N peers per torrent.
                     let mut peer_count = 0;
 
-                    for &peer in torrent.peers.values() {
-                        if peer.user_id == user_id && peer.is_active {
+                    for (&index, &peer) in torrent.peers.iter() {
+                        if index.user_id == user_id && peer.is_active {
                             peer_count += 1;
 
                             if peer_count > config.max_peers_per_torrent_per_user {
@@ -616,8 +614,8 @@ pub async fn announce(
             ));
 
             // Don't return peers with the same user id or those that are marked as inactive
-            let valid_peers = torrent.peers.iter().filter(|(_index, peer)| {
-                peer.user_id != user_id && peer.is_included_in_peer_list(&config)
+            let valid_peers = torrent.peers.iter().filter(|(index, peer)| {
+                index.user_id != user_id && peer.is_included_in_peer_list(&config)
             });
 
             // Make sure leech peer lists are filled with seeds

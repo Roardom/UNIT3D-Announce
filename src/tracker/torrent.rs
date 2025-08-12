@@ -124,8 +124,6 @@ impl Map {
                         ip_address: peer
                             .ip_address
                             .expect("INET6_NTOA failed to decode peer ip."),
-                        user_id: peer.user_id,
-                        torrent_id: peer.torrent_id,
                         port: peer.port,
                         is_seeder: peer.is_seeder,
                         is_active: peer.is_active,

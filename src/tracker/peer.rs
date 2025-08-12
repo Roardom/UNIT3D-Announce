@@ -23,8 +23,6 @@ pub struct Index {
 #[derive(Clone, Copy, Debug, Serialize)]
 pub struct Peer {
     pub ip_address: std::net::IpAddr,
-    pub user_id: u32,
-    pub torrent_id: u32,
     pub port: u16,
     pub is_seeder: bool,
     pub is_active: bool,

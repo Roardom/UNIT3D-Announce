@@ -89,7 +89,7 @@ pub async fn reap(tracker: &Arc<Tracker>) {
             .peers
             .retain(|_index, peer| inactive_cutoff <= peer.updated_at || peer.is_active);
 
-        for (_index, peer) in torrent.peers.iter_mut() {
+        for (index, peer) in torrent.peers.iter_mut() {
             // Peers get marked as inactive if not announced for more than
             // active_peer_ttl seconds. User peer count and torrent peer
             // count are updated to reflect.
@@ -100,7 +100,7 @@ pub async fn reap(tracker: &Arc<Tracker>) {
                     tracker
                         .users
                         .write()
-                        .entry(peer.user_id)
+                        .entry(index.user_id)
                         .and_modify(|user| {
                             if peer.is_seeder {
                                 user.num_seeding = user.num_seeding.saturating_sub(1);
