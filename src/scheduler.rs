@@ -9,8 +9,8 @@ pub mod user_update;
 
 use crate::tracker::Tracker;
 use chrono::{Duration, Utc};
-use indexmap::IndexMap;
 use parking_lot::Mutex;
+use ringmap::RingMap;
 use tokio::{join, time::Instant};
 use torrent_update::{Index, TorrentUpdate};
 use tracing::info;
@@ -134,7 +134,7 @@ pub async fn reap(tracker: &Arc<Tracker>) {
 }
 
 pub struct Queue<K, V> {
-    records: IndexMap<K, V>,
+    records: RingMap<K, V>,
     config: QueueConfig,
 }
 
@@ -158,7 +158,7 @@ where
     /// Initialize a new queue
     pub fn new(config: QueueConfig) -> Queue<K, V> {
         Self {
-            records: IndexMap::new(),
+            records: RingMap::new(),
             config,
         }
     }

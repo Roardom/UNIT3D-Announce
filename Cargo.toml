@@ -13,6 +13,7 @@ indexmap = { version = "2.0.0", default-features = false, features = ["std", "se
 memchr = { version = "2.6.0", default-features = false, features = ["std"] }
 parking_lot = "0.12.1"
 rand = { version = "0.8.5", default-features = false, features = ["alloc", "small_rng"] }
+ringmap = "0.1.4"
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde_bytes = "0.11.14"
 serde_repr = { version = "0.1", default-features = false }
