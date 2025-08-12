@@ -1,4 +1,4 @@
-use std::{cmp::min, hash::Hash, sync::Arc};
+use std::{cmp::min, hash::Hash, slice::Iter, sync::Arc, vec::IntoIter};
 
 pub mod announce_update;
 pub mod history_update;
@@ -9,10 +9,7 @@ pub mod user_update;
 
 use crate::tracker::Tracker;
 use chrono::{Duration, Utc};
-use indexmap::{
-    map::{IntoIter, Iter},
-    IndexMap,
-};
+use indexmap::IndexMap;
 use parking_lot::Mutex;
 use tokio::{join, time::Instant};
 use torrent_update::{Index, TorrentUpdate};
@@ -180,9 +177,9 @@ where
         let mut batch = self
             .records
             .drain(0..min(self.records.len(), self.config.max_batch_size()))
-            .collect::<IndexMap<K, V>>();
+            .collect::<Vec<(K, V)>>();
 
-        batch.sort_unstable_keys();
+        batch.sort_unstable_by(move |a, b| K::cmp(&a.0, &b.0));
 
         Batch(batch)
     }
@@ -231,18 +228,18 @@ where
     }
 }
 
-pub struct Batch<K, V>(IndexMap<K, V>);
+pub struct Batch<K, V>(Vec<(K, V)>);
 
 impl<'a, K, V> Batch<K, V> {
     fn is_empty(&self) -> bool {
         self.0.len() == 0
     }
 
-    fn iter(&'a self) -> Iter<'a, K, V> {
+    fn iter(&'a self) -> Iter<'a, (K, V)> {
         self.0.iter()
     }
 
-    fn into_iter(self) -> IntoIter<K, V> {
+    fn into_iter(self) -> IntoIter<(K, V)> {
         self.0.into_iter()
     }
 
