@@ -1,6 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use crate::tracker::torrent::InfoHash;
+use futures_util::TryStreamExt;
 use indexmap::IndexMap;
 use sqlx::MySqlPool;
 
@@ -31,7 +32,7 @@ impl Map {
         // Load one torrent per info hash. If multiple are found, prefer
         // undeleted torrents. If multiple are still found, prefer approved
         // torrents. If multiple are still found, prefer the oldest.
-        let info_hash2ids = sqlx::query_as!(
+        let mut info_hash2ids = sqlx::query_as!(
             InfoHash2Id,
             r#"
                 SELECT
@@ -54,13 +55,15 @@ impl Map {
                     ON distinct_torrents.id = torrents.id
             "#
         )
-        .fetch_all(db)
-        .await
-        .context("Failed loading torrent infohash to id mappings.")?;
+        .fetch(db);
 
         let mut info_hash2id_map = Map::new();
 
-        for info_hash2id in info_hash2ids {
+        while let Some(info_hash2id) = info_hash2ids
+            .try_next()
+            .await
+            .context("Failed loading torrent infohash to id mappings.")?
+        {
             info_hash2id_map.insert(info_hash2id.info_hash, info_hash2id.id);
         }
 

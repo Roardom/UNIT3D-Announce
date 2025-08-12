@@ -1,6 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
 use super::Passkey;
+use futures_util::TryStreamExt;
 use indexmap::IndexMap;
 use sqlx::MySqlPool;
 
@@ -28,7 +29,7 @@ impl Map {
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Map> {
-        let passkey2ids = sqlx::query_as!(
+        let mut passkey2ids = sqlx::query_as!(
             Passkey2Id,
             r#"
                 SELECT
@@ -40,13 +41,15 @@ impl Map {
                     users.deleted_at IS NULL
             "#
         )
-        .fetch_all(db)
-        .await
-        .context("Failed loading user passkey to id mappings.")?;
+        .fetch(db);
 
         let mut passkey2id_map = Map::new();
 
-        for passkey2id in passkey2ids {
+        while let Some(passkey2id) = passkey2ids
+            .try_next()
+            .await
+            .context("Failed loading user passkey to id mappings.")?
+        {
             passkey2id_map.insert(passkey2id.passkey, passkey2id.id);
         }
 

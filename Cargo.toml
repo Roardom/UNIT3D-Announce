@@ -8,6 +8,7 @@ anyhow = { version = "1.0.0", default-features = true, features = ["std"] }
 axum = { version = "0.8.0", default-features = false, features = ["http1", "tokio", "query", "macros", "json"] }
 chrono = { version = "0.4.22", default-features = false, features = ["serde"] }
 dotenvy = { version = "0.15.0", default-features = false }
+futures-util = "0.3.31"
 indexmap = { version = "2.0.0", default-features = false, features = ["std", "serde"] }
 memchr = { version = "2.6.0", default-features = false, features = ["std"] }
 parking_lot = "0.12.1"

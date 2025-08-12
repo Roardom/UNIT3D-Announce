@@ -1,14 +1,10 @@
 use std::fmt::Display;
-use std::net::IpAddr;
 use std::ops::{Deref, DerefMut};
 
 use chrono::serde::ts_seconds;
 use indexmap::IndexMap;
 use serde::{Serialize, Serializer};
 use sqlx::types::chrono::{DateTime, Utc};
-use sqlx::MySqlPool;
-
-use anyhow::{Context, Result};
 
 pub mod peer_id;
 pub use peer_id::PeerId;
@@ -67,58 +63,6 @@ impl Peer {
 impl Map {
     pub fn new() -> Map {
         Map(IndexMap::new())
-    }
-
-    pub async fn from_db(db: &MySqlPool) -> Result<Vec<(Index, Peer)>> {
-        let peers: Vec<(Index, Peer)> = sqlx::query!(
-            r#"
-                SELECT
-                    INET6_NTOA(peers.ip) as `ip_address: IpAddr`,
-                    peers.user_id as `user_id: u32`,
-                    peers.torrent_id as `torrent_id: u32`,
-                    peers.port as `port: u16`,
-                    peers.seeder as `is_seeder: bool`,
-                    peers.active as `is_active: bool`,
-                    peers.visible as `is_visible: bool`,
-                    peers.connectable as `is_connectable: bool`,
-                    peers.updated_at as `updated_at: DateTime<Utc>`,
-                    peers.uploaded as `uploaded: u64`,
-                    peers.downloaded as `downloaded: u64`,
-                    peers.peer_id as `peer_id: PeerId`
-                FROM
-                    peers
-            "#
-        )
-        .map(|row| {
-            (
-                Index {
-                    user_id: row.user_id,
-                    peer_id: row.peer_id,
-                },
-                Peer {
-                    ip_address: row
-                        .ip_address
-                        .expect("INET6_NTOA failed to decode peer ip."),
-                    user_id: row.user_id,
-                    torrent_id: row.torrent_id,
-                    port: row.port,
-                    is_seeder: row.is_seeder,
-                    is_active: row.is_active,
-                    is_visible: row.is_visible,
-                    is_connectable: row.is_connectable,
-                    updated_at: row
-                        .updated_at
-                        .expect("Peer with a null updated_at found in database."),
-                    uploaded: row.uploaded,
-                    downloaded: row.downloaded,
-                },
-            )
-        })
-        .fetch_all(db)
-        .await
-        .context("Failed loading peers.")?;
-
-        Ok(peers)
     }
 }
 

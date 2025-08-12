@@ -3,6 +3,7 @@ use std::{ops::Deref, sync::Arc};
 
 use axum::extract::State;
 use axum::Json;
+use futures_util::TryStreamExt;
 use indexmap::IndexSet;
 use serde::Deserialize;
 use sqlx::MySqlPool;
@@ -20,7 +21,7 @@ impl Set {
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Set> {
-        let agents = sqlx::query_as!(
+        let mut agents = sqlx::query_as!(
             Agent,
             r#"
                 SELECT
@@ -29,13 +30,15 @@ impl Set {
                     blacklist_clients
             "#
         )
-        .fetch_all(db)
-        .await
-        .context("Failed loading blacklisted clients.")?;
+        .fetch(db);
 
         let mut agent_set = Set::new();
 
-        for agent in agents {
+        while let Some(agent) = agents
+            .try_next()
+            .await
+            .context("Failed loading blacklisted clients.")?
+        {
             agent_set.insert(agent);
         }
 

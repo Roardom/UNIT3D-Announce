@@ -4,6 +4,7 @@ use std::{ops::Deref, sync::Arc};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
+use futures_util::TryStreamExt;
 use indexmap::IndexMap;
 use serde::Deserialize;
 use sqlx::MySqlPool;
@@ -21,7 +22,7 @@ impl Map {
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Map> {
-        let groups = sqlx::query_as!(
+        let mut groups = sqlx::query_as!(
             Group,
             r#"
                 SELECT
@@ -35,13 +36,11 @@ impl Map {
                     `groups`
             "#
         )
-        .fetch_all(db)
-        .await
-        .context("Failed loading groups.")?;
+        .fetch(db);
 
         let mut group_map = Map::new();
 
-        for group in groups {
+        while let Some(group) = groups.try_next().await.context("Failed loading groups.")? {
             group_map.insert(group.id, group);
         }
 

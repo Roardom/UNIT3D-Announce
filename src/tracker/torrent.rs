@@ -1,15 +1,16 @@
+use std::net::IpAddr;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::Arc;
 
 use axum::extract::{Json, Path, State};
 use axum::http::StatusCode;
+use futures_util::TryStreamExt;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::MySqlPool;
 use tracing::info;
-
-use crate::tracker::peer;
 
 use anyhow::{Context, Result};
 
@@ -21,7 +22,9 @@ pub mod infohash2id;
 pub mod status;
 pub use status::Status;
 
-use crate::tracker::Tracker;
+use crate::tracker::peer::{self, Index};
+use crate::tracker::{Peer, Tracker};
+use peer::peer_id::PeerId;
 
 pub struct Map(IndexMap<u32, Torrent>);
 
@@ -31,34 +34,10 @@ impl Map {
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Map> {
-        let peers = peer::Map::from_db(db).await?;
-
-        // First, group the peers by their torrent id.
-
-        struct GroupedPeer {
-            peers: peer::Map,
-        }
-
-        let mut grouped_peers: IndexMap<u32, GroupedPeer> = IndexMap::new();
-
-        peers.iter().for_each(|(index, peer)| {
-            grouped_peers
-                .entry(peer.torrent_id)
-                .and_modify(|torrent| {
-                    torrent.peers.insert(*index, *peer);
-                })
-                .or_insert_with(|| {
-                    let mut peers = peer::Map::new();
-                    peers.insert(*index, *peer);
-
-                    GroupedPeer { peers }
-                });
-        });
-
         // Load one torrent per info hash. If multiple are found, prefer
         // undeleted torrents. If multiple are still found, prefer approved
         // torrents. If multiple are still found, prefer the oldest.
-        let torrents: Vec<DBImportTorrent> = sqlx::query_as!(
+        let mut torrents = sqlx::query_as!(
             DBImportTorrent,
             r#"
                 SELECT
@@ -87,22 +66,15 @@ impl Map {
                     ON distinct_torrents.id = torrents.id
             "#
         )
-        .fetch_all(db)
-        .await
-        .context("Failed loading torrents.")?;
+        .fetch(db);
 
         let mut torrent_map = Map::new();
 
-        torrents.iter().for_each(|torrent| {
-            // Default values if torrent doesn't exist
-            let mut peers = peer::Map::new();
-
-            // Overwrite default values if peers exists
-            if let Some(peer_group) = grouped_peers.get(&torrent.id) {
-                peers.extend(peer_group.peers.iter());
-            }
-
-            // Insert torrent with its peers
+        while let Some(torrent) = torrents
+            .try_next()
+            .await
+            .context("Failed loading torrents.")?
+        {
             torrent_map.insert(
                 torrent.id,
                 Torrent {
@@ -114,10 +86,60 @@ impl Map {
                     download_factor: torrent.download_factor,
                     upload_factor: torrent.upload_factor,
                     is_deleted: torrent.is_deleted,
-                    peers,
+                    peers: peer::Map::new(),
                 },
             );
-        });
+        }
+
+        // Load peers into each torrent
+        let mut peers = sqlx::query!(
+            r#"
+                SELECT
+                    INET6_NTOA(peers.ip) as `ip_address: IpAddr`,
+                    peers.user_id as `user_id: u32`,
+                    peers.torrent_id as `torrent_id: u32`,
+                    peers.port as `port: u16`,
+                    peers.seeder as `is_seeder: bool`,
+                    peers.active as `is_active: bool`,
+                    peers.visible as `is_visible: bool`,
+                    peers.connectable as `is_connectable: bool`,
+                    peers.updated_at as `updated_at: DateTime<Utc>`,
+                    peers.uploaded as `uploaded: u64`,
+                    peers.downloaded as `downloaded: u64`,
+                    peers.peer_id as `peer_id: PeerId`
+                FROM
+                    peers
+            "#
+        )
+        .fetch(db);
+
+        while let Some(peer) = peers.try_next().await.expect("Failed loading peers.") {
+            torrent_map.entry(peer.torrent_id).and_modify(|torrent| {
+                torrent.peers.insert(
+                    Index {
+                        user_id: peer.user_id,
+                        peer_id: peer.peer_id,
+                    },
+                    Peer {
+                        ip_address: peer
+                            .ip_address
+                            .expect("INET6_NTOA failed to decode peer ip."),
+                        user_id: peer.user_id,
+                        torrent_id: peer.torrent_id,
+                        port: peer.port,
+                        is_seeder: peer.is_seeder,
+                        is_active: peer.is_active,
+                        is_visible: peer.is_visible,
+                        is_connectable: peer.is_connectable,
+                        updated_at: peer
+                            .updated_at
+                            .expect("Peer with a null updated_at found in database."),
+                        uploaded: peer.uploaded,
+                        downloaded: peer.downloaded,
+                    },
+                );
+            });
+        }
 
         Ok(torrent_map)
     }

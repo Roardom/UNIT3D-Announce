@@ -2,6 +2,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
+use futures_util::TryStreamExt;
 use indexmap::IndexMap;
 use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::MySqlPool;
@@ -23,7 +24,7 @@ impl Map {
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Map> {
-        let peers: Vec<(SocketAddr, ConnectablePort)> = sqlx::query!(
+        let mut peers = sqlx::query!(
             r#"
                 SELECT
                     INET6_NTOA(peers.ip) as `ip_address: String`,
@@ -36,32 +37,28 @@ impl Map {
                     peers.ip, peers.port
             "#
         )
-        .map(|row| {
-            (
-                SocketAddr::from((
-                    IpAddr::from_str(
-                        &row.ip_address
-                            .expect("INET6_NTOA failed to decode peer ip."),
-                    )
-                    .expect("Peer ip failed to decode."),
-                    row.port,
-                )),
-                ConnectablePort {
-                    connectable: row.connectable,
-                    updated_at: row
-                        .updated_at
-                        .expect("Peer with a null updated_at found in database."),
-                },
-            )
-        })
-        .fetch_all(db)
-        .await
-        .context("Failed loading peers.")?;
+        .fetch(db);
 
         let mut peer_map = Map::new();
 
-        for (index, peer) in peers {
-            peer_map.insert(index, peer);
+        while let Some(peer) = peers.try_next().await.context("Failed loading peers.")? {
+            peer_map.insert(
+                SocketAddr::from((
+                    IpAddr::from_str(
+                        &peer
+                            .ip_address
+                            .context("INET6_NTOA failed to decode peer ip.")?,
+                    )
+                    .context("Peer ip failed to decode.")?,
+                    peer.port,
+                )),
+                ConnectablePort {
+                    connectable: peer.connectable,
+                    updated_at: peer
+                        .updated_at
+                        .context("Peer with a null updated_at found in database.")?,
+                },
+            );
         }
 
         Ok(peer_map)

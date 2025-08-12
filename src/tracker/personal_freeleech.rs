@@ -3,6 +3,7 @@ use std::{ops::Deref, sync::Arc};
 
 use axum::extract::State;
 use axum::Json;
+use futures_util::TryStreamExt;
 use indexmap::IndexSet;
 use serde::Deserialize;
 use sqlx::MySqlPool;
@@ -20,7 +21,7 @@ impl Set {
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Set> {
-        let personal_freeleeches = sqlx::query_as!(
+        let mut personal_freeleeches = sqlx::query_as!(
             PersonalFreeleech,
             r#"
                 SELECT
@@ -29,13 +30,15 @@ impl Set {
                     personal_freeleeches
             "#
         )
-        .fetch_all(db)
-        .await
-        .context("Failed loading personal freeleeches.")?;
+        .fetch(db);
 
         let mut personal_freeleech_set = Set::new();
 
-        for personal_freeleech in personal_freeleeches {
+        while let Some(personal_freeleech) = personal_freeleeches
+            .try_next()
+            .await
+            .context("Failed loading personal freeleeches.")?
+        {
             personal_freeleech_set.insert(personal_freeleech);
         }
 

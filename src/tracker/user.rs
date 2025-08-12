@@ -5,6 +5,7 @@ use std::{ops::Deref, sync::Arc};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
+use futures_util::TryStreamExt;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use sqlx::MySqlPool;
@@ -30,7 +31,7 @@ impl Map {
     }
 
     pub async fn from_db(db: &MySqlPool, config: &Config) -> Result<Map> {
-        let users = sqlx::query_as!(
+        let mut users = sqlx::query_as!(
             DBImportUser,
             r#"
                 SELECT
@@ -54,13 +55,11 @@ impl Map {
                     users.id
             "#
         )
-        .fetch_all(db)
-        .await
-        .context("Failed loading users.")?;
+        .fetch(db);
 
         let mut user_map = Map::new();
 
-        for user in users {
+        while let Some(user) = users.try_next().await.context("Failed loading users.")? {
             user_map.insert(
                 user.id,
                 User {
@@ -77,6 +76,7 @@ impl Map {
                 },
             );
         }
+
         Ok(user_map)
     }
 
