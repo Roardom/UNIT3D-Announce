@@ -12,6 +12,19 @@ pub enum AnnounceWarning {
     ConnectivityIssueDetected,
 }
 
+impl AnnounceWarning {
+    /// Returns true if the warning should be not be sent to the user
+    /// but still used internally to give empty peer lists.
+    fn is_silent(&self) -> bool {
+        match self {
+            // Silenced because it's unlikely qBittorrent will ever fix its
+            // duplicate announce bug.
+            Self::RateLimitExceeded => true,
+            _ => false,
+        }
+    }
+}
+
 const SEPARATOR: &[u8] = b"; ";
 
 pub struct WarningCollection {
@@ -64,9 +77,15 @@ impl WarningCollection {
         let mut message: Vec<u8> = Vec::with_capacity(self.max_byte_length());
 
         self.warnings.into_iter().for_each(|warning| {
-            message.extend(warning.to_string().as_bytes());
-            message.extend(SEPARATOR);
+            if !warning.is_silent() {
+                message.extend(warning.to_string().as_bytes());
+                message.extend(SEPARATOR);
+            }
         });
+
+        if message.is_empty() {
+            return None;
+        }
 
         // remove the last separator
         message.truncate(message.len() - SEPARATOR.len());
