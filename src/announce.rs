@@ -1,13 +1,13 @@
 use axum::{
     extract::{ConnectInfo, FromRef, FromRequestParts, Path, State},
     http::{
+        HeaderMap,
         header::{ACCEPT_CHARSET, ACCEPT_LANGUAGE, REFERER, USER_AGENT},
         request::Parts,
-        HeaderMap,
     },
 };
 use chrono::Duration;
-use rand::{seq::IteratorRandom, thread_rng, Rng};
+use rand::{Rng, rng, seq::IteratorRandom};
 use sqlx::types::chrono::Utc;
 use std::{
     fmt::Display,
@@ -41,7 +41,7 @@ use crate::{
 };
 
 use crate::tracker::{
-    self,
+    self, Tracker,
     connectable_port::ConnectablePort,
     featured_torrent::FeaturedTorrent,
     freeleech_token::FreeleechToken,
@@ -49,7 +49,6 @@ use crate::tracker::{
     personal_freeleech::PersonalFreeleech,
     torrent::InfoHash,
     user::Passkey,
-    Tracker,
 };
 use crate::utils;
 
@@ -630,7 +629,7 @@ pub async fn announce(
                         valid_peers
                             .clone()
                             .filter(|(_index, peer)| peer.is_seeder)
-                            .choose_multiple(&mut thread_rng(), queries.numwant),
+                            .choose_multiple(&mut rng(), queries.numwant),
                     );
                 } else {
                     is_over_seed_list_rate_limit = true;
@@ -646,7 +645,7 @@ pub async fn announce(
                         valid_peers
                             .filter(|(_index, peer)| !peer.is_seeder)
                             .choose_multiple(
-                                &mut thread_rng(),
+                                &mut rng(),
                                 queries.numwant.saturating_sub(peers.len()),
                             ),
                     );
@@ -673,7 +672,7 @@ pub async fn announce(
 
         // Generate bencoded response to return to client
 
-        let interval = thread_rng().gen_range(config.announce_min..=config.announce_max);
+        let interval = rng().random_range(config.announce_min..=config.announce_max);
 
         // Write out bencoded response (keys must be sorted to be within spec)
         let mut response: Vec<u8> = Vec::with_capacity(
