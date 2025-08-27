@@ -1,6 +1,6 @@
 use std::{net::IpAddr, sync::Arc};
 
-use crate::tracker::{peer::PeerId, Tracker};
+use crate::tracker::{Tracker, peer::PeerId};
 use chrono::{DateTime, Utc};
 use sqlx::{MySql, QueryBuilder};
 

@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 /// Decodes a url-encoded string to 20 bytes.
 ///

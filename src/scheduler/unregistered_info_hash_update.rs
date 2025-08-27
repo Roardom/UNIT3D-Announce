@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::tracker::{torrent::InfoHash, Tracker};
+use crate::tracker::{Tracker, torrent::InfoHash};
 use chrono::{DateTime, Utc};
 use sqlx::{MySql, QueryBuilder};
 

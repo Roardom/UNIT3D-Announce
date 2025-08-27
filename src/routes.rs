@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use axum::{
+    Router,
     middleware::from_fn_with_state,
     routing::{get, post, put},
-    Router,
 };
 
 use crate::{

@@ -1,16 +1,16 @@
 use std::{
     sync::{
-        atomic::{AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicU64, Ordering},
     },
     time::{SystemTime, UNIX_EPOCH},
 };
 
 use axum::{
+    Json,
     extract::{Request, State},
     middleware::Next,
     response::Response,
-    Json,
 };
 
 use crate::tracker::Tracker;

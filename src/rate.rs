@@ -25,6 +25,7 @@ pub struct Rate {
     updated_at: f64,
 }
 
+#[allow(dead_code)]
 impl Rate {
     /// Initializes a new rate.
     pub fn new(window: Duration, max_events_per_window: f64) -> Self {
@@ -75,6 +76,7 @@ pub struct RateCollection {
 
 impl RateCollection {
     /// Create a new RateCollection.
+    #[allow(dead_code)]
     pub fn new(rates: &[Rate]) -> Self {
         Self {
             rates: rates.into(),
@@ -124,6 +126,7 @@ impl RateCollection {
     }
 
     // At least one rate is over the max rate.
+    #[allow(dead_code)]
     pub fn is_over_limit(&self) -> bool {
         !self.is_under_limit()
     }

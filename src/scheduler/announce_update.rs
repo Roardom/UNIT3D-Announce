@@ -9,7 +9,7 @@ use sqlx::{MySql, QueryBuilder};
 
 use crate::{
     announce::Event,
-    tracker::{peer::PeerId, Tracker},
+    tracker::{Tracker, peer::PeerId},
 };
 
 pub struct Queue(pub Vec<AnnounceUpdate>);

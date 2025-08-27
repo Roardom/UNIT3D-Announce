@@ -4,8 +4,8 @@ use std::str::FromStr;
 
 use futures_util::TryStreamExt;
 use indexmap::IndexMap;
-use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::MySqlPool;
+use sqlx::types::chrono::{DateTime, Utc};
 
 use anyhow::{Context, Result};
 

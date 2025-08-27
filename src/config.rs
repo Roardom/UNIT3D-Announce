@@ -1,6 +1,6 @@
 use std::{env, net::IpAddr, num::NonZeroU64, sync::Arc};
 
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{Context, Result, bail, ensure};
 use axum::{
     extract::State,
     http::StatusCode,

@@ -5,7 +5,7 @@ use sqlx::{Database, Decode};
 
 use crate::utils::{hex_decode, hex_encode};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
 #[derive(Clone, Copy, Deserialize, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct InfoHash(pub [u8; 20]);
