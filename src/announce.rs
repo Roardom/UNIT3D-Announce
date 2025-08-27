@@ -7,7 +7,7 @@ use axum::{
     },
 };
 use chrono::Duration;
-use rand::{seq::IteratorRandom, thread_rng, Rng};
+use rand::{rng, seq::IteratorRandom, Rng};
 use sqlx::types::chrono::Utc;
 use std::{
     fmt::Display,
@@ -630,7 +630,7 @@ pub async fn announce(
                         valid_peers
                             .clone()
                             .filter(|(_index, peer)| peer.is_seeder)
-                            .choose_multiple(&mut thread_rng(), queries.numwant),
+                            .choose_multiple(&mut rng(), queries.numwant),
                     );
                 } else {
                     is_over_seed_list_rate_limit = true;
@@ -646,7 +646,7 @@ pub async fn announce(
                         valid_peers
                             .filter(|(_index, peer)| !peer.is_seeder)
                             .choose_multiple(
-                                &mut thread_rng(),
+                                &mut rng(),
                                 queries.numwant.saturating_sub(peers.len()),
                             ),
                     );
@@ -673,7 +673,7 @@ pub async fn announce(
 
         // Generate bencoded response to return to client
 
-        let interval = thread_rng().gen_range(config.announce_min..=config.announce_max);
+        let interval = rng().random_range(config.announce_min..=config.announce_max);
 
         // Write out bencoded response (keys must be sorted to be within spec)
         let mut response: Vec<u8> = Vec::with_capacity(
