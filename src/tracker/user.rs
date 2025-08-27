@@ -2,9 +2,9 @@ use std::ops::DerefMut;
 use std::str::FromStr;
 use std::{ops::Deref, sync::Arc};
 
+use axum::Json;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::Json;
 use futures_util::TryStreamExt;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -99,11 +99,14 @@ impl Map {
                 });
 
             let new_passkey = if let Some(new_passkey) = &user.new_passkey {
-                if let Ok(new_passkey) = Passkey::from_str(new_passkey) {
-                    tracker.passkey2id.write().swap_remove(&passkey);
-                    new_passkey
-                } else {
-                    return StatusCode::BAD_REQUEST;
+                match Passkey::from_str(new_passkey) {
+                    Ok(new_passkey) => {
+                        tracker.passkey2id.write().swap_remove(&passkey);
+                        new_passkey
+                    }
+                    _ => {
+                        return StatusCode::BAD_REQUEST;
+                    }
                 }
             } else {
                 passkey
