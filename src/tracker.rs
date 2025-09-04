@@ -18,19 +18,18 @@ use anyhow::{Context, Result};
 use crate::config;
 use crate::scheduler::unregistered_info_hash_update::{self, UnregisteredInfoHashUpdate};
 use crate::scheduler::{
-    announce_update,
+    Queue, QueueConfig, announce_update,
     history_update::{self, HistoryUpdate},
     peer_update::{self, PeerUpdate},
     torrent_update::{self, TorrentUpdate},
     user_update::{self, UserUpdate},
-    Queue, QueueConfig,
 };
 use crate::stats::Stats;
 
 use dotenvy::dotenv;
 use parking_lot::{Mutex, RwLock};
-use sqlx::mysql::MySqlPoolOptions;
 use sqlx::Connection;
+use sqlx::mysql::MySqlPoolOptions;
 use std::io::{self, Write};
 use std::{env, sync::Arc, time::Duration};
 

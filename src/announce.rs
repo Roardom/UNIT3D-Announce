@@ -1,13 +1,13 @@
 use axum::{
     extract::{ConnectInfo, FromRef, FromRequestParts, Path, State},
     http::{
+        HeaderMap,
         header::{ACCEPT_CHARSET, ACCEPT_LANGUAGE, REFERER, USER_AGENT},
         request::Parts,
-        HeaderMap,
     },
 };
 use chrono::Duration;
-use rand::{rng, seq::IteratorRandom, Rng};
+use rand::{Rng, rng, seq::IteratorRandom};
 use sqlx::types::chrono::Utc;
 use std::{
     fmt::Display,
@@ -41,7 +41,7 @@ use crate::{
 };
 
 use crate::tracker::{
-    self,
+    self, Tracker,
     connectable_port::ConnectablePort,
     featured_torrent::FeaturedTorrent,
     freeleech_token::FreeleechToken,
@@ -49,7 +49,6 @@ use crate::tracker::{
     personal_freeleech::PersonalFreeleech,
     torrent::InfoHash,
     user::Passkey,
-    Tracker,
 };
 use crate::utils;
 

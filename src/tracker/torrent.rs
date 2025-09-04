@@ -8,8 +8,8 @@ use axum::http::StatusCode;
 use futures_util::TryStreamExt;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::MySqlPool;
+use sqlx::types::chrono::{DateTime, Utc};
 use tracing::info;
 
 use anyhow::{Context, Result};
