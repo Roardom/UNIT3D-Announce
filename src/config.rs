@@ -16,6 +16,10 @@ pub struct Config {
     /// The interval (in milliseconds) between when history, peers, torrents and
     /// users are flushed to the main mysql database.
     pub flush_interval_milliseconds: u64,
+    /// If specified, limits the amount of records upserted in each SQL query.
+    /// Can be used to distribute increased load across multiple SQL queries.
+    /// If unspecified, uses the max bindings allowed per SQL query.
+    pub max_records_per_batch: Option<usize>,
     /// The amount of peers that should be sent back if the peer does not
     /// include a numwant.
     pub numwant_default: usize,
@@ -120,6 +124,14 @@ impl Config {
             .context("FLUSH_INTERVAL_MILLISECONDS not found in .env file.")?
             .parse()
             .context("FLUSH_INTERVAL_MILLISECONDS must be a number between 1 and 2^64 - 1")?;
+
+        let max_records_per_batch = env::var("MAX_RECORDS_PER_BATCH")
+            .ok()
+            .map(|s| s.parse())
+            .transpose()
+            .context(
+                "MAX_RECORDS_PER_BATCH must be a number between 0 and 2^64 - 1, if provided",
+            )?;
 
         let numwant_default = env::var("NUMWANT_DEFAULT")
             .context("NUMWANT_DEFAULT not found in .env file.")?
@@ -294,6 +306,7 @@ impl Config {
 
         Ok(Config {
             flush_interval_milliseconds: flush_interval_milliseconds.into(),
+            max_records_per_batch,
             numwant_default,
             numwant_max,
             announce_min,

@@ -145,8 +145,15 @@ pub struct QueueConfig {
 }
 
 impl QueueConfig {
-    fn max_batch_size(&mut self) -> usize {
-        (self.max_bindings_per_flush - self.extra_bindings_per_flush) / self.bindings_per_record
+    fn max_batch_size(&mut self, tracker: &Arc<Tracker>) -> usize {
+        let max_bindings = (self.max_bindings_per_flush - self.extra_bindings_per_flush)
+            / self.bindings_per_record;
+
+        if let Some(max_records) = tracker.config.read().max_records_per_batch {
+            return max_bindings.min(max_records);
+        }
+
+        max_bindings
     }
 }
 
@@ -173,10 +180,10 @@ where
 
     /// Take a portion of the updates from the start of the queue with a max
     /// size defined by the buffer config
-    fn take_batch(&mut self) -> Batch<K, V> {
+    fn take_batch(&mut self, tracker: &Arc<Tracker>) -> Batch<K, V> {
         let mut batch = self
             .records
-            .drain(0..min(self.records.len(), self.config.max_batch_size()))
+            .drain(0..min(self.records.len(), self.config.max_batch_size(tracker)))
             .collect::<Vec<(K, V)>>();
 
         batch.sort_unstable_by(move |a, b| K::cmp(&a.0, &b.0));
@@ -210,7 +217,7 @@ where
     Batch<K, V>: Flushable<V>,
 {
     async fn flush<'a>(&self, tracker: &Arc<Tracker>, record_type: &'a str) {
-        let batch = self.lock().take_batch();
+        let batch = self.lock().take_batch(tracker);
         let start = Instant::now();
         let len = batch.len();
         let result = batch.flush_to_db(tracker).await;
