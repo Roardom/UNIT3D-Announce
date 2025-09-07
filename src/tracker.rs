@@ -200,7 +200,7 @@ async fn connect_to_database() -> sqlx::Pool<sqlx::MySql> {
     // Get pool of database connections.
     MySqlPoolOptions::new()
         .min_connections(0)
-        .max_connections(10)
+        .max_connections(60)
         .max_lifetime(Duration::from_secs(30 * 60))
         .idle_timeout(Duration::from_secs(10 * 60))
         .acquire_timeout(Duration::from_secs(30))

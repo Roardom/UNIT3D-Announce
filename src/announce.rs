@@ -377,6 +377,7 @@ pub async fn announce(
         leecher_delta,
         times_completed_delta,
         is_visible,
+        is_active_after_stop,
         user,
         user_id,
         group,
@@ -437,6 +438,7 @@ pub async fn announce(
         let leecher_delta;
         let times_completed_delta;
         let is_visible;
+        let mut is_active_after_stop = false;
 
         if queries.event == Event::Stopped {
             // Try and remove the peer
@@ -453,6 +455,14 @@ pub async fn announce(
 
                 leecher_delta = 0 - peer.is_included_in_leech_list(&config) as i32;
                 seeder_delta = 0 - peer.is_included_in_seed_list(&config) as i32;
+
+                for (&index, &peer) in torrent.peers.iter() {
+                    if index.user_id == user_id && peer.is_active {
+                        is_active_after_stop = true;
+
+                        break;
+                    }
+                }
             } else {
                 // Some clients (namely transmission) will keep sending
                 // `stopped` events until a successful announce is received.
@@ -780,6 +790,7 @@ pub async fn announce(
             leecher_delta,
             times_completed_delta,
             is_visible,
+            is_active_after_stop,
             user,
             user_id,
             group,
@@ -881,7 +892,7 @@ pub async fn announce(
         },
         HistoryUpdate {
             user_agent: String::from(user_agent),
-            is_active: queries.event != Event::Stopped,
+            is_active: queries.event != Event::Stopped || is_active_after_stop,
             is_seeder: queries.left == 0,
             is_immune: if user.is_lifetime {
                 config
