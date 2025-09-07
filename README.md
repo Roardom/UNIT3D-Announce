@@ -2,12 +2,16 @@
 
 High-performance backend BitTorrent tracker compatible with UNIT3D tracker software.
 
-## Supported UNIT3D versions
+---
+
+## Supported UNIT3D Versions
 
 | UNIT3D Version  | UNIT3D-Announce Version |
-|-----------------|-------------------------|
+| --------------- | ----------------------- |
 | v8.3.4 - v9.0.4 | v0.1                    |
 | v9.0.5+         | v0.2                    |
+
+---
 
 ## Installation
 
@@ -33,7 +37,7 @@ $ cargo build --release
 # Go into UNIT3D's base directory
 $ cd /var/www/html
 
-# Add the required environment variables to UNIT3D'S .env file:
+# Add the required environment variables to UNIT3D's .env file:
 # (`TRACKER_HOST`, `TRACKER_PORT`, and `TRACKER_KEY`)
 # These values should match their respective values in UNIT3D-Announce's .env file:
 # (`LISTENING_IP_ADDRESS`, `LISTENING_PORT`, and `APIKEY`)
@@ -42,6 +46,8 @@ $ sudo nano .env
 # Enable the external tracker in UNIT3D's config
 $ sudo nano config/announce.php
 ```
+
+---
 
 ## Update
 
@@ -62,9 +68,11 @@ $ sudo nano .env
 $ cargo build --release
 ```
 
-Remember to [restart the tracker](#startingrestarting-unit3d-announce).
+> Remember to [restart the tracker](#startingrestarting-unit3d-announce).
 
-## Reverse proxy
+---
+
+## Reverse Proxy
 
 If you serve both UNIT3D and UNIT3D-Announce on the same domain, add the following `location` block to your nginx configuration already used for UNIT3D.
 
@@ -76,26 +84,28 @@ $ sudo nano /etc/nginx/sites-enabled/default
 Paste the following `location` block into the first `server` block immediately after the last existing `location` block.
 
 ```nginx
-    location /announce/ {
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header Host $host;
-        proxy_pass http://aaa.bbb.ccc.ddd:eeee$request_uri;
-        real_ip_header X-Forwarded-For;
-        real_ip_recursive on;
-        set_real_ip_from fff.ggg.hhh.iii;
-    }
+location /announce/ {
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header Host $host;
+    proxy_pass http://aaa.bbb.ccc.ddd:eeee$request_uri;
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive on;
+    set_real_ip_from fff.ggg.hhh.iii;
+}
 ```
 
-- `aaa.bbb.ccc.ddd:eeee` is the local listening IP address and port of UNIT3D-Announce. Set this to the `LISTENING_IP_ADDRESS` and `LISTENING_PORT` configured in the .env file.
-- `fff.ggg.hhh.iii` is the public listening IP address of the nginx proxy used for accessing the frontend website. You can add additional `set_real_ip_from jjj.kkk.lll.mmm/nn;` lines for each additional proxy used so long as the proxy appends the proper values to the `X-Forwarded-For` header. Replace this with your proxy IP address.
+* `aaa.bbb.ccc.ddd:eeee` → Local listening IP address and port of UNIT3D-Announce (`LISTENING_IP_ADDRESS` and `LISTENING_PORT` in `.env`).
+* `fff.ggg.hhh.iii` → Public IP address of the nginx proxy. Add additional `set_real_ip_from jjj.kkk.lll.mmm/nn;` for extra proxies if needed.
 
-Uncomment and set `REVERSE_PROXY_CLIENT_IP_HEADER_NAME` in the .env file to `X-Real-IP`.
+Uncomment and set `REVERSE_PROXY_CLIENT_IP_HEADER_NAME` in the `.env` file to `X-Real-IP`.
 
 ```sh
 # Reload nginx once finished
 $ service nginx reload
 ```
+
+---
 
 ## Supervisor
 
@@ -125,7 +135,7 @@ stdout_logfile=/var/www/html/storage/logs/announce.log
 
 ### Starting/Restarting UNIT3D-Announce
 
-Reload supervisor
+Reload supervisor:
 
 ```sh
 $ sudo supervisorctl reread && sudo supervisorctl update && sudo supervisorctl reload
@@ -139,12 +149,17 @@ To gracefully exit the tracker:
 sudo supervisorctl stop unit3d-announce:unit3d-announce_00
 ```
 
+---
+
 ## Global Freeleech or Double Upload Events
 
-> [!IMPORTANT]
-> When using the Rust-based UNIT3D-Announce tracker, the global freeleech and double upload events are handled by the external tracker itself. This means you must activate the events in the `config/other.php` file within UNIT3D as normal to show the timer and then also within the `.env` file of the UNIT3D-Announce tracker to update user stats correctly.
+> \[!IMPORTANT]
+> When using the Rust-based UNIT3D-Announce tracker, the global freeleech and double upload events are handled by the external tracker itself. Activate the events in both:
+>
+> 1. `config/other.php` in UNIT3D (to show the timer)
+> 2. `.env` file of UNIT3D-Announce (to update user stats correctly)
 
-To enable/disable global freeleech or double upload events, you need to adjust the following environment variables in the `.env` file and then [restart the tracker](#startingrestarting-unit3d-announce).
+Adjust the following `.env` variables and [restart the tracker](#startingrestarting-unit3d-announce):
 
 ```sh
 # The upload_factor is multiplied by 0.01 before being multiplied with
@@ -162,28 +177,30 @@ UPLOAD_FACTOR=200
 DOWNLOAD_FACTOR=0
 ```
 
-## Configuration
+---
 
-### Reload
+## Configuration Reload
 
-To reload the configuration without restarting the tracker, send the following curl:
+To reload the configuration without restarting the tracker:
 
 ```sh
 curl -X POST "http://<LISTENING_IP_ADDRESS>:<LISTENING_PORT>/announce/<APIKEY>/config/reload"
 ```
 
+---
+
 ## Uninstall
 
-To uninstall UNIT3D-announce, you need to [exit the tracker](#exiting-unit3d-announce) and then:
+Exit the tracker first, then:
 
 ```sh
 # Disable the external tracker in UNIT3D's config
 $ sudo nano /var/www/html/config/announce.php
 
-# Remove any potential `location /announce/` block from the nginx configuration
+# Remove any potential `location /announce/` block from nginx configuration
 $ sudo nano /etc/nginx/sites-enabled/default
 
-# Remove any potential `[program:unit3d-announce]` block from the supervisor configuration
+# Remove any potential `[program:unit3d-announce]` block from supervisor
 $ sudo nano /etc/supervisor/conf.d/unit3d.conf
 
 # Remove tracker files
@@ -193,8 +210,10 @@ $ sudo rm -rf /var/www/html/unit3d-announce
 $ sudo nano /var/www/html/.env
 ```
 
+---
+
 ## Performance
 
-UNIT3D's PHP announce can handle ~250 HTTP requests per second per core on modern hardware.
-
-Using the same hardware, UNIT3D-Announce handles ~50k HTTP requests per second per core (using wrk). Adding it behind an nginx proxy with TLS will reduce it to ~10k HTTP requests per second per core.
+* UNIT3D's PHP announce: \~250 HTTP requests/sec per core on modern hardware
+* UNIT3D-Announce: \~50k HTTP requests/sec per core (using wrk)
+* Behind nginx proxy with TLS: \~10k HTTP requests/sec per core
