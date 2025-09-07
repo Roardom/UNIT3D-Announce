@@ -21,7 +21,7 @@ sqlx = { version = "0.8.6", default-features = false, features = ["runtime-tokio
 thiserror = { version = "2.0.16", default-features = false }
 tokio = { version = "1.47.1", default-features = false, features = ["rt-multi-thread", "macros", "signal", "sync"] }
 tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.6"
