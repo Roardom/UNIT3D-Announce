@@ -28,6 +28,7 @@ pub struct Peer {
     pub is_active: bool,
     pub is_visible: bool,
     pub is_connectable: bool,
+    pub has_sent_completed: bool,
     #[serde(with = "ts_seconds")]
     pub updated_at: DateTime<Utc>,
     pub uploaded: u64,

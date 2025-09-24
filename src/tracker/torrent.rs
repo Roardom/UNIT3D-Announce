@@ -129,6 +129,7 @@ impl Map {
                         is_active: peer.is_active,
                         is_visible: peer.is_visible,
                         is_connectable: peer.is_connectable,
+                        has_sent_completed: false,
                         updated_at: peer
                             .updated_at
                             .expect("Peer with a null updated_at found in database."),
