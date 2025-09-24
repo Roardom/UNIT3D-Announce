@@ -8,6 +8,7 @@ High-performance backend BitTorrent tracker compatible with UNIT3D tracker softw
 |-----------------|-------------------------|
 | v8.3.4 - v9.0.4 | v0.1                    |
 | v9.0.5+         | v0.2                    |
+| v9.1.7+         | v0.3                    |
 
 ## Installation
 
@@ -16,7 +17,7 @@ High-performance backend BitTorrent tracker compatible with UNIT3D tracker softw
 $ cd /var/www/html
 
 # Clone this repository
-$ git clone -b v0.2 https://github.com/HDInnovations/UNIT3D-Announce unit3d-announce
+$ git clone -b v0.3 https://github.com/HDInnovations/UNIT3D-Announce unit3d-announce
 
 # Go into the repository
 $ cd unit3d-announce
@@ -51,7 +52,7 @@ $ sudo nano config/announce.php
 $ cd /var/www/html/unit3d-announce
 
 # Pull the new updates
-$ git pull origin v0.2
+$ git pull origin v0.3
 
 # Review changes to the configuration
 $ diff -u .env .env.example
