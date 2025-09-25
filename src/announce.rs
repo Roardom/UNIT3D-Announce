@@ -502,6 +502,8 @@ pub async fn announce(
                     peer.is_visible =
                         peer.is_included_in_leech_list(&config) || !has_hit_download_slot_limit;
                     peer.is_active = true;
+                    peer.has_sent_completed =
+                        peer.has_sent_completed || queries.event == Event::Completed;
                     peer.updated_at = now;
                     peer.uploaded = queries.uploaded;
                     peer.downloaded = queries.downloaded;
@@ -513,6 +515,7 @@ pub async fn announce(
                     is_active: true,
                     is_visible: !has_hit_download_slot_limit,
                     is_connectable,
+                    has_sent_completed: queries.event == Event::Completed,
                     updated_at: now,
                     uploaded: queries.uploaded,
                     downloaded: queries.downloaded,
@@ -551,11 +554,13 @@ pub async fn announce(
                     }
 
                     // Warn user if peer last announced less than
-                    // announce_min_enforced seconds ago
+                    // announce_min_enforced seconds ago and it's
+                    // not their first completed event
                     if old_peer
                         .updated_at
                         .checked_add_signed(Duration::seconds(config.announce_min_enforced.into()))
                         .is_some_and(|blocked_until| blocked_until > now)
+                        && (queries.event != Event::Completed || old_peer.has_sent_completed)
                     {
                         warnings.add(AnnounceWarning::RateLimitExceeded);
                     }
