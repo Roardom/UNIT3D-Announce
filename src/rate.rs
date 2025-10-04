@@ -25,6 +25,7 @@ pub struct Rate {
     updated_at: f64,
 }
 
+#[allow(dead_code)]
 impl Rate {
     /// Initializes a new rate.
     pub fn new(window: Duration, max_events_per_window: f64) -> Self {
@@ -73,6 +74,7 @@ pub struct RateCollection {
     rates: Vec<Rate>,
 }
 
+#[allow(dead_code)]
 impl RateCollection {
     /// Create a new RateCollection.
     pub fn new(rates: &[Rate]) -> Self {
