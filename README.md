@@ -156,7 +156,7 @@ sudo supervisorctl stop unit3d-announce:unit3d-announce_00
 > [!IMPORTANT]
 > When using the Rust-based UNIT3D-Announce tracker, the global freeleech and double upload events are handled by the external tracker itself. This means you must activate the events in the `config/other.php` file within UNIT3D as normal to show the timer and then also within the `.env` file of the UNIT3D-Announce tracker to update user stats correctly.
 
-To enable/disable global freeleech or double upload events, you need to adjust the following environment variables in the `.env` file and then [restart the tracker](#startingrestarting-unit3d-announce).
+To enable/disable global freeleech or double upload events, you need to adjust the following environment variables in the `.env` file and then either [reload the configuration](#reload) or [restart the tracker](#startingrestarting-unit3d-announce).
 
 ```sh
 # The upload_factor is multiplied by 0.01 before being multiplied with
