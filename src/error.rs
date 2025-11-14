@@ -93,7 +93,17 @@ impl IntoResponse for AnnounceError {
 
         if self.is_critical_warning() {
             response.extend(b"d8:completei0e10:downloadedi0e10:incompletei0e");
-            response.extend(b"8:intervali5400e12:min intervali5400e");
+
+            match self {
+                // If the torrent status is pending, postponed, or rejected,
+                // reduce the interval to 30 seconds. This allows the uploader
+                // to start seeding sooner when the torrent is approved.
+                Self::TorrentIsPendingModeration
+                | Self::TorrentIsPostponed
+                | Self::TorrentIsRejected => response.extend(b"8:intervali30e12:min intervali30e"),
+                _ => response.extend(b"8:intervali5400e12:min intervali5400e"),
+            };
+
             response.extend(b"5:peers0:15:warning message");
             response.extend(self.to_string().len().to_string().as_bytes());
             response.extend(b":");
@@ -135,7 +145,12 @@ impl AnnounceError {
             // of sending `stopped` events. To prevent this, we need to
             // send a warning (i.e. succcessful announce) instead, so that
             // the client can successfully restart its session.
-            Self::StoppedPeerDoesNotExist => true,
+            Self::StoppedPeerDoesNotExist
+            // These moderation warnings can't be errors or else
+            // libtorrent-rasterbar clients will backoff exponentially.
+            | Self::TorrentIsPendingModeration
+            | Self::TorrentIsPostponed
+            | Self::TorrentIsRejected => true,
             _ => false,
         }
     }
