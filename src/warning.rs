@@ -1,9 +1,9 @@
 use thiserror::Error;
 
+/// Announce warnings that don't stop the announce processing but still return
+/// an empty peer list..
 #[derive(Error, Debug, Clone, Copy, PartialEq)]
 pub enum AnnounceWarning {
-    #[error("Stopped peer doesn't exist.")]
-    StoppedPeerDoesntExist,
     #[error("Rate limit exceeded. Please wait.")]
     RateLimitExceeded,
     #[error("Download slot limit reached")]
@@ -60,12 +60,6 @@ impl WarningCollection {
     #[inline(always)]
     pub fn is_empty(&self) -> bool {
         self.warnings.is_empty()
-    }
-
-    /// Returns true if there exists a warning which requires returning early.
-    pub fn should_early_return(&self) -> bool {
-        self.warnings
-            .contains(&AnnounceWarning::StoppedPeerDoesntExist)
     }
 
     /// Create the warning message to be returned to the user.

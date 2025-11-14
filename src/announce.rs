@@ -25,9 +25,9 @@ use crate::{
         InvalidPeerId, InvalidPort, InvalidQueryStringKey, InvalidQueryStringValue,
         InvalidUploaded, InvalidUserAgent, MissingDownloaded, MissingInfoHash, MissingLeft,
         MissingPeerId, MissingPort, MissingUploaded, NotAClient, PasskeyNotFound,
-        PeersPerTorrentPerUserLimit, TorrentIsDeleted, TorrentIsPendingModeration,
-        TorrentIsPostponed, TorrentIsRejected, TorrentNotFound, TorrentUnknownModerationStatus,
-        UnsupportedEvent, UserAgentTooLong, UserNotFound,
+        PeersPerTorrentPerUserLimit, StoppedPeerDoesNotExist, TorrentIsDeleted,
+        TorrentIsPendingModeration, TorrentIsPostponed, TorrentIsRejected, TorrentNotFound,
+        TorrentUnknownModerationStatus, UnsupportedEvent, UserAgentTooLong, UserNotFound,
     },
     scheduler::{
         announce_update::AnnounceUpdate,
@@ -383,7 +383,6 @@ pub async fn announce(
         group,
         has_requested_seed_list,
         has_requested_leech_list,
-        should_early_return,
         response,
     ) = {
         let mut torrent_guard = tracker.torrents.lock();
@@ -464,21 +463,10 @@ pub async fn announce(
                     }
                 }
             } else {
-                // Some clients (namely transmission) will keep sending
-                // `stopped` events until a successful announce is received.
-                // If a user's network is having issues, their peer might be
-                // deleted for inactivity from missed announces. If their peer
-                // isn't found when we receive a `stopped` event from them
-                // after regaining network connectivity, we can't return an
-                // error otherwise the client might enter into an infinite loop
-                // of sending `stopped` events. To prevent this, we need to
-                // send a warning (i.e. succcessful announce) instead, so that
-                // the client can successfully restart its session.
-                warnings.add(AnnounceWarning::StoppedPeerDoesntExist);
-                leecher_delta = 0;
-                seeder_delta = 0;
-                uploaded_delta = 0;
-                downloaded_delta = 0;
+                // Short circuit response for stopped peer doesn't exist error
+                // since we can't do anything with it and don't want to update
+                // any data.
+                return Err(StoppedPeerDoesNotExist);
             }
 
             times_completed_delta = 0;
@@ -599,9 +587,6 @@ pub async fn announce(
                 }
             }
         }
-
-        // Compute this before we convert the warnings into a message.
-        let should_early_return = warnings.should_early_return();
 
         // Has to be adjusted before the peer list is generated
         torrent.seeders = torrent.seeders.saturating_add_signed(seeder_delta);
@@ -801,16 +786,9 @@ pub async fn announce(
             group,
             has_requested_seed_list,
             has_requested_leech_list,
-            should_early_return,
             response,
         )
     };
-
-    // Short circuit response for stopped peer doesn't exist error since we
-    // can't do anything with it and don't want to update any data.
-    if should_early_return {
-        return Ok(response);
-    }
 
     let download_factor = if tracker
         .personal_freeleeches
