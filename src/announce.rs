@@ -389,6 +389,19 @@ pub async fn announce(
         let torrent = torrent_guard.get_mut(&torrent_id).ok_or(TorrentNotFound)?;
 
         if torrent.is_deleted {
+            if let Ok(user) = &user {
+                tracker.unregistered_info_hash_updates.lock().upsert(
+                    unregistered_info_hash_update::Index {
+                        user_id: user.id,
+                        info_hash: queries.info_hash,
+                    },
+                    UnregisteredInfoHashUpdate {
+                        created_at: now,
+                        updated_at: now,
+                    },
+                );
+            }
+
             return Err(TorrentIsDeleted);
         }
 
