@@ -110,21 +110,21 @@ impl Flushable<HistoryUpdate> for super::Batch<Index, HistoryUpdate> {
                         downloaded = downloaded + VALUES(downloaded),
                         actual_downloaded = actual_downloaded + VALUES(actual_downloaded),
                         client_downloaded = VALUES(client_downloaded),
-                        seedtime = IF(
-                            DATE_ADD(updated_at, INTERVAL
+                        seedtime = CASE
+                            WHEN updated_at + INTERVAL
             "#,
             )
             .push_bind(tracker.config.read().active_peer_ttl + tracker.config.read().peer_expiry_interval)
             .push(
                 r#"
-                                                                SECOND) > VALUES(updated_at) AND seeder = 1 AND active = 1 AND VALUES(seeder) = 1,
-                            seedtime + TIMESTAMPDIFF(second, updated_at, VALUES(updated_at)),
-                            seedtime
-                        ),
+                                                         SECOND > VALUES(updated_at) AND seeder = TRUE AND active = TRUE AND VALUES(seeder) = TRUE
+                            THEN seedtime + TIMESTAMPDIFF(second, updated_at, VALUES(updated_at))
+                            ELSE seedtime
+                        END,
                         updated_at = VALUES(updated_at),
                         seeder = VALUES(seeder),
                         active = VALUES(active),
-                        immune = immune AND VALUES(immune),
+                        immune = immune = TRUE AND VALUES(immune) = TRUE,
                         completed_at = COALESCE(completed_at, VALUES(completed_at))
                 "#,
             );
