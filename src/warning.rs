@@ -13,7 +13,7 @@ pub enum AnnounceWarning {
 }
 
 impl AnnounceWarning {
-    /// Returns true if the warning should be not be sent to the user
+    /// Returns true if the warning should not be sent to the user
     /// but still used internally to give empty peer lists.
     fn is_silent(&self) -> bool {
         match self {
