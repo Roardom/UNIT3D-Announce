@@ -204,12 +204,6 @@ async fn connect_to_database() -> sqlx::Pool<sqlx::MySql> {
         .max_lifetime(Duration::from_secs(30 * 60))
         .idle_timeout(Duration::from_secs(10 * 60))
         .acquire_timeout(Duration::from_secs(30))
-        .before_acquire(|conn, _meta| Box::pin(async move {
-            // MySQL will never shrink its buffers and MySQL will eventually crash
-            // from running out of memory if we don't do this.
-            conn.shrink_buffers();
-            Ok(true)
-        }))
         .connect(&env::var("DATABASE_URL").expect("DATABASE_URL not found in .env file. Aborting."))
         .await
         .expect("Could not connect to the database using the DATABASE_URL value in .env file. Aborting.")
