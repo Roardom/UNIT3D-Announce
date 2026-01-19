@@ -175,7 +175,7 @@ where
             .await
             .or(Err(InternalTrackerError))?;
 
-        let config = tracker.config.read();
+        let config = tracker.config.load();
 
         Ok(Query(Announce {
             info_hash: info_hash.ok_or(MissingInfoHash)?,
@@ -211,7 +211,7 @@ impl FromRequestParts<Arc<Tracker>> for ClientIp {
     ) -> Result<Self, Self::Rejection> {
         let header_name_opt = &state
             .config
-            .read()
+            .load()
             .reverse_proxy_client_ip_header_name
             .to_owned();
 
@@ -362,7 +362,7 @@ pub async fn announce(
 
     let mut warnings = WarningCollection::new();
 
-    let config = tracker.config.read();
+    let config = tracker.config.load();
 
     if !is_connectable && config.require_peer_connectivity {
         warnings.add(AnnounceWarning::ConnectivityIssueDetected);
@@ -962,13 +962,13 @@ pub async fn announce(
 }
 
 async fn check_connectivity(tracker: &Arc<Tracker>, ip: IpAddr, port: u16) -> bool {
-    if tracker.config.read().is_connectivity_check_enabled {
+    if tracker.config.load().is_connectivity_check_enabled {
         let now = Utc::now();
         let socket = SocketAddr::from((ip, port));
         let connectable_port_opt = tracker.connectable_ports.read().get(&socket).cloned();
 
         if let Some(connectable_port) = connectable_port_opt {
-            let ttl = Duration::seconds(tracker.config.read().connectivity_check_interval);
+            let ttl = Duration::seconds(tracker.config.load().connectivity_check_interval);
 
             if let Some(cached_until) = connectable_port.updated_at.checked_add_signed(ttl) {
                 if cached_until > now {

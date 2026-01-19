@@ -63,7 +63,7 @@ async fn main() -> Result<()> {
 
     // Ensure lock is dropped before axum::serve() is called otherwise
     // reloading config triggers a deadlock
-    let config = tracker.config.read().clone();
+    let config = tracker.config.load().clone();
 
     if let Some(path) = config.listening_unix_socket.to_owned() {
         // Create unix domain socket.

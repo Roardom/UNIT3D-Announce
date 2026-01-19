@@ -24,11 +24,11 @@ pub async fn handle(tracker: &Arc<Tracker>) {
         interval.tick().await;
         counter += 1;
 
-        if counter % tracker.config.read().flush_interval_milliseconds == 0 {
+        if counter % tracker.config.load().flush_interval_milliseconds == 0 {
             flush(tracker).await;
         }
 
-        if counter % (tracker.config.read().peer_expiry_interval * 1000) == 0 {
+        if counter % (tracker.config.load().peer_expiry_interval * 1000) == 0 {
             reap(tracker).await;
         }
     }
@@ -72,9 +72,9 @@ async fn flush_announce_updates(tracker: &Arc<Tracker>) {
 
 /// Remove peers that have not announced for some time
 pub async fn reap(tracker: &Arc<Tracker>) {
-    let ttl = Duration::seconds(tracker.config.read().active_peer_ttl.try_into().unwrap());
+    let ttl = Duration::seconds(tracker.config.load().active_peer_ttl.try_into().unwrap());
     let active_cutoff = Utc::now().checked_sub_signed(ttl).unwrap();
-    let ttl = Duration::seconds(tracker.config.read().inactive_peer_ttl.try_into().unwrap());
+    let ttl = Duration::seconds(tracker.config.load().inactive_peer_ttl.try_into().unwrap());
     let inactive_cutoff = Utc::now().checked_sub_signed(ttl).unwrap();
 
     for (_index, torrent) in tracker.torrents.lock().iter_mut() {
@@ -150,7 +150,7 @@ impl QueueConfig {
         let max_bindings = (self.max_bindings_per_flush - self.extra_bindings_per_flush)
             / self.bindings_per_record;
 
-        if let Some(max_records) = tracker.config.read().max_records_per_batch {
+        if let Some(max_records) = tracker.config.load().max_records_per_batch {
             return max_bindings.min(max_records);
         }
 
@@ -182,7 +182,7 @@ where
     /// Take a portion of the updates from the start of the queue with a max
     /// size defined by the buffer config
     fn take_batches(&mut self, tracker: &Arc<Tracker>) -> VecDeque<Batch<K, V>> {
-        let max_batches = tracker.config.read().max_batches_per_flush;
+        let max_batches = tracker.config.load().max_batches_per_flush;
         let max_batch_size = self.config.max_batch_size(tracker);
 
         let mut records = self

@@ -114,7 +114,7 @@ impl Flushable<HistoryUpdate> for super::Batch<Index, HistoryUpdate> {
                             WHEN updated_at + INTERVAL
             "#,
             )
-            .push_bind(tracker.config.read().active_peer_ttl + tracker.config.read().peer_expiry_interval)
+            .push_bind(tracker.config.load().active_peer_ttl + tracker.config.load().peer_expiry_interval)
             .push(
                 r#"
                                                          SECOND > VALUES(updated_at) AND seeder = TRUE AND active = TRUE AND VALUES(seeder) = TRUE

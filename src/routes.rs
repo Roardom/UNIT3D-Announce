@@ -24,7 +24,7 @@ pub fn routes(state: Arc<Tracker>) -> Router<Arc<Tracker>> {
                     Router::new().route("/ping", get(|| async { "PONG" })),
                 )
                 .nest(
-                    &("/".to_string() + &state.config.read().apikey),
+                    &("/".to_string() + &state.config.load().apikey),
                     Router::new()
                         .route(
                             "/torrents",

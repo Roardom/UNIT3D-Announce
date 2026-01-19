@@ -9,6 +9,7 @@ pub mod personal_freeleech;
 pub mod torrent;
 pub mod user;
 
+use arc_swap::ArcSwap;
 pub use peer::Peer;
 
 use sqlx::{MySql, MySqlPool, QueryBuilder};
@@ -35,7 +36,7 @@ use std::{env, sync::Arc, time::Duration};
 pub struct Tracker {
     pub agent_blacklist: RwLock<blacklisted_agent::Set>,
     pub announce_updates: Mutex<announce_update::Queue>,
-    pub config: RwLock<config::Config>,
+    pub config: ArcSwap<config::Config>,
     pub connectable_ports: RwLock<connectable_port::Map>,
     pub featured_torrents: RwLock<featured_torrent::Set>,
     pub freeleech_tokens: RwLock<freeleech_token::Set>,
@@ -144,7 +145,7 @@ impl Tracker {
         Ok(Arc::new(Tracker {
             agent_blacklist: RwLock::new(agent_blacklist),
             announce_updates: Mutex::new(announce_update::Queue::new()),
-            config: RwLock::new(config),
+            config: ArcSwap::from_pointee(config),
             connectable_ports: RwLock::new(connectable_ports),
             freeleech_tokens: RwLock::new(freeleech_tokens),
             featured_torrents: RwLock::new(featured_torrents),

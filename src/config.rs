@@ -386,11 +386,9 @@ impl Config {
         info!("Reloading config.",);
 
         if dotenv_override().is_ok() {
-            let mut config = tracker.config.write();
-
             match Config::from_env() {
                 Ok(new_config) => {
-                    *config = new_config;
+                    tracker.config.store(Arc::new(new_config));
 
                     info!("Successfully reloaded config.");
 
