@@ -28,7 +28,6 @@ use crate::stats::Stats;
 
 use dotenvy::dotenv;
 use parking_lot::{Mutex, RwLock};
-use sqlx::Connection;
 use sqlx::mysql::MySqlPoolOptions;
 use std::io::{self, Write};
 use std::{env, sync::Arc, time::Duration};
