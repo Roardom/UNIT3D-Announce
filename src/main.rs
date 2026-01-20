@@ -103,10 +103,10 @@ async fn main() -> Result<()> {
     let mut flushes = 0;
 
     while flushes < max_flushes
-        && (tracker.history_updates.lock().is_not_empty()
-            || tracker.peer_updates.lock().is_not_empty()
-            || tracker.torrent_updates.lock().is_not_empty()
-            || tracker.user_updates.lock().is_not_empty())
+        && (tracker.queues.histories.lock().is_not_empty()
+            || tracker.queues.peers.lock().is_not_empty()
+            || tracker.queues.torrents.lock().is_not_empty()
+            || tracker.queues.users.lock().is_not_empty())
     {
         scheduler::flush(&tracker).await;
         flushes += 1;

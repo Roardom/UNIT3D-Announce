@@ -10,11 +10,15 @@ pub mod user_update;
 use crate::tracker::Tracker;
 use chrono::{Duration, Utc};
 use futures_util::future::join_all;
+use history_update::HistoryUpdate;
 use parking_lot::Mutex;
+use peer_update::PeerUpdate;
 use ringmap::RingMap;
 use tokio::{join, time::Instant};
 use torrent_update::{Index, TorrentUpdate};
 use tracing::info;
+use unregistered_info_hash_update::UnregisteredInfoHashUpdate;
+use user_update::UserUpdate;
 
 pub async fn handle(tracker: &Arc<Tracker>) {
     let mut interval = tokio::time::interval(std::time::Duration::from_millis(1));
@@ -38,19 +42,20 @@ pub async fn handle(tracker: &Arc<Tracker>) {
 pub async fn flush(tracker: &Arc<Tracker>) {
     join!(
         flush_announce_updates(tracker),
-        tracker.history_updates.flush(tracker, "histories"),
-        tracker.peer_updates.flush(tracker, "peers"),
-        tracker.torrent_updates.flush(tracker, "torrents"),
-        tracker.user_updates.flush(tracker, "users"),
+        tracker.queues.histories.flush(tracker, "histories"),
+        tracker.queues.peers.flush(tracker, "peers"),
+        tracker.queues.torrents.flush(tracker, "torrents"),
+        tracker.queues.users.flush(tracker, "users"),
         tracker
-            .unregistered_info_hash_updates
+            .queues
+            .unregistered_info_hashes
             .flush(tracker, "unregistered info hashes"),
     );
 }
 
 /// Send announce updates to mysql database
 async fn flush_announce_updates(tracker: &Arc<Tracker>) {
-    let announce_update_batch = tracker.announce_updates.lock().take_batch();
+    let announce_update_batch = tracker.queues.announces.lock().take_batch();
     let start = Instant::now();
     let len = announce_update_batch.len();
     let result = announce_update_batch.flush_to_db(tracker).await;
@@ -63,7 +68,8 @@ async fn flush_announce_updates(tracker: &Arc<Tracker>) {
         Err(e) => {
             info!("Failed to update {len} announces after {elapsed} ms: {e}");
             tracker
-                .announce_updates
+                .queues
+                .announces
                 .lock()
                 .upsert_batch(announce_update_batch);
         }
@@ -119,7 +125,7 @@ pub async fn reap(tracker: &Arc<Tracker>) {
             torrent.seeders = torrent.seeders.saturating_add_signed(seeder_delta);
             torrent.leechers = torrent.leechers.saturating_add_signed(leecher_delta);
 
-            tracker.torrent_updates.lock().upsert(
+            tracker.queues.torrents.lock().upsert(
                 Index {
                     torrent_id: torrent.id,
                 },
@@ -130,6 +136,59 @@ pub async fn reap(tracker: &Arc<Tracker>) {
                     balance_delta: 0,
                 },
             );
+        }
+    }
+}
+
+/// Holds queued database updates
+pub struct Queues {
+    pub announces: Mutex<announce_update::Queue>,
+    pub histories: Mutex<Queue<history_update::Index, HistoryUpdate>>,
+    pub peers: Mutex<Queue<peer_update::Index, PeerUpdate>>,
+    pub torrents: Mutex<Queue<torrent_update::Index, TorrentUpdate>>,
+    pub unregistered_info_hashes:
+        Mutex<Queue<unregistered_info_hash_update::Index, UnregisteredInfoHashUpdate>>,
+    pub users: Mutex<Queue<user_update::Index, UserUpdate>>,
+}
+
+impl Queues {
+    /// Initializes new queues
+    pub fn new() -> Queues {
+        Queues {
+            announces: Mutex::new(announce_update::Queue::new()),
+            histories: Mutex::new(Queue::<history_update::Index, HistoryUpdate>::new(
+                QueueConfig {
+                    max_bindings_per_flush: 65_535,
+                    bindings_per_record: 16,
+                    // 1 extra binding is used to insert the TTL
+                    extra_bindings_per_flush: 1,
+                },
+            )),
+            peers: Mutex::new(Queue::<peer_update::Index, PeerUpdate>::new(QueueConfig {
+                max_bindings_per_flush: 65_535,
+                bindings_per_record: 15,
+                extra_bindings_per_flush: 0,
+            })),
+            torrents: Mutex::new(Queue::<torrent_update::Index, TorrentUpdate>::new(
+                QueueConfig {
+                    max_bindings_per_flush: 65_535,
+                    bindings_per_record: 15,
+                    extra_bindings_per_flush: 0,
+                },
+            )),
+            unregistered_info_hashes: Mutex::new(Queue::<
+                unregistered_info_hash_update::Index,
+                UnregisteredInfoHashUpdate,
+            >::new(QueueConfig {
+                max_bindings_per_flush: 65_535,
+                bindings_per_record: 4,
+                extra_bindings_per_flush: 0,
+            })),
+            users: Mutex::new(Queue::<user_update::Index, UserUpdate>::new(QueueConfig {
+                max_bindings_per_flush: 65_535,
+                bindings_per_record: 9,
+                extra_bindings_per_flush: 0,
+            })),
         }
     }
 }

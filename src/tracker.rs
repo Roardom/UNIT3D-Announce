@@ -17,14 +17,7 @@ use sqlx::{MySql, MySqlPool, QueryBuilder};
 use anyhow::{Context, Result};
 
 use crate::config;
-use crate::scheduler::unregistered_info_hash_update::{self, UnregisteredInfoHashUpdate};
-use crate::scheduler::{
-    Queue, QueueConfig, announce_update,
-    history_update::{self, HistoryUpdate},
-    peer_update::{self, PeerUpdate},
-    torrent_update::{self, TorrentUpdate},
-    user_update::{self, UserUpdate},
-};
+use crate::scheduler::Queues;
 use crate::stats::Stats;
 
 use dotenvy::dotenv;
@@ -35,26 +28,20 @@ use std::{env, sync::Arc, time::Duration};
 
 pub struct Tracker {
     pub agent_blacklist: RwLock<blacklisted_agent::Set>,
-    pub announce_updates: Mutex<announce_update::Queue>,
     pub config: ArcSwap<config::Config>,
     pub connectable_ports: RwLock<connectable_port::Map>,
     pub featured_torrents: RwLock<featured_torrent::Set>,
     pub freeleech_tokens: RwLock<freeleech_token::Set>,
     pub groups: RwLock<group::Map>,
-    pub history_updates: Mutex<Queue<history_update::Index, HistoryUpdate>>,
     pub infohash2id: RwLock<torrent::infohash2id::Map>,
     pub passkey2id: RwLock<user::passkey2id::Map>,
-    pub peer_updates: Mutex<Queue<peer_update::Index, PeerUpdate>>,
     pub personal_freeleeches: RwLock<personal_freeleech::Set>,
     pub pool: MySqlPool,
     pub port_blacklist: RwLock<blacklisted_port::Set>,
+    pub queues: Queues,
     pub stats: Stats,
     pub torrents: Mutex<torrent::Map>,
-    pub torrent_updates: Mutex<Queue<torrent_update::Index, TorrentUpdate>>,
-    pub unregistered_info_hash_updates:
-        Mutex<Queue<unregistered_info_hash_update::Index, UnregisteredInfoHashUpdate>>,
     pub users: RwLock<user::Map>,
-    pub user_updates: Mutex<Queue<user_update::Index, UserUpdate>>,
 }
 
 impl Tracker {
@@ -144,53 +131,20 @@ impl Tracker {
 
         Ok(Arc::new(Tracker {
             agent_blacklist: RwLock::new(agent_blacklist),
-            announce_updates: Mutex::new(announce_update::Queue::new()),
             config: ArcSwap::from_pointee(config),
             connectable_ports: RwLock::new(connectable_ports),
             freeleech_tokens: RwLock::new(freeleech_tokens),
             featured_torrents: RwLock::new(featured_torrents),
             groups: RwLock::new(groups),
-            history_updates: Mutex::new(Queue::<history_update::Index, HistoryUpdate>::new(
-                QueueConfig {
-                    max_bindings_per_flush: 65_535,
-                    bindings_per_record: 16,
-                    // 1 extra binding is used to insert the TTL
-                    extra_bindings_per_flush: 1,
-                },
-            )),
             infohash2id: RwLock::new(infohash2id),
             passkey2id: RwLock::new(passkey2id),
-            peer_updates: Mutex::new(Queue::<peer_update::Index, PeerUpdate>::new(QueueConfig {
-                max_bindings_per_flush: 65_535,
-                bindings_per_record: 15,
-                extra_bindings_per_flush: 0,
-            })),
             personal_freeleeches: RwLock::new(personal_freeleeches),
             pool,
             port_blacklist: RwLock::new(port_blacklist),
+            queues: Queues::new(),
             stats,
             torrents: Mutex::new(torrents),
-            torrent_updates: Mutex::new(Queue::<torrent_update::Index, TorrentUpdate>::new(
-                QueueConfig {
-                    max_bindings_per_flush: 65_535,
-                    bindings_per_record: 15,
-                    extra_bindings_per_flush: 0,
-                },
-            )),
-            unregistered_info_hash_updates: Mutex::new(Queue::<
-                unregistered_info_hash_update::Index,
-                UnregisteredInfoHashUpdate,
-            >::new(QueueConfig {
-                max_bindings_per_flush: 65_535,
-                bindings_per_record: 4,
-                extra_bindings_per_flush: 0,
-            })),
             users: RwLock::new(users),
-            user_updates: Mutex::new(Queue::<user_update::Index, UserUpdate>::new(QueueConfig {
-                max_bindings_per_flush: 65_535,
-                bindings_per_record: 9,
-                extra_bindings_per_flush: 0,
-            })),
         }))
     }
 }

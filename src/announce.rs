@@ -343,7 +343,7 @@ pub async fn announce(
 
     if let Ok(user) = &user {
         if let Err(InfoHashNotFound) = torrent_id_res {
-            tracker.unregistered_info_hash_updates.lock().upsert(
+            tracker.queues.unregistered_info_hashes.lock().upsert(
                 unregistered_info_hash_update::Index {
                     user_id: user.id,
                     info_hash: queries.info_hash,
@@ -390,7 +390,7 @@ pub async fn announce(
 
         if torrent.is_deleted {
             if let Ok(user) = &user {
-                tracker.unregistered_info_hash_updates.lock().upsert(
+                tracker.queues.unregistered_info_hashes.lock().upsert(
                     unregistered_info_hash_update::Index {
                         user_id: user.id,
                         info_hash: queries.info_hash,
@@ -859,7 +859,7 @@ pub async fn announce(
         });
     }
 
-    tracker.peer_updates.lock().upsert(
+    tracker.queues.peers.lock().upsert(
         peer_update::Index {
             peer_id: queries.peer_id,
             torrent_id,
@@ -881,7 +881,7 @@ pub async fn announce(
         },
     );
 
-    tracker.history_updates.lock().upsert(
+    tracker.queues.histories.lock().upsert(
         history_update::Index {
             user_id,
             torrent_id,
@@ -912,7 +912,7 @@ pub async fn announce(
     );
 
     if credited_uploaded_delta != 0 || credited_downloaded_delta != 0 {
-        tracker.user_updates.lock().upsert(
+        tracker.queues.users.lock().upsert(
             user_update::Index { user_id },
             UserUpdate {
                 uploaded_delta: credited_uploaded_delta,
@@ -927,7 +927,7 @@ pub async fn announce(
         || uploaded_delta != 0
         || downloaded_delta != 0
     {
-        tracker.torrent_updates.lock().upsert(
+        tracker.queues.torrents.lock().upsert(
             torrent_update::Index { torrent_id },
             TorrentUpdate {
                 seeder_delta,
@@ -940,7 +940,7 @@ pub async fn announce(
     }
 
     if config.is_announce_logging_enabled {
-        tracker.announce_updates.lock().upsert(AnnounceUpdate {
+        tracker.queues.announces.lock().upsert(AnnounceUpdate {
             user_id,
             torrent_id,
             uploaded: queries.uploaded,
