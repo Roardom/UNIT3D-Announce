@@ -29,7 +29,7 @@ use crate::{
         TorrentIsPendingModeration, TorrentIsPostponed, TorrentIsRejected, TorrentNotFound,
         TorrentUnknownModerationStatus, UnsupportedEvent, UserAgentTooLong, UserNotFound,
     },
-    scheduler::{
+    queue::{
         announce_update::AnnounceUpdate,
         history_update::{self, HistoryUpdate},
         peer_update::{self, PeerUpdate},

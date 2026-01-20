@@ -18,6 +18,7 @@ static GLOBAL: Jemalloc = Jemalloc;
 mod announce;
 mod config;
 mod error;
+mod queue;
 mod rate;
 mod routes;
 mod scheduler;
@@ -108,7 +109,7 @@ async fn main() -> Result<()> {
             || tracker.queues.torrents.lock().is_not_empty()
             || tracker.queues.users.lock().is_not_empty())
     {
-        scheduler::flush(&tracker).await;
+        tracker.queues.flush(&tracker).await;
         flushes += 1;
     }
 

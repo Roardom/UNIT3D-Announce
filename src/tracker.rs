@@ -17,7 +17,7 @@ use sqlx::{MySql, MySqlPool, QueryBuilder};
 use anyhow::{Context, Result};
 
 use crate::config;
-use crate::scheduler::Queues;
+use crate::queue::Queues;
 use crate::stats::Stats;
 
 use dotenvy::dotenv;
