@@ -52,7 +52,7 @@ impl Set {
             token.user_id, token.torrent_id
         );
 
-        tracker.freeleech_tokens.write().insert(token);
+        tracker.stores.freeleech_tokens.write().insert(token);
     }
 
     pub async fn destroy(State(tracker): State<Arc<Tracker>>, Json(token): Json<FreeleechToken>) {
@@ -61,7 +61,7 @@ impl Set {
             token.user_id, token.torrent_id
         );
 
-        tracker.freeleech_tokens.write().swap_remove(&token);
+        tracker.stores.freeleech_tokens.write().swap_remove(&token);
     }
 }
 

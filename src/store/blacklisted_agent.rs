@@ -52,7 +52,7 @@ impl Set {
             agent.peer_id_prefix,
         );
 
-        tracker.agent_blacklist.write().insert(agent);
+        tracker.stores.agent_blacklist.write().insert(agent);
     }
 
     pub async fn destroy(State(tracker): State<Arc<Tracker>>, Json(agent): Json<Agent>) {
@@ -62,7 +62,7 @@ impl Set {
             agent.peer_id_prefix,
         );
 
-        tracker.agent_blacklist.write().swap_remove(&agent);
+        tracker.stores.agent_blacklist.write().swap_remove(&agent);
     }
 }
 

@@ -55,6 +55,7 @@ impl Set {
         );
 
         tracker
+            .stores
             .personal_freeleeches
             .write()
             .insert(personal_freeleech);
@@ -70,6 +71,7 @@ impl Set {
         );
 
         tracker
+            .stores
             .personal_freeleeches
             .write()
             .swap_remove(&personal_freeleech);

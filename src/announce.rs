@@ -40,8 +40,8 @@ use crate::{
     warning::{AnnounceWarning, WarningCollection},
 };
 
-use crate::tracker::{
-    self, Tracker,
+use crate::store::{
+    self,
     connectable_port::ConnectablePort,
     featured_torrent::FeaturedTorrent,
     freeleech_token::FreeleechToken,
@@ -50,6 +50,7 @@ use crate::tracker::{
     torrent::InfoHash,
     user::Passkey,
 };
+use crate::tracker::Tracker;
 use crate::utils;
 
 #[derive(Clone, Copy, PartialEq, Default)]
@@ -281,7 +282,7 @@ pub async fn announce(
     }
 
     // Block user agent strings on the blacklist
-    for client in tracker.agent_blacklist.read().iter() {
+    for client in tracker.stores.agent_blacklist.read().iter() {
         if queries.peer_id.starts_with(&client.peer_id_prefix) {
             return Err(BlacklistedClient);
         }
@@ -306,7 +307,9 @@ pub async fn announce(
 
     // Validate port
     // Some clients send port 0 on the stopped event
-    if tracker.port_blacklist.read().contains(&queries.port) && queries.event != Event::Stopped {
+    if tracker.stores.port_blacklist.read().contains(&queries.port)
+        && queries.event != Event::Stopped
+    {
         return Err(BlacklistedPort(queries.port));
     }
 
@@ -314,6 +317,7 @@ pub async fn announce(
 
     // Validate passkey
     let user_id = tracker
+        .stores
         .passkey2id
         .read()
         .get(&passkey)
@@ -322,6 +326,7 @@ pub async fn announce(
 
     let user = if let Ok(user_id) = user_id {
         tracker
+            .stores
             .users
             .read()
             .get(&user_id)
@@ -333,6 +338,7 @@ pub async fn announce(
 
     // Validate torrent
     let torrent_id_res = tracker
+        .stores
         .infohash2id
         .read()
         .get(&queries.info_hash)
@@ -385,7 +391,7 @@ pub async fn announce(
         has_requested_leech_list,
         response,
     ) = {
-        let mut torrent_guard = tracker.torrents.lock();
+        let mut torrent_guard = tracker.stores.torrents.lock();
         let torrent = torrent_guard.get_mut(&torrent_id).ok_or(TorrentNotFound)?;
 
         if torrent.is_deleted {
@@ -406,10 +412,10 @@ pub async fn announce(
         }
 
         match torrent.status {
-            tracker::torrent::Status::Approved => (),
-            tracker::torrent::Status::Pending => return Err(TorrentIsPendingModeration),
-            tracker::torrent::Status::Rejected => return Err(TorrentIsRejected),
-            tracker::torrent::Status::Postponed => return Err(TorrentIsPostponed),
+            store::torrent::Status::Approved => (),
+            store::torrent::Status::Pending => return Err(TorrentIsPendingModeration),
+            store::torrent::Status::Rejected => return Err(TorrentIsRejected),
+            store::torrent::Status::Postponed => return Err(TorrentIsPostponed),
             _ => return Err(TorrentUnknownModerationStatus),
         }
 
@@ -422,6 +428,7 @@ pub async fn announce(
         }
 
         let group = tracker
+            .stores
             .groups
             .read()
             .get(&user.group_id)
@@ -454,7 +461,7 @@ pub async fn announce(
 
         if queries.event == Event::Stopped {
             // Try and remove the peer
-            let removed_peer = torrent.peers.swap_remove(&tracker::peer::Index {
+            let removed_peer = torrent.peers.swap_remove(&store::peer::Index {
                 user_id,
                 peer_id: queries.peer_id,
             });
@@ -489,7 +496,7 @@ pub async fn announce(
             let mut old_peer: Option<Peer> = None;
             let new_peer = *torrent
                 .peers
-                .entry(tracker::peer::Index {
+                .entry(store::peer::Index {
                     user_id,
                     peer_id: queries.peer_id,
                 })
@@ -509,7 +516,7 @@ pub async fn announce(
                     peer.uploaded = queries.uploaded;
                     peer.downloaded = queries.downloaded;
                 })
-                .or_insert(tracker::Peer {
+                .or_insert(store::peer::Peer {
                     ip_address: client_ip,
                     port: queries.port,
                     is_seeder: queries.left == 0,
@@ -577,7 +584,7 @@ pub async fn announce(
                             peer_count += 1;
 
                             if peer_count > config.max_peers_per_torrent_per_user {
-                                torrent.peers.swap_remove(&tracker::peer::Index {
+                                torrent.peers.swap_remove(&store::peer::Index {
                                     user_id,
                                     peer_id: queries.peer_id,
                                 });
@@ -804,14 +811,20 @@ pub async fn announce(
     };
 
     let download_factor = if tracker
+        .stores
         .personal_freeleeches
         .read()
         .contains(&PersonalFreeleech { user_id })
-        || tracker.freeleech_tokens.read().contains(&FreeleechToken {
-            user_id,
-            torrent_id,
-        })
         || tracker
+            .stores
+            .freeleech_tokens
+            .read()
+            .contains(&FreeleechToken {
+                user_id,
+                torrent_id,
+            })
+        || tracker
+            .stores
             .featured_torrents
             .read()
             .contains(&FeaturedTorrent { torrent_id })
@@ -822,6 +835,7 @@ pub async fn announce(
     };
 
     let upload_factor = if tracker
+        .stores
         .featured_torrents
         .read()
         .contains(&FeaturedTorrent { torrent_id })
@@ -845,18 +859,23 @@ pub async fn announce(
         || has_requested_seed_list
         || has_requested_leech_list
     {
-        tracker.users.write().entry(user_id).and_modify(|user| {
-            user.num_seeding = user.num_seeding.saturating_add_signed(seeder_delta);
-            user.num_leeching = user.num_leeching.saturating_add_signed(leecher_delta);
+        tracker
+            .stores
+            .users
+            .write()
+            .entry(user_id)
+            .and_modify(|user| {
+                user.num_seeding = user.num_seeding.saturating_add_signed(seeder_delta);
+                user.num_leeching = user.num_leeching.saturating_add_signed(leecher_delta);
 
-            if has_requested_seed_list {
-                user.receive_seed_list_rates.tick();
-            }
+                if has_requested_seed_list {
+                    user.receive_seed_list_rates.tick();
+                }
 
-            if has_requested_leech_list {
-                user.receive_leech_list_rates.tick();
-            }
-        });
+                if has_requested_leech_list {
+                    user.receive_leech_list_rates.tick();
+                }
+            });
     }
 
     tracker.queues.peers.lock().upsert(
@@ -965,7 +984,12 @@ async fn check_connectivity(tracker: &Arc<Tracker>, ip: IpAddr, port: u16) -> bo
     if tracker.config.load().is_connectivity_check_enabled {
         let now = Utc::now();
         let socket = SocketAddr::from((ip, port));
-        let connectable_port_opt = tracker.connectable_ports.read().get(&socket).cloned();
+        let connectable_port_opt = tracker
+            .stores
+            .connectable_ports
+            .read()
+            .get(&socket)
+            .cloned();
 
         if let Some(connectable_port) = connectable_port_opt {
             let ttl = Duration::seconds(tracker.config.load().connectivity_check_interval);
@@ -989,6 +1013,7 @@ async fn check_connectivity(tracker: &Arc<Tracker>, ip: IpAddr, port: u16) -> bo
         .unwrap_or(false);
 
         tracker
+            .stores
             .connectable_ports
             .write()
             .entry(socket)

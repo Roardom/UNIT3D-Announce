@@ -88,7 +88,7 @@ impl Map {
         if let Ok(passkey) = Passkey::from_str(&user.passkey) {
             info!("Inserting user with id {}.", user.id);
             let config = tracker.config.load();
-            let old_user = tracker.users.write().swap_remove(&user.id);
+            let old_user = tracker.stores.users.write().swap_remove(&user.id);
             let (receive_seed_list_rates, receive_leech_list_rates) = old_user
                 .map(|user| (user.receive_seed_list_rates, user.receive_leech_list_rates))
                 .unwrap_or_else(|| {
@@ -100,7 +100,7 @@ impl Map {
 
             let new_passkey = if let Some(new_passkey) = &user.new_passkey {
                 if let Ok(new_passkey) = Passkey::from_str(new_passkey) {
-                    tracker.passkey2id.write().swap_remove(&passkey);
+                    tracker.stores.passkey2id.write().swap_remove(&passkey);
                     new_passkey
                 } else {
                     return StatusCode::BAD_REQUEST;
@@ -109,7 +109,7 @@ impl Map {
                 passkey
             };
 
-            tracker.users.write().insert(
+            tracker.stores.users.write().insert(
                 user.id,
                 User {
                     id: user.id,
@@ -125,7 +125,11 @@ impl Map {
                 },
             );
 
-            tracker.passkey2id.write().insert(new_passkey, user.id);
+            tracker
+                .stores
+                .passkey2id
+                .write()
+                .insert(new_passkey, user.id);
 
             return StatusCode::OK;
         }
@@ -140,8 +144,8 @@ impl Map {
         if let Ok(passkey) = Passkey::from_str(&user.passkey) {
             info!("Removing user with id {}.", user.id);
 
-            tracker.users.write().swap_remove(&user.id);
-            tracker.passkey2id.write().swap_remove(&passkey);
+            tracker.stores.users.write().swap_remove(&user.id);
+            tracker.stores.passkey2id.write().swap_remove(&passkey);
 
             return StatusCode::OK;
         }
@@ -154,6 +158,7 @@ impl Map {
         Path(id): Path<u32>,
     ) -> Result<Json<User>, StatusCode> {
         tracker
+            .stores
             .users
             .read()
             .get(&id)

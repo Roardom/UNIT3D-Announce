@@ -51,7 +51,7 @@ impl Set {
             token.torrent_id
         );
 
-        tracker.featured_torrents.write().insert(token);
+        tracker.stores.featured_torrents.write().insert(token);
     }
 
     pub async fn destroy(State(tracker): State<Arc<Tracker>>, Json(token): Json<FeaturedTorrent>) {
@@ -60,7 +60,7 @@ impl Set {
             token.torrent_id
         );
 
-        tracker.featured_torrents.write().swap_remove(&token);
+        tracker.stores.featured_torrents.write().swap_remove(&token);
     }
 }
 

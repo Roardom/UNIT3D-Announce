@@ -23,6 +23,7 @@ mod rate;
 mod routes;
 mod scheduler;
 mod stats;
+mod store;
 mod tracker;
 mod utils;
 mod warning;

@@ -53,7 +53,7 @@ impl Map {
     ) -> StatusCode {
         info!("Inserting group with id {}.", group.id);
 
-        tracker.groups.write().insert(
+        tracker.stores.groups.write().insert(
             group.id,
             Group {
                 id: group.id,
@@ -74,7 +74,7 @@ impl Map {
     ) -> StatusCode {
         info!("Removing group with id {}.", group.id);
 
-        tracker.groups.write().swap_remove(&group.id);
+        tracker.stores.groups.write().swap_remove(&group.id);
 
         StatusCode::OK
     }

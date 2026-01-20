@@ -22,8 +22,8 @@ pub mod infohash2id;
 pub mod status;
 pub use status::Status;
 
-use crate::tracker::peer::{self, Index};
-use crate::tracker::{Peer, Tracker};
+use crate::store::peer::{self, Index, Peer};
+use crate::tracker::Tracker;
 use peer::peer_id::PeerId;
 
 pub struct Map(IndexMap<u32, Torrent>);
@@ -149,10 +149,10 @@ impl Map {
     ) -> StatusCode {
         if let Ok(info_hash) = InfoHash::from_str(&torrent.info_hash) {
             info!("Inserting torrent with id {}.", torrent.id);
-            let old_torrent = tracker.torrents.lock().swap_remove(&torrent.id);
+            let old_torrent = tracker.stores.torrents.lock().swap_remove(&torrent.id);
             let peers = old_torrent.unwrap_or_default().peers;
 
-            tracker.torrents.lock().insert(
+            tracker.stores.torrents.lock().insert(
                 torrent.id,
                 Torrent {
                     id: torrent.id,
@@ -167,7 +167,11 @@ impl Map {
                 },
             );
 
-            tracker.infohash2id.write().insert(info_hash, torrent.id);
+            tracker
+                .stores
+                .infohash2id
+                .write()
+                .insert(info_hash, torrent.id);
 
             return StatusCode::OK;
         }
@@ -179,7 +183,7 @@ impl Map {
         State(tracker): State<Arc<Tracker>>,
         Json(torrent): Json<APIRemoveTorrent>,
     ) -> StatusCode {
-        let mut torrent_guard = tracker.torrents.lock();
+        let mut torrent_guard = tracker.stores.torrents.lock();
 
         if let Some(torrent) = torrent_guard.get_mut(&torrent.id) {
             info!("Removing torrent with id {}.", torrent.id);
@@ -196,6 +200,7 @@ impl Map {
         Path(id): Path<u32>,
     ) -> Result<Json<Torrent>, StatusCode> {
         tracker
+            .stores
             .torrents
             .lock()
             .get(&id)

@@ -29,7 +29,7 @@ pub async fn reap(tracker: &Arc<Tracker>) {
     let ttl = Duration::seconds(tracker.config.load().inactive_peer_ttl.try_into().unwrap());
     let inactive_cutoff = Utc::now().checked_sub_signed(ttl).unwrap();
 
-    for (_index, torrent) in tracker.torrents.lock().iter_mut() {
+    for (_index, torrent) in tracker.stores.torrents.lock().iter_mut() {
         let mut seeder_delta: i32 = 0;
         let mut leecher_delta: i32 = 0;
 
@@ -48,6 +48,7 @@ pub async fn reap(tracker: &Arc<Tracker>) {
 
                 if peer.is_visible {
                     tracker
+                        .stores
                         .users
                         .write()
                         .entry(index.user_id)
