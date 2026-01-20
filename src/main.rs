@@ -103,12 +103,7 @@ async fn main() -> Result<()> {
     let max_flushes = 1000;
     let mut flushes = 0;
 
-    while flushes < max_flushes
-        && (tracker.queues.histories.lock().is_not_empty()
-            || tracker.queues.peers.lock().is_not_empty()
-            || tracker.queues.torrents.lock().is_not_empty()
-            || tracker.queues.users.lock().is_not_empty())
-    {
+    while flushes < max_flushes && tracker.queues.are_not_empty() {
         tracker.queues.flush(&tracker).await;
         flushes += 1;
     }

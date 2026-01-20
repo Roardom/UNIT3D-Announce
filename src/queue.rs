@@ -106,6 +106,13 @@ impl Queues {
             }
         }
     }
+
+    pub fn are_not_empty(&self) -> bool {
+        self.histories.lock().is_not_empty()
+            || self.peers.lock().is_not_empty()
+            || self.torrents.lock().is_not_empty()
+            || self.users.lock().is_not_empty()
+    }
 }
 
 pub struct Queue<K, V> {
