@@ -108,10 +108,12 @@ impl Queues {
     }
 
     pub fn are_not_empty(&self) -> bool {
-        self.histories.lock().is_not_empty()
+        !self.announces.lock().is_empty()
+            || self.histories.lock().is_not_empty()
             || self.peers.lock().is_not_empty()
             || self.torrents.lock().is_not_empty()
             || self.users.lock().is_not_empty()
+            || self.unregistered_info_hashes.lock().is_not_empty()
     }
 }
 
