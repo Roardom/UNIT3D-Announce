@@ -28,7 +28,7 @@ impl ConnectablePortStore {
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<ConnectablePortStore> {
-        let mut peers = sqlx::query!(
+        sqlx::query!(
             r#"
                 SELECT
                     INET6_NTOA(peers.ip) as `ip_address: String`,
@@ -41,31 +41,30 @@ impl ConnectablePortStore {
                     peers.ip, peers.port
             "#
         )
-        .fetch(db);
-
-        let mut peer_map = ConnectablePortStore::new();
-
-        while let Some(peer) = peers.try_next().await.context("Failed loading peers.")? {
-            peer_map.insert(
+        .fetch(db)
+        .try_fold(ConnectablePortStore::new(), |mut store, peer| async move {
+            store.insert(
                 SocketAddr::from((
                     IpAddr::from_str(
                         &peer
                             .ip_address
-                            .context("INET6_NTOA failed to decode peer ip.")?,
+                            .expect("INET6_NTOA failed to decode peer ip."),
                     )
-                    .context("Peer ip failed to decode.")?,
+                    .expect("Peer ip failed to decode."),
                     peer.port,
                 )),
                 ConnectablePort {
                     connectable: peer.connectable,
                     updated_at: peer
                         .updated_at
-                        .context("Peer with a null updated_at found in database.")?,
+                        .expect("Peer with a null updated_at found in database."),
                 },
             );
-        }
 
-        Ok(peer_map)
+            Ok(store)
+        })
+        .await
+        .context("Failed loading peers.")
     }
 }
 

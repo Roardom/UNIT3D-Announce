@@ -27,7 +27,7 @@ impl TorrentStore {
         // Load one torrent per info hash. If multiple are found, prefer
         // undeleted torrents. If multiple are still found, prefer approved
         // torrents. If multiple are still found, prefer the oldest.
-        let mut torrents = sqlx::query_as!(
+        let torrents = sqlx::query_as!(
             DBImportTorrent,
             r#"
                 SELECT
@@ -56,16 +56,9 @@ impl TorrentStore {
                     ON distinct_torrents.id = torrents.id
             "#
         )
-        .fetch(db);
-
-        let mut torrent_map = TorrentStore::new();
-
-        while let Some(torrent) = torrents
-            .try_next()
-            .await
-            .context("Failed loading torrents.")?
-        {
-            torrent_map.insert(
+        .fetch(db)
+        .try_fold(TorrentStore::new(), |mut store, torrent| async move {
+            store.insert(
                 torrent.id,
                 Torrent {
                     id: torrent.id,
@@ -79,10 +72,14 @@ impl TorrentStore {
                     peers: PeerStore::new(),
                 },
             );
-        }
+
+            Ok(store)
+        })
+        .await
+        .context("Failed loading torrents.")?;
 
         // Load peers into each torrent
-        let mut peers = sqlx::query!(
+        sqlx::query!(
             r#"
                 SELECT
                     INET6_NTOA(peers.ip) as `ip_address: IpAddr`,
@@ -101,10 +98,9 @@ impl TorrentStore {
                     peers
             "#
         )
-        .fetch(db);
-
-        while let Some(peer) = peers.try_next().await.expect("Failed loading peers.") {
-            torrent_map.entry(peer.torrent_id).and_modify(|torrent| {
+        .fetch(db)
+        .try_fold(torrents, |mut store, peer| async move {
+            store.entry(peer.torrent_id).and_modify(|torrent| {
                 torrent.peers.insert(
                     Index {
                         user_id: peer.user_id,
@@ -128,9 +124,11 @@ impl TorrentStore {
                     },
                 );
             });
-        }
 
-        Ok(torrent_map)
+            Ok(store)
+        })
+        .await
+        .context("Failed loading peers.")
     }
 }
 

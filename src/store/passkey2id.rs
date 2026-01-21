@@ -33,7 +33,7 @@ impl Passkey2IdStore {
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<Passkey2IdStore> {
-        let mut passkey2ids = sqlx::query_as!(
+        sqlx::query_as!(
             Passkey2Id,
             r#"
                 SELECT
@@ -45,19 +45,14 @@ impl Passkey2IdStore {
                     users.deleted_at IS NULL
             "#
         )
-        .fetch(db);
+        .fetch(db)
+        .try_fold(Passkey2IdStore::new(), |mut store, user| async move {
+            store.insert(user.passkey, user.id);
 
-        let mut passkey2id_map = Passkey2IdStore::new();
-
-        while let Some(passkey2id) = passkey2ids
-            .try_next()
-            .await
-            .context("Failed loading user passkey to id mappings.")?
-        {
-            passkey2id_map.insert(passkey2id.passkey, passkey2id.id);
-        }
-
-        Ok(passkey2id_map)
+            Ok(store)
+        })
+        .await
+        .context("Failed loading user passkey to id mappings.")
     }
 }
 

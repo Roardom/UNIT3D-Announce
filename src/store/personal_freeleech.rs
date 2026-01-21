@@ -20,7 +20,7 @@ impl PersonalFreeleechStore {
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<PersonalFreeleechStore> {
-        let mut personal_freeleeches = sqlx::query_as!(
+        sqlx::query_as!(
             PersonalFreeleech,
             r#"
                 SELECT
@@ -29,19 +29,17 @@ impl PersonalFreeleechStore {
                     personal_freeleeches
             "#
         )
-        .fetch(db);
+        .fetch(db)
+        .try_fold(
+            PersonalFreeleechStore::new(),
+            |mut store, personal_freeleech| async move {
+                store.insert(personal_freeleech);
 
-        let mut personal_freeleech_set = PersonalFreeleechStore::new();
-
-        while let Some(personal_freeleech) = personal_freeleeches
-            .try_next()
-            .await
-            .context("Failed loading personal freeleeches.")?
-        {
-            personal_freeleech_set.insert(personal_freeleech);
-        }
-
-        Ok(personal_freeleech_set)
+                Ok(store)
+            },
+        )
+        .await
+        .context("Failed loading personal freeleeches.")
     }
 }
 

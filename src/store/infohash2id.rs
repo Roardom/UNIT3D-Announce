@@ -36,7 +36,7 @@ impl InfoHash2IdStore {
         // Load one torrent per info hash. If multiple are found, prefer
         // undeleted torrents. If multiple are still found, prefer approved
         // torrents. If multiple are still found, prefer the oldest.
-        let mut info_hash2ids = sqlx::query_as!(
+        sqlx::query_as!(
             InfoHash2Id,
             r#"
                 SELECT
@@ -59,19 +59,14 @@ impl InfoHash2IdStore {
                     ON distinct_torrents.id = torrents.id
             "#
         )
-        .fetch(db);
+        .fetch(db)
+        .try_fold(InfoHash2IdStore::new(), |mut store, torrent| async move {
+            store.insert(torrent.info_hash, torrent.id);
 
-        let mut info_hash2id_map = InfoHash2IdStore::new();
-
-        while let Some(info_hash2id) = info_hash2ids
-            .try_next()
-            .await
-            .context("Failed loading torrent infohash to id mappings.")?
-        {
-            info_hash2id_map.insert(info_hash2id.info_hash, info_hash2id.id);
-        }
-
-        Ok(info_hash2id_map)
+            Ok(store)
+        })
+        .await
+        .context("Failed loading torrent infohash to id mappings.")
     }
 }
 

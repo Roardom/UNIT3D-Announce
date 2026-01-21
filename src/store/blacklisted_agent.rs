@@ -20,7 +20,7 @@ impl BlacklistedAgentStore {
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<BlacklistedAgentStore> {
-        let mut agents = sqlx::query_as!(
+        sqlx::query_as!(
             Agent,
             r#"
                 SELECT
@@ -29,19 +29,14 @@ impl BlacklistedAgentStore {
                     blacklist_clients
             "#
         )
-        .fetch(db);
+        .fetch(db)
+        .try_fold(BlacklistedAgentStore::new(), |mut store, agent| async {
+            store.insert(agent);
 
-        let mut agent_set = BlacklistedAgentStore::new();
-
-        while let Some(agent) = agents
-            .try_next()
-            .await
-            .context("Failed loading blacklisted clients.")?
-        {
-            agent_set.insert(agent);
-        }
-
-        Ok(agent_set)
+            Ok(store)
+        })
+        .await
+        .context("Failed loading blacklisted clients.")
     }
 }
 

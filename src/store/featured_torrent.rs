@@ -20,7 +20,7 @@ impl FeaturedTorrentStore {
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<FeaturedTorrentStore> {
-        let mut featured_torrents = sqlx::query_as!(
+        sqlx::query_as!(
             FeaturedTorrent,
             r#"
                 SELECT
@@ -29,19 +29,17 @@ impl FeaturedTorrentStore {
                     featured_torrents
             "#
         )
-        .fetch(db);
+        .fetch(db)
+        .try_fold(
+            FeaturedTorrentStore::new(),
+            |mut store, featured_torrent| async move {
+                store.insert(featured_torrent);
 
-        let mut featured_torrent_set = FeaturedTorrentStore::new();
-
-        while let Some(featured_torrent) = featured_torrents
-            .try_next()
-            .await
-            .context("Failed loading featured torrents.")?
-        {
-            featured_torrent_set.insert(featured_torrent);
-        }
-
-        Ok(featured_torrent_set)
+                Ok(store)
+            },
+        )
+        .await
+        .context("Failed loading featured torrents.")
     }
 }
 

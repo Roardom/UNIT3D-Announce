@@ -20,7 +20,7 @@ impl FreeleechTokenStore {
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<FreeleechTokenStore> {
-        let mut freeleech_tokens = sqlx::query_as!(
+        sqlx::query_as!(
             FreeleechToken,
             r#"
                 SELECT
@@ -30,19 +30,14 @@ impl FreeleechTokenStore {
                     freeleech_tokens
             "#
         )
-        .fetch(db);
+        .fetch(db)
+        .try_fold(FreeleechTokenStore::new(), |mut store, token| async move {
+            store.insert(token);
 
-        let mut freeleech_token_set = FreeleechTokenStore::new();
-
-        while let Some(freeleech_token) = freeleech_tokens
-            .try_next()
-            .await
-            .context("Failed loading freeleech tokens.")?
-        {
-            freeleech_token_set.insert(freeleech_token);
-        }
-
-        Ok(freeleech_token_set)
+            Ok(store)
+        })
+        .await
+        .context("Failed loading freeleech tokens.")
     }
 }
 

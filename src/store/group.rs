@@ -20,7 +20,7 @@ impl GroupStore {
     }
 
     pub async fn from_db(db: &MySqlPool) -> Result<GroupStore> {
-        let mut groups = sqlx::query_as!(
+        sqlx::query_as!(
             Group,
             r#"
                 SELECT
@@ -34,15 +34,14 @@ impl GroupStore {
                     `groups`
             "#
         )
-        .fetch(db);
+        .fetch(db)
+        .try_fold(GroupStore::new(), |mut store, group| async move {
+            store.insert(group.id, group);
 
-        let mut group_map = GroupStore::new();
-
-        while let Some(group) = groups.try_next().await.context("Failed loading groups.")? {
-            group_map.insert(group.id, group);
-        }
-
-        Ok(group_map)
+            Ok(store)
+        })
+        .await
+        .context("Failed loading groups.")
     }
 }
 

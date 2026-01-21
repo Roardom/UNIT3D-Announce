@@ -26,7 +26,7 @@ impl UserStore {
     }
 
     pub async fn from_db(db: &MySqlPool, config: &Config) -> Result<UserStore> {
-        let mut users = sqlx::query_as!(
+        sqlx::query_as!(
             DBImportUser,
             r#"
                 SELECT
@@ -50,12 +50,9 @@ impl UserStore {
                     users.id
             "#
         )
-        .fetch(db);
-
-        let mut user_map = UserStore::new();
-
-        while let Some(user) = users.try_next().await.context("Failed loading users.")? {
-            user_map.insert(
+        .fetch(db)
+        .try_fold(UserStore::new(), |mut store, user| async move {
+            store.insert(
                 user.id,
                 User {
                     id: user.id,
@@ -70,9 +67,11 @@ impl UserStore {
                     is_lifetime: user.is_lifetime,
                 },
             );
-        }
 
-        Ok(user_map)
+            Ok(store)
+        })
+        .await
+        .context("Failed loading users.")
     }
 }
 
