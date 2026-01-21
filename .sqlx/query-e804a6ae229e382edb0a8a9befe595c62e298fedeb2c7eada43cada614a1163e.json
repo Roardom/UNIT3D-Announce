@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n                SELECT\n                    torrents.id as `id: u32`,\n                    torrents.status as `status: Status`,\n                    torrents.seeders as `seeders: u32`,\n                    torrents.leechers as `leechers: u32`,\n                    torrents.times_completed as `times_completed: u32`,\n                    100 - LEAST(torrents.free, 100) as `download_factor: u8`,\n                    IF(torrents.doubleup, 200, 100) as `upload_factor: u8`,\n                    torrents.deleted_at IS NOT NULL as `is_deleted: bool`\n                FROM\n                    torrents\n                JOIN (\n                    SELECT\n                        COALESCE(\n                            MIN(CASE WHEN deleted_at IS NULL AND status = 1 THEN id END),\n                            MIN(CASE WHEN deleted_at IS NULL AND status != 1 THEN id END),\n                            MIN(CASE WHEN deleted_at IS NOT NULL THEN id END)\n                        ) AS id\n                    FROM\n                        torrents\n                    GROUP BY\n                        info_hash\n                ) AS distinct_torrents\n                    ON distinct_torrents.id = torrents.id\n            ",
+  "query": "\n                SELECT\n                    torrents.id as `id: u32`,\n                    torrents.status as `status: TorrentStatus`,\n                    torrents.seeders as `seeders: u32`,\n                    torrents.leechers as `leechers: u32`,\n                    torrents.times_completed as `times_completed: u32`,\n                    100 - LEAST(torrents.free, 100) as `download_factor: u8`,\n                    IF(torrents.doubleup, 200, 100) as `upload_factor: u8`,\n                    torrents.deleted_at IS NOT NULL as `is_deleted: bool`\n                FROM\n                    torrents\n                JOIN (\n                    SELECT\n                        COALESCE(\n                            MIN(CASE WHEN deleted_at IS NULL AND status = 1 THEN id END),\n                            MIN(CASE WHEN deleted_at IS NULL AND status != 1 THEN id END),\n                            MIN(CASE WHEN deleted_at IS NOT NULL THEN id END)\n                        ) AS id\n                    FROM\n                        torrents\n                    GROUP BY\n                        info_hash\n                ) AS distinct_torrents\n                    ON distinct_torrents.id = torrents.id\n            ",
   "describe": {
     "columns": [
       {
@@ -14,7 +14,7 @@
       },
       {
         "ordinal": 1,
-        "name": "status: Status",
+        "name": "status: TorrentStatus",
         "type_info": {
           "type": "Short",
           "flags": "NOT_NULL",
@@ -90,5 +90,5 @@
       false
     ]
   },
-  "hash": "1f53226d803666539124745014c25fbb31e9d65a7e4f683410e41a1f6da7508e"
+  "hash": "e804a6ae229e382edb0a8a9befe595c62e298fedeb2c7eada43cada614a1163e"
 }

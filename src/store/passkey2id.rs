@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use super::Passkey;
+use crate::model::passkey::Passkey;
 use futures_util::TryStreamExt;
 use indexmap::IndexMap;
 use sqlx::MySqlPool;

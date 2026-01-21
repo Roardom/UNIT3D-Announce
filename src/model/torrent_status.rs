@@ -7,7 +7,7 @@ use sqlx::{Database, Decode};
 /// Torrent moderation status
 #[derive(Clone, Copy, Debug, Default, Deserialize_repr, Eq, PartialEq, Serialize)]
 #[repr(i16)]
-pub enum Status {
+pub enum TorrentStatus {
     /// A torrent with pending status is currently in moderation queue
     /// and have not yet been moderated. Pending torrents are only visible
     /// to moderators and the uploader.
@@ -33,8 +33,8 @@ pub enum Status {
     Unknown,
 }
 
-impl Status {
-    fn from_i16(status: i16) -> Status {
+impl TorrentStatus {
+    fn from_i16(status: i16) -> Self {
         match status {
             0 => Self::Pending,
             1 => Self::Approved,
@@ -45,20 +45,20 @@ impl Status {
     }
 }
 
-impl<'r, DB: Database> Decode<'r, DB> for Status
+impl<'r, DB: Database> Decode<'r, DB> for TorrentStatus
 where
     i16: Decode<'r, DB>,
 {
     fn decode(
         value: <DB as Database>::ValueRef<'r>,
-    ) -> Result<Status, Box<dyn std::error::Error + 'static + Send + Sync>> {
+    ) -> Result<TorrentStatus, Box<dyn std::error::Error + 'static + Send + Sync>> {
         let value = <i16 as Decode<DB>>::decode(value)?;
 
-        Ok(Status::from_i16(value))
+        Ok(TorrentStatus::from_i16(value))
     }
 }
 
-impl Display for Status {
+impl Display for TorrentStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Pending => f.write_str("Pending"),

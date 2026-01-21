@@ -1,6 +1,6 @@
 use std::{net::IpAddr, sync::Arc};
 
-use crate::{state::AppState, store::peer::PeerId};
+use crate::{model::peer_id::PeerId, state::AppState};
 use chrono::{DateTime, Utc};
 use sqlx::{MySql, QueryBuilder};
 

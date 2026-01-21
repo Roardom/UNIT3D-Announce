@@ -7,7 +7,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use sqlx::{MySql, QueryBuilder};
 
-use crate::{announce::Event, state::AppState, store::peer::PeerId};
+use crate::{announce::Event, model::peer_id::PeerId, state::AppState};
 
 pub struct Queue(pub Vec<AnnounceUpdate>);
 

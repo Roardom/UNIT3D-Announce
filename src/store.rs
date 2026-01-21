@@ -4,6 +4,8 @@ pub mod connectable_port;
 pub mod featured_torrent;
 pub mod freeleech_token;
 pub mod group;
+pub mod infohash2id;
+pub mod passkey2id;
 pub mod peer;
 pub mod personal_freeleech;
 pub mod torrent;
@@ -16,15 +18,11 @@ use anyhow::{Context, Result};
 use crate::{
     config::{self, Config},
     store::{
-        blacklisted_agent::BlacklistedAgentStore,
-        blacklisted_port::BlacklistedPortStore,
-        connectable_port::ConnectablePortStore,
-        featured_torrent::FeaturedTorrentStore,
-        freeleech_token::FreeleechTokenStore,
-        group::GroupStore,
-        personal_freeleech::PersonalFreeleechStore,
-        torrent::{TorrentStore, infohash2id::InfoHash2IdStore},
-        user::{UserStore, passkey2id::Passkey2IdStore},
+        blacklisted_agent::BlacklistedAgentStore, blacklisted_port::BlacklistedPortStore,
+        connectable_port::ConnectablePortStore, featured_torrent::FeaturedTorrentStore,
+        freeleech_token::FreeleechTokenStore, group::GroupStore, infohash2id::InfoHash2IdStore,
+        passkey2id::Passkey2IdStore, personal_freeleech::PersonalFreeleechStore,
+        torrent::TorrentStore, user::UserStore,
     },
 };
 

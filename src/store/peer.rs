@@ -6,8 +6,7 @@ use indexmap::IndexMap;
 use serde::{Serialize, Serializer};
 use sqlx::types::chrono::{DateTime, Utc};
 
-pub mod peer_id;
-pub use peer_id::PeerId;
+use crate::model::peer_id::PeerId;
 
 use crate::config::Config;
 

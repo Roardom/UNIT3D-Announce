@@ -18,6 +18,7 @@ static GLOBAL: Jemalloc = Jemalloc;
 mod announce;
 mod config;
 mod error;
+mod model;
 mod queue;
 mod rate;
 mod routes;

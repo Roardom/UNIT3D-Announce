@@ -1,6 +1,6 @@
 use std::ops::{Deref, DerefMut};
 
-use crate::store::torrent::InfoHash;
+use crate::model::info_hash::InfoHash;
 use futures_util::TryStreamExt;
 use indexmap::IndexMap;
 use sqlx::MySqlPool;

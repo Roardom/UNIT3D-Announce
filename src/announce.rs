@@ -29,6 +29,9 @@ use crate::{
         TorrentIsPendingModeration, TorrentIsPostponed, TorrentIsRejected, TorrentNotFound,
         TorrentUnknownModerationStatus, UnsupportedEvent, UserAgentTooLong, UserNotFound,
     },
+    model::{
+        info_hash::InfoHash, passkey::Passkey, peer_id::PeerId, torrent_status::TorrentStatus,
+    },
     queue::{
         announce_update::AnnounceUpdate,
         history_update::{self, HistoryUpdate},
@@ -46,10 +49,8 @@ use crate::store::{
     connectable_port::ConnectablePort,
     featured_torrent::FeaturedTorrent,
     freeleech_token::FreeleechToken,
-    peer::{self, Peer, PeerId},
+    peer::{self, Peer},
     personal_freeleech::PersonalFreeleech,
-    torrent::InfoHash,
-    user::Passkey,
 };
 use crate::utils;
 
@@ -411,10 +412,10 @@ pub async fn announce(
         }
 
         match torrent.status {
-            store::torrent::Status::Approved => (),
-            store::torrent::Status::Pending => return Err(TorrentIsPendingModeration),
-            store::torrent::Status::Rejected => return Err(TorrentIsRejected),
-            store::torrent::Status::Postponed => return Err(TorrentIsPostponed),
+            TorrentStatus::Approved => (),
+            TorrentStatus::Pending => return Err(TorrentIsPendingModeration),
+            TorrentStatus::Rejected => return Err(TorrentIsRejected),
+            TorrentStatus::Postponed => return Err(TorrentIsPostponed),
             _ => return Err(TorrentUnknownModerationStatus),
         }
 

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{state::AppState, store::torrent::InfoHash};
+use crate::{model::info_hash::InfoHash, state::AppState};
 use chrono::{DateTime, Utc};
 use sqlx::{MySql, QueryBuilder};
 

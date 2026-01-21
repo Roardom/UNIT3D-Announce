@@ -17,10 +17,7 @@ use crate::config::Config;
 use crate::rate::RateCollection;
 use crate::state::AppState;
 
-pub mod passkey;
-pub use passkey::Passkey;
-
-pub mod passkey2id;
+use crate::model::passkey::Passkey;
 
 #[derive(Serialize)]
 pub struct UserStore {

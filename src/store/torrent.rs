@@ -14,17 +14,9 @@ use tracing::info;
 
 use anyhow::{Context, Result};
 
-pub mod infohash;
-pub use infohash::InfoHash;
-
-pub mod infohash2id;
-
-pub mod status;
-pub use status::Status;
-
+use crate::model::{info_hash::InfoHash, peer_id::PeerId, torrent_status::TorrentStatus};
 use crate::state::AppState;
-use crate::store::peer::{self, Index, Peer, PeerStore};
-use peer::peer_id::PeerId;
+use crate::store::peer::{Index, Peer, PeerStore};
 
 pub struct TorrentStore {
     inner: IndexMap<u32, Torrent>,
@@ -46,7 +38,7 @@ impl TorrentStore {
             r#"
                 SELECT
                     torrents.id as `id: u32`,
-                    torrents.status as `status: Status`,
+                    torrents.status as `status: TorrentStatus`,
                     torrents.seeders as `seeders: u32`,
                     torrents.leechers as `leechers: u32`,
                     torrents.times_completed as `times_completed: u32`,
@@ -165,7 +157,7 @@ impl DerefMut for TorrentStore {
 #[derive(Clone, Default)]
 pub struct DBImportTorrent {
     pub id: u32,
-    pub status: Status,
+    pub status: TorrentStatus,
     pub seeders: u32,
     pub leechers: u32,
     pub times_completed: u32,
@@ -177,7 +169,7 @@ pub struct DBImportTorrent {
 #[derive(Clone, Default, Serialize)]
 pub struct Torrent {
     pub id: u32,
-    pub status: Status,
+    pub status: TorrentStatus,
     pub is_deleted: bool,
     pub peers: PeerStore,
     pub seeders: u32,
@@ -190,7 +182,7 @@ pub struct Torrent {
 #[derive(Clone, Deserialize)]
 pub struct APIInsertTorrent {
     pub id: u32,
-    pub status: Status,
+    pub status: TorrentStatus,
     pub info_hash: String,
     pub is_deleted: bool,
     pub seeders: u32,
