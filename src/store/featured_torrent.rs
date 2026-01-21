@@ -44,24 +44,6 @@ impl Set {
 
         Ok(featured_torrent_set)
     }
-
-    pub async fn upsert(State(state): State<Arc<AppState>>, Json(token): Json<FeaturedTorrent>) {
-        info!(
-            "Inserting featured torrent with torrent_id {}.",
-            token.torrent_id
-        );
-
-        state.stores.featured_torrents.write().insert(token);
-    }
-
-    pub async fn destroy(State(state): State<Arc<AppState>>, Json(token): Json<FeaturedTorrent>) {
-        info!(
-            "Removing featured torrent with torrent_id {}.",
-            token.torrent_id
-        );
-
-        state.stores.featured_torrents.write().swap_remove(&token);
-    }
 }
 
 impl Deref for Set {
@@ -81,4 +63,22 @@ impl DerefMut for Set {
 #[derive(Eq, Deserialize, Hash, PartialEq)]
 pub struct FeaturedTorrent {
     pub torrent_id: u32,
+}
+
+pub async fn upsert(State(state): State<Arc<AppState>>, Json(token): Json<FeaturedTorrent>) {
+    info!(
+        "Inserting featured torrent with torrent_id {}.",
+        token.torrent_id
+    );
+
+    state.stores.featured_torrents.write().insert(token);
+}
+
+pub async fn destroy(State(state): State<Arc<AppState>>, Json(token): Json<FeaturedTorrent>) {
+    info!(
+        "Removing featured torrent with torrent_id {}.",
+        token.torrent_id
+    );
+
+    state.stores.featured_torrents.write().swap_remove(&token);
 }

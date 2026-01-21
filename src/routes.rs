@@ -23,37 +23,37 @@ pub fn routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
                     Router::new()
                         .route(
                             "/torrents",
-                            put(store::torrent::Map::upsert).delete(store::torrent::Map::destroy),
+                            put(store::torrent::upsert).delete(store::torrent::destroy),
                         )
-                        .route("/torrents/{id}", get(store::torrent::Map::show))
+                        .route("/torrents/{id}", get(store::torrent::show))
                         .route(
                             "/users",
-                            put(store::user::Map::upsert).delete(store::user::Map::destroy),
+                            put(store::user::upsert).delete(store::user::destroy),
                         )
-                        .route("/users/{id}", get(store::user::Map::show))
+                        .route("/users/{id}", get(store::user::show))
                         .route(
                             "/groups",
-                            put(store::group::Map::upsert).delete(store::group::Map::destroy),
+                            put(store::group::upsert).delete(store::group::destroy),
                         )
                         .route(
                             "/blacklisted-agents",
-                            put(store::blacklisted_agent::Set::upsert)
-                                .delete(store::blacklisted_agent::Set::destroy),
+                            put(store::blacklisted_agent::upsert)
+                                .delete(store::blacklisted_agent::destroy),
                         )
                         .route(
                             "/freeleech-tokens",
-                            put(store::freeleech_token::Set::upsert)
-                                .delete(store::freeleech_token::Set::destroy),
+                            put(store::freeleech_token::upsert)
+                                .delete(store::freeleech_token::destroy),
                         )
                         .route(
                             "/personal-freeleech",
-                            put(store::personal_freeleech::Set::upsert)
-                                .delete(store::personal_freeleech::Set::destroy),
+                            put(store::personal_freeleech::upsert)
+                                .delete(store::personal_freeleech::destroy),
                         )
                         .route(
                             "/featured-torrents",
-                            put(store::featured_torrent::Set::upsert)
-                                .delete(store::featured_torrent::Set::destroy),
+                            put(store::featured_torrent::upsert)
+                                .delete(store::featured_torrent::destroy),
                         )
                         .route("/stats", get(crate::stats::show))
                         .route("/config/reload", post(Config::reload)),

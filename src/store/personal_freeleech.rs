@@ -44,38 +44,6 @@ impl Set {
 
         Ok(personal_freeleech_set)
     }
-
-    pub async fn upsert(
-        State(state): State<Arc<AppState>>,
-        Json(personal_freeleech): Json<PersonalFreeleech>,
-    ) {
-        info!(
-            "Inserting personal freeleech with user_id {}.",
-            personal_freeleech.user_id
-        );
-
-        state
-            .stores
-            .personal_freeleeches
-            .write()
-            .insert(personal_freeleech);
-    }
-
-    pub async fn destroy(
-        State(state): State<Arc<AppState>>,
-        Json(personal_freeleech): Json<PersonalFreeleech>,
-    ) {
-        info!(
-            "Removing personal freeleech with user_id {}.",
-            personal_freeleech.user_id
-        );
-
-        state
-            .stores
-            .personal_freeleeches
-            .write()
-            .swap_remove(&personal_freeleech);
-    }
 }
 
 impl Deref for Set {
@@ -95,4 +63,36 @@ impl DerefMut for Set {
 #[derive(Eq, Deserialize, Hash, PartialEq)]
 pub struct PersonalFreeleech {
     pub user_id: u32,
+}
+
+pub async fn upsert(
+    State(state): State<Arc<AppState>>,
+    Json(personal_freeleech): Json<PersonalFreeleech>,
+) {
+    info!(
+        "Inserting personal freeleech with user_id {}.",
+        personal_freeleech.user_id
+    );
+
+    state
+        .stores
+        .personal_freeleeches
+        .write()
+        .insert(personal_freeleech);
+}
+
+pub async fn destroy(
+    State(state): State<Arc<AppState>>,
+    Json(personal_freeleech): Json<PersonalFreeleech>,
+) {
+    info!(
+        "Removing personal freeleech with user_id {}.",
+        personal_freeleech.user_id
+    );
+
+    state
+        .stores
+        .personal_freeleeches
+        .write()
+        .swap_remove(&personal_freeleech);
 }
