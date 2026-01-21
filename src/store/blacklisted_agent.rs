@@ -13,14 +13,18 @@ use tracing::info;
 
 use crate::state::AppState;
 
-pub struct Set(pub IndexSet<Agent>);
+pub struct BlacklistedAgentStore {
+    inner: IndexSet<Agent>,
+}
 
-impl Set {
-    pub fn new() -> Set {
-        Set(IndexSet::new())
+impl BlacklistedAgentStore {
+    pub fn new() -> BlacklistedAgentStore {
+        BlacklistedAgentStore {
+            inner: IndexSet::new(),
+        }
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Set> {
+    pub async fn from_db(db: &MySqlPool) -> Result<BlacklistedAgentStore> {
         let mut agents = sqlx::query_as!(
             Agent,
             r#"
@@ -32,7 +36,7 @@ impl Set {
         )
         .fetch(db);
 
-        let mut agent_set = Set::new();
+        let mut agent_set = BlacklistedAgentStore::new();
 
         while let Some(agent) = agents
             .try_next()
@@ -46,17 +50,17 @@ impl Set {
     }
 }
 
-impl Deref for Set {
+impl Deref for BlacklistedAgentStore {
     type Target = IndexSet<Agent>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.inner
     }
 }
 
-impl DerefMut for Set {
+impl DerefMut for BlacklistedAgentStore {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.inner
     }
 }
 

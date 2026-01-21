@@ -23,17 +23,21 @@ pub mod status;
 pub use status::Status;
 
 use crate::state::AppState;
-use crate::store::peer::{self, Index, Peer};
+use crate::store::peer::{self, Index, Peer, PeerStore};
 use peer::peer_id::PeerId;
 
-pub struct Map(IndexMap<u32, Torrent>);
+pub struct TorrentStore {
+    inner: IndexMap<u32, Torrent>,
+}
 
-impl Map {
-    pub fn new() -> Map {
-        Map(IndexMap::new())
+impl TorrentStore {
+    pub fn new() -> TorrentStore {
+        TorrentStore {
+            inner: IndexMap::new(),
+        }
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Map> {
+    pub async fn from_db(db: &MySqlPool) -> Result<TorrentStore> {
         // Load one torrent per info hash. If multiple are found, prefer
         // undeleted torrents. If multiple are still found, prefer approved
         // torrents. If multiple are still found, prefer the oldest.
@@ -68,7 +72,7 @@ impl Map {
         )
         .fetch(db);
 
-        let mut torrent_map = Map::new();
+        let mut torrent_map = TorrentStore::new();
 
         while let Some(torrent) = torrents
             .try_next()
@@ -86,7 +90,7 @@ impl Map {
                     download_factor: torrent.download_factor,
                     upload_factor: torrent.upload_factor,
                     is_deleted: torrent.is_deleted,
-                    peers: peer::Map::new(),
+                    peers: PeerStore::new(),
                 },
             );
         }
@@ -144,17 +148,17 @@ impl Map {
     }
 }
 
-impl Deref for Map {
+impl Deref for TorrentStore {
     type Target = IndexMap<u32, Torrent>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.inner
     }
 }
 
-impl DerefMut for Map {
+impl DerefMut for TorrentStore {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.inner
     }
 }
 
@@ -175,7 +179,7 @@ pub struct Torrent {
     pub id: u32,
     pub status: Status,
     pub is_deleted: bool,
-    pub peers: peer::Map,
+    pub peers: PeerStore,
     pub seeders: u32,
     pub leechers: u32,
     pub times_completed: u32,

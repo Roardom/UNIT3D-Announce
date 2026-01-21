@@ -13,23 +13,36 @@ use sqlx::{MySql, MySqlPool, QueryBuilder};
 
 use anyhow::{Context, Result};
 
-use crate::config::{self, Config};
+use crate::{
+    config::{self, Config},
+    store::{
+        blacklisted_agent::BlacklistedAgentStore,
+        blacklisted_port::BlacklistedPortStore,
+        connectable_port::ConnectablePortStore,
+        featured_torrent::FeaturedTorrentStore,
+        freeleech_token::FreeleechTokenStore,
+        group::GroupStore,
+        personal_freeleech::PersonalFreeleechStore,
+        torrent::{TorrentStore, infohash2id::InfoHash2IdStore},
+        user::{UserStore, passkey2id::Passkey2IdStore},
+    },
+};
 
 use parking_lot::{Mutex, RwLock};
 use std::io::{self, Write};
 
 pub struct Stores {
-    pub agent_blacklist: RwLock<blacklisted_agent::Set>,
-    pub connectable_ports: RwLock<connectable_port::Map>,
-    pub featured_torrents: RwLock<featured_torrent::Set>,
-    pub freeleech_tokens: RwLock<freeleech_token::Set>,
-    pub groups: RwLock<group::Map>,
-    pub infohash2id: RwLock<torrent::infohash2id::Map>,
-    pub passkey2id: RwLock<user::passkey2id::Map>,
-    pub personal_freeleeches: RwLock<personal_freeleech::Set>,
-    pub port_blacklist: RwLock<blacklisted_port::Set>,
-    pub torrents: Mutex<torrent::Map>,
-    pub users: RwLock<user::Map>,
+    pub agent_blacklist: RwLock<BlacklistedAgentStore>,
+    pub connectable_ports: RwLock<ConnectablePortStore>,
+    pub featured_torrents: RwLock<FeaturedTorrentStore>,
+    pub freeleech_tokens: RwLock<FreeleechTokenStore>,
+    pub groups: RwLock<GroupStore>,
+    pub infohash2id: RwLock<InfoHash2IdStore>,
+    pub passkey2id: RwLock<Passkey2IdStore>,
+    pub personal_freeleeches: RwLock<PersonalFreeleechStore>,
+    pub port_blacklist: RwLock<BlacklistedPortStore>,
+    pub torrents: Mutex<TorrentStore>,
+    pub users: RwLock<UserStore>,
 }
 
 impl Stores {
@@ -43,57 +56,57 @@ impl Stores {
         println!("Loading entities from database into memory...");
         print!("Starting to load  1/11: blacklisted ports              ... ");
         io::stdout().flush().unwrap();
-        let port_blacklist = blacklisted_port::Set::default();
+        let port_blacklist = BlacklistedPortStore::default();
         println!("[Finished] Records: {:?}", port_blacklist.len());
 
         print!("Starting to load  2/11: blacklisted user agents        ... ");
         io::stdout().flush().unwrap();
-        let agent_blacklist = blacklisted_agent::Set::from_db(&pool).await?;
+        let agent_blacklist = BlacklistedAgentStore::from_db(&pool).await?;
         println!("[Finished] Records: {:?}", agent_blacklist.len());
 
         print!("Starting to load  3/11: torrents                       ... ");
         io::stdout().flush().unwrap();
-        let torrents = torrent::Map::from_db(&pool).await?;
+        let torrents = TorrentStore::from_db(&pool).await?;
         println!("[Finished] Records: {:?}", torrents.len());
 
         print!("Starting to load  4/11: infohash to torrent id mappings... ");
         io::stdout().flush().unwrap();
-        let infohash2id = torrent::infohash2id::Map::from_db(&pool).await?;
+        let infohash2id = InfoHash2IdStore::from_db(&pool).await?;
         println!("[Finished] Records: {:?}", infohash2id.len());
 
         print!("Starting to load  5/11: users                          ... ");
         io::stdout().flush().unwrap();
-        let users = user::Map::from_db(&pool, &config).await?;
+        let users = UserStore::from_db(&pool, &config).await?;
         println!("[Finished] Records: {:?}", users.len());
 
         print!("Starting to load  6/11: passkey to user id mappings    ... ");
         io::stdout().flush().unwrap();
-        let passkey2id = user::passkey2id::Map::from_db(&pool).await?;
+        let passkey2id = Passkey2IdStore::from_db(&pool).await?;
         println!("[Finished] Records: {:?}", passkey2id.len());
 
         print!("Starting to load  7/11: connectable ports              ... ");
         io::stdout().flush().unwrap();
-        let connectable_ports = connectable_port::Map::from_db(&pool).await?;
+        let connectable_ports = ConnectablePortStore::from_db(&pool).await?;
         println!("[Finished] Records: {:?}", connectable_ports.len());
 
         print!("Starting to load  8/11: freeleech tokens               ... ");
         io::stdout().flush().unwrap();
-        let freeleech_tokens = freeleech_token::Set::from_db(&pool).await?;
+        let freeleech_tokens = FreeleechTokenStore::from_db(&pool).await?;
         println!("[Finished] Records: {:?}", freeleech_tokens.len());
 
         print!("Starting to load  9/11: personal freeleeches           ... ");
         io::stdout().flush().unwrap();
-        let personal_freeleeches = personal_freeleech::Set::from_db(&pool).await?;
+        let personal_freeleeches = PersonalFreeleechStore::from_db(&pool).await?;
         println!("[Finished] Records: {:?}", personal_freeleeches.len());
 
         print!("Starting to load 10/11: featured torrents              ... ");
         io::stdout().flush().unwrap();
-        let featured_torrents = featured_torrent::Set::from_db(&pool).await?;
+        let featured_torrents = FeaturedTorrentStore::from_db(&pool).await?;
         println!("[Finished] Records: {:?}", featured_torrents.len());
 
         print!("Starting to load 11/11: groups                         ... ");
         io::stdout().flush().unwrap();
-        let groups = group::Map::from_db(&pool).await?;
+        let groups = GroupStore::from_db(&pool).await?;
         println!("[Finished] Records: {:?}", groups.len());
 
         println!("All entities loaded into memory.");

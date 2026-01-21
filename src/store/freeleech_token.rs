@@ -13,14 +13,18 @@ use tracing::info;
 
 use crate::state::AppState;
 
-pub struct Set(IndexSet<FreeleechToken>);
+pub struct FreeleechTokenStore {
+    inner: IndexSet<FreeleechToken>,
+}
 
-impl Set {
-    pub fn new() -> Set {
-        Set(IndexSet::new())
+impl FreeleechTokenStore {
+    pub fn new() -> FreeleechTokenStore {
+        FreeleechTokenStore {
+            inner: IndexSet::new(),
+        }
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Set> {
+    pub async fn from_db(db: &MySqlPool) -> Result<FreeleechTokenStore> {
         let mut freeleech_tokens = sqlx::query_as!(
             FreeleechToken,
             r#"
@@ -33,7 +37,7 @@ impl Set {
         )
         .fetch(db);
 
-        let mut freeleech_token_set = Set::new();
+        let mut freeleech_token_set = FreeleechTokenStore::new();
 
         while let Some(freeleech_token) = freeleech_tokens
             .try_next()
@@ -47,17 +51,17 @@ impl Set {
     }
 }
 
-impl Deref for Set {
+impl Deref for FreeleechTokenStore {
     type Target = IndexSet<FreeleechToken>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.inner
     }
 }
 
-impl DerefMut for Set {
+impl DerefMut for FreeleechTokenStore {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.inner
     }
 }
 

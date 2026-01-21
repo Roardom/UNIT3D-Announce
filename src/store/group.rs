@@ -14,14 +14,18 @@ use tracing::info;
 
 use crate::state::AppState;
 
-pub struct Map(IndexMap<i32, Group>);
+pub struct GroupStore {
+    inner: IndexMap<i32, Group>,
+}
 
-impl Map {
-    pub fn new() -> Map {
-        Map(IndexMap::new())
+impl GroupStore {
+    pub fn new() -> GroupStore {
+        GroupStore {
+            inner: IndexMap::new(),
+        }
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Map> {
+    pub async fn from_db(db: &MySqlPool) -> Result<GroupStore> {
         let mut groups = sqlx::query_as!(
             Group,
             r#"
@@ -38,7 +42,7 @@ impl Map {
         )
         .fetch(db);
 
-        let mut group_map = Map::new();
+        let mut group_map = GroupStore::new();
 
         while let Some(group) = groups.try_next().await.context("Failed loading groups.")? {
             group_map.insert(group.id, group);
@@ -48,17 +52,17 @@ impl Map {
     }
 }
 
-impl Deref for Map {
+impl Deref for GroupStore {
     type Target = IndexMap<i32, Group>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.inner
     }
 }
 
-impl DerefMut for Map {
+impl DerefMut for GroupStore {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.inner
     }
 }
 

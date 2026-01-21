@@ -13,14 +13,18 @@ use tracing::info;
 
 use crate::state::AppState;
 
-pub struct Set(IndexSet<FeaturedTorrent>);
+pub struct FeaturedTorrentStore {
+    inner: IndexSet<FeaturedTorrent>,
+}
 
-impl Set {
-    pub fn new() -> Set {
-        Set(IndexSet::new())
+impl FeaturedTorrentStore {
+    pub fn new() -> FeaturedTorrentStore {
+        FeaturedTorrentStore {
+            inner: IndexSet::new(),
+        }
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Set> {
+    pub async fn from_db(db: &MySqlPool) -> Result<FeaturedTorrentStore> {
         let mut featured_torrents = sqlx::query_as!(
             FeaturedTorrent,
             r#"
@@ -32,7 +36,7 @@ impl Set {
         )
         .fetch(db);
 
-        let mut featured_torrent_set = Set::new();
+        let mut featured_torrent_set = FeaturedTorrentStore::new();
 
         while let Some(featured_torrent) = featured_torrents
             .try_next()
@@ -46,17 +50,17 @@ impl Set {
     }
 }
 
-impl Deref for Set {
+impl Deref for FeaturedTorrentStore {
     type Target = IndexSet<FeaturedTorrent>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.inner
     }
 }
 
-impl DerefMut for Set {
+impl DerefMut for FeaturedTorrentStore {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.inner
     }
 }
 

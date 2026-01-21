@@ -2,11 +2,13 @@ use std::ops::{Deref, DerefMut};
 
 use indexmap::IndexSet;
 
-pub struct Set(IndexSet<u16>);
+pub struct BlacklistedPortStore {
+    inner: IndexSet<u16>,
+}
 
-impl Default for Set {
+impl Default for BlacklistedPortStore {
     #[rustfmt::skip]
-    fn default() -> Set {
+    fn default() -> BlacklistedPortStore {
         let mut set = IndexSet::from([
             // Hyper Text Transfer Protocol (HTTP) - port used for web traffic
             8080,
@@ -29,20 +31,22 @@ impl Default for Set {
             set.insert(system_reserved_port);
         }
 
-        Set(set)
+        BlacklistedPortStore {
+            inner: set
+        }
     }
 }
 
-impl Deref for Set {
+impl Deref for BlacklistedPortStore {
     type Target = IndexSet<u16>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.inner
     }
 }
 
-impl DerefMut for Set {
+impl DerefMut for BlacklistedPortStore {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.inner
     }
 }

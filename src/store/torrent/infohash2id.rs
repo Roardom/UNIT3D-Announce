@@ -7,28 +7,32 @@ use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
 
-pub struct Map(IndexMap<InfoHash, u32>);
+pub struct InfoHash2IdStore {
+    inner: IndexMap<InfoHash, u32>,
+}
 
-impl Deref for Map {
+impl Deref for InfoHash2IdStore {
     type Target = IndexMap<InfoHash, u32>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.inner
     }
 }
 
-impl DerefMut for Map {
+impl DerefMut for InfoHash2IdStore {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.inner
     }
 }
 
-impl Map {
-    pub fn new() -> Map {
-        Map(IndexMap::new())
+impl InfoHash2IdStore {
+    pub fn new() -> InfoHash2IdStore {
+        InfoHash2IdStore {
+            inner: IndexMap::new(),
+        }
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Map> {
+    pub async fn from_db(db: &MySqlPool) -> Result<InfoHash2IdStore> {
         // Load one torrent per info hash. If multiple are found, prefer
         // undeleted torrents. If multiple are still found, prefer approved
         // torrents. If multiple are still found, prefer the oldest.
@@ -57,7 +61,7 @@ impl Map {
         )
         .fetch(db);
 
-        let mut info_hash2id_map = Map::new();
+        let mut info_hash2id_map = InfoHash2IdStore::new();
 
         while let Some(info_hash2id) = info_hash2ids
             .try_next()

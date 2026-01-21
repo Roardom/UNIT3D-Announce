@@ -10,7 +10,9 @@ use sqlx::types::chrono::{DateTime, Utc};
 use anyhow::{Context, Result};
 
 #[derive(Clone)]
-pub struct Map(IndexMap<SocketAddr, ConnectablePort>);
+pub struct ConnectablePortStore {
+    inner: IndexMap<SocketAddr, ConnectablePort>,
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct ConnectablePort {
@@ -18,12 +20,14 @@ pub struct ConnectablePort {
     pub updated_at: DateTime<Utc>,
 }
 
-impl Map {
-    pub fn new() -> Map {
-        Map(IndexMap::new())
+impl ConnectablePortStore {
+    pub fn new() -> ConnectablePortStore {
+        ConnectablePortStore {
+            inner: IndexMap::new(),
+        }
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Map> {
+    pub async fn from_db(db: &MySqlPool) -> Result<ConnectablePortStore> {
         let mut peers = sqlx::query!(
             r#"
                 SELECT
@@ -39,7 +43,7 @@ impl Map {
         )
         .fetch(db);
 
-        let mut peer_map = Map::new();
+        let mut peer_map = ConnectablePortStore::new();
 
         while let Some(peer) = peers.try_next().await.context("Failed loading peers.")? {
             peer_map.insert(
@@ -65,22 +69,22 @@ impl Map {
     }
 }
 
-impl Deref for Map {
+impl Deref for ConnectablePortStore {
     type Target = IndexMap<SocketAddr, ConnectablePort>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.inner
     }
 }
 
-impl DerefMut for Map {
+impl DerefMut for ConnectablePortStore {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.inner
     }
 }
 
-impl Default for Map {
+impl Default for ConnectablePortStore {
     fn default() -> Self {
-        Map::new()
+        ConnectablePortStore::new()
     }
 }

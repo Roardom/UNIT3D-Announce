@@ -12,7 +12,9 @@ pub use peer_id::PeerId;
 use crate::config::Config;
 
 #[derive(Clone, Serialize)]
-pub struct Map(IndexMap<Index, Peer>);
+pub struct PeerStore {
+    inner: IndexMap<Index, Peer>,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Index {
@@ -59,29 +61,31 @@ impl Peer {
     }
 }
 
-impl Map {
-    pub fn new() -> Map {
-        Map(IndexMap::new())
+impl PeerStore {
+    pub fn new() -> PeerStore {
+        PeerStore {
+            inner: IndexMap::new(),
+        }
     }
 }
 
-impl Deref for Map {
+impl Deref for PeerStore {
     type Target = IndexMap<Index, Peer>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.inner
     }
 }
 
-impl DerefMut for Map {
+impl DerefMut for PeerStore {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.inner
     }
 }
 
-impl Default for Map {
+impl Default for PeerStore {
     fn default() -> Self {
-        Map::new()
+        PeerStore::new()
     }
 }
 

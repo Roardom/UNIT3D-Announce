@@ -7,28 +7,32 @@ use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
 
-pub struct Map(IndexMap<Passkey, u32>);
+pub struct Passkey2IdStore {
+    inner: IndexMap<Passkey, u32>,
+}
 
-impl Deref for Map {
+impl Deref for Passkey2IdStore {
     type Target = IndexMap<Passkey, u32>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.inner
     }
 }
 
-impl DerefMut for Map {
+impl DerefMut for Passkey2IdStore {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.inner
     }
 }
 
-impl Map {
-    pub fn new() -> Map {
-        Map(IndexMap::new())
+impl Passkey2IdStore {
+    pub fn new() -> Passkey2IdStore {
+        Passkey2IdStore {
+            inner: IndexMap::new(),
+        }
     }
 
-    pub async fn from_db(db: &MySqlPool) -> Result<Map> {
+    pub async fn from_db(db: &MySqlPool) -> Result<Passkey2IdStore> {
         let mut passkey2ids = sqlx::query_as!(
             Passkey2Id,
             r#"
@@ -43,7 +47,7 @@ impl Map {
         )
         .fetch(db);
 
-        let mut passkey2id_map = Map::new();
+        let mut passkey2id_map = Passkey2IdStore::new();
 
         while let Some(passkey2id) = passkey2ids
             .try_next()

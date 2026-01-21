@@ -23,14 +23,18 @@ pub use passkey::Passkey;
 pub mod passkey2id;
 
 #[derive(Serialize)]
-pub struct Map(IndexMap<u32, User>);
+pub struct UserStore {
+    inner: IndexMap<u32, User>,
+}
 
-impl Map {
-    pub fn new() -> Map {
-        Map(IndexMap::new())
+impl UserStore {
+    pub fn new() -> UserStore {
+        UserStore {
+            inner: IndexMap::new(),
+        }
     }
 
-    pub async fn from_db(db: &MySqlPool, config: &Config) -> Result<Map> {
+    pub async fn from_db(db: &MySqlPool, config: &Config) -> Result<UserStore> {
         let mut users = sqlx::query_as!(
             DBImportUser,
             r#"
@@ -57,7 +61,7 @@ impl Map {
         )
         .fetch(db);
 
-        let mut user_map = Map::new();
+        let mut user_map = UserStore::new();
 
         while let Some(user) = users.try_next().await.context("Failed loading users.")? {
             user_map.insert(
@@ -81,17 +85,17 @@ impl Map {
     }
 }
 
-impl Deref for Map {
+impl Deref for UserStore {
     type Target = IndexMap<u32, User>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.inner
     }
 }
 
-impl DerefMut for Map {
+impl DerefMut for UserStore {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.inner
     }
 }
 
