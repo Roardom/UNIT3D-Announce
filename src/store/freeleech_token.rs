@@ -11,7 +11,7 @@ use sqlx::MySqlPool;
 use anyhow::{Context, Result};
 use tracing::info;
 
-use crate::tracker::Tracker;
+use crate::state::AppState;
 
 pub struct Set(IndexSet<FreeleechToken>);
 
@@ -46,22 +46,22 @@ impl Set {
         Ok(freeleech_token_set)
     }
 
-    pub async fn upsert(State(tracker): State<Arc<Tracker>>, Json(token): Json<FreeleechToken>) {
+    pub async fn upsert(State(state): State<Arc<AppState>>, Json(token): Json<FreeleechToken>) {
         info!(
             "Inserting freeleech token with user_id {} and torrent_id {}.",
             token.user_id, token.torrent_id
         );
 
-        tracker.stores.freeleech_tokens.write().insert(token);
+        state.stores.freeleech_tokens.write().insert(token);
     }
 
-    pub async fn destroy(State(tracker): State<Arc<Tracker>>, Json(token): Json<FreeleechToken>) {
+    pub async fn destroy(State(state): State<Arc<AppState>>, Json(token): Json<FreeleechToken>) {
         info!(
             "Removing freeleech token with user_id {} and torrent_id {}.",
             token.user_id, token.torrent_id
         );
 
-        tracker.stores.freeleech_tokens.write().swap_remove(&token);
+        state.stores.freeleech_tokens.write().swap_remove(&token);
     }
 }
 

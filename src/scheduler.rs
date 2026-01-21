@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use crate::queue::torrent_update::{Index, TorrentUpdate};
-use crate::tracker::Tracker;
+use crate::state::AppState;
 use chrono::{Duration, Utc};
 
-pub async fn handle(tracker: &Arc<Tracker>) {
+pub async fn handle(state: &Arc<AppState>) {
     let mut interval = tokio::time::interval(std::time::Duration::from_millis(1));
     let mut counter = 0_u64;
 
@@ -12,24 +12,24 @@ pub async fn handle(tracker: &Arc<Tracker>) {
         interval.tick().await;
         counter += 1;
 
-        if counter % tracker.config.load().flush_interval_milliseconds == 0 {
-            tracker.queues.flush(tracker).await;
+        if counter % state.config.load().flush_interval_milliseconds == 0 {
+            state.queues.flush(state).await;
         }
 
-        if counter % (tracker.config.load().peer_expiry_interval * 1000) == 0 {
-            reap(tracker).await;
+        if counter % (state.config.load().peer_expiry_interval * 1000) == 0 {
+            reap(state).await;
         }
     }
 }
 
 /// Remove peers that have not announced for some time
-pub async fn reap(tracker: &Arc<Tracker>) {
-    let ttl = Duration::seconds(tracker.config.load().active_peer_ttl.try_into().unwrap());
+pub async fn reap(state: &Arc<AppState>) {
+    let ttl = Duration::seconds(state.config.load().active_peer_ttl.try_into().unwrap());
     let active_cutoff = Utc::now().checked_sub_signed(ttl).unwrap();
-    let ttl = Duration::seconds(tracker.config.load().inactive_peer_ttl.try_into().unwrap());
+    let ttl = Duration::seconds(state.config.load().inactive_peer_ttl.try_into().unwrap());
     let inactive_cutoff = Utc::now().checked_sub_signed(ttl).unwrap();
 
-    for (_index, torrent) in tracker.stores.torrents.lock().iter_mut() {
+    for (_index, torrent) in state.stores.torrents.lock().iter_mut() {
         let mut seeder_delta: i32 = 0;
         let mut leecher_delta: i32 = 0;
 
@@ -47,7 +47,7 @@ pub async fn reap(tracker: &Arc<Tracker>) {
                 peer.is_active = false;
 
                 if peer.is_visible {
-                    tracker
+                    state
                         .stores
                         .users
                         .write()
@@ -72,7 +72,7 @@ pub async fn reap(tracker: &Arc<Tracker>) {
             torrent.seeders = torrent.seeders.saturating_add_signed(seeder_delta);
             torrent.leechers = torrent.leechers.saturating_add_signed(leecher_delta);
 
-            tracker.queues.torrents.lock().upsert(
+            state.queues.torrents.lock().upsert(
                 Index {
                     torrent_id: torrent.id,
                 },

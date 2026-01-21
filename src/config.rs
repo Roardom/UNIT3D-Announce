@@ -9,7 +9,7 @@ use axum::{
 use dotenvy::dotenv_override;
 use tracing::{error, info};
 
-use crate::{rate::RateCollection, tracker::Tracker};
+use crate::{rate::RateCollection, state::AppState};
 
 #[derive(Clone)]
 pub struct Config {
@@ -382,13 +382,13 @@ impl Config {
         })
     }
 
-    pub async fn reload(State(tracker): State<Arc<Tracker>>) -> Response {
+    pub async fn reload(State(state): State<Arc<AppState>>) -> Response {
         info!("Reloading config.",);
 
         if dotenv_override().is_ok() {
             match Config::from_env() {
                 Ok(new_config) => {
-                    tracker.config.store(Arc::new(new_config));
+                    state.config.store(Arc::new(new_config));
 
                     info!("Successfully reloaded config.");
 

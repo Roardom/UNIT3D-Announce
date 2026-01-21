@@ -13,7 +13,7 @@ use axum::{
     response::Response,
 };
 
-use crate::tracker::Tracker;
+use crate::state::AppState;
 
 pub struct Stats {
     created_at: AtomicF64,
@@ -125,39 +125,39 @@ impl Stats {
     }
 }
 
-pub async fn show(State(tracker): State<Arc<Tracker>>) -> Json<APIGetStats> {
+pub async fn show(State(state): State<Arc<AppState>>) -> Json<APIGetStats> {
     Json(APIGetStats {
-        created_at: tracker.stats.created_at.load(Ordering::Relaxed),
-        last_request_at: tracker.stats.last_request_at.load(Ordering::Relaxed),
-        last_announce_response_at: tracker
+        created_at: state.stats.created_at.load(Ordering::Relaxed),
+        last_request_at: state.stats.last_request_at.load(Ordering::Relaxed),
+        last_announce_response_at: state
             .stats
             .last_announce_response_at
             .load(Ordering::Relaxed),
-        requests_per_1s: tracker.stats.requests_per_1s.load(Ordering::Relaxed),
-        requests_per_10s: tracker.stats.requests_per_10s.load(Ordering::Relaxed) / 10f64,
-        requests_per_60s: tracker.stats.requests_per_60s.load(Ordering::Relaxed) / 60f64,
-        requests_per_900s: tracker.stats.requests_per_900s.load(Ordering::Relaxed) / 900f64,
-        requests_per_7200s: tracker.stats.requests_per_7200s.load(Ordering::Relaxed) / 7200f64,
-        announce_responses_per_1s: tracker
+        requests_per_1s: state.stats.requests_per_1s.load(Ordering::Relaxed),
+        requests_per_10s: state.stats.requests_per_10s.load(Ordering::Relaxed) / 10f64,
+        requests_per_60s: state.stats.requests_per_60s.load(Ordering::Relaxed) / 60f64,
+        requests_per_900s: state.stats.requests_per_900s.load(Ordering::Relaxed) / 900f64,
+        requests_per_7200s: state.stats.requests_per_7200s.load(Ordering::Relaxed) / 7200f64,
+        announce_responses_per_1s: state
             .stats
             .announce_responses_per_1s
             .load(Ordering::Relaxed),
-        announce_responses_per_10s: tracker
+        announce_responses_per_10s: state
             .stats
             .announce_responses_per_10s
             .load(Ordering::Relaxed)
             / 10f64,
-        announce_responses_per_60s: tracker
+        announce_responses_per_60s: state
             .stats
             .announce_responses_per_60s
             .load(Ordering::Relaxed)
             / 60f64,
-        announce_responses_per_900s: tracker
+        announce_responses_per_900s: state
             .stats
             .announce_responses_per_900s
             .load(Ordering::Relaxed)
             / 900f64,
-        announce_responses_per_7200s: tracker
+        announce_responses_per_7200s: state
             .stats
             .announce_responses_per_7200s
             .load(Ordering::Relaxed)
@@ -183,7 +183,7 @@ pub struct APIGetStats {
 }
 
 pub async fn record_request(
-    State(state): State<Arc<Tracker>>,
+    State(state): State<Arc<AppState>>,
     request: Request,
     next: Next,
 ) -> Response {

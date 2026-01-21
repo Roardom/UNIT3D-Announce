@@ -22,9 +22,9 @@ mod queue;
 mod rate;
 mod routes;
 mod scheduler;
+mod state;
 mod stats;
 mod store;
-mod tracker;
 mod utils;
 mod warning;
 
@@ -45,27 +45,27 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    // The Tracker struct keeps track of all state within the application.
-    let tracker = tracker::Tracker::default().await?;
+    // The state struct keeps track of all state within the application.
+    let state = state::AppState::default().await?;
 
     // Starts scheduler to automate flushing updates
     // to database and inactive peer removal.
     let _handle = tokio::spawn({
-        let tracker = tracker.clone();
+        let state = state.clone();
 
         async move {
-            scheduler::handle(&tracker).await;
+            scheduler::handle(&state).await;
         }
     });
 
     // Create router.
     let app = Router::new()
-        .merge(routes::routes(tracker.clone()))
-        .with_state(tracker.clone());
+        .merge(routes::routes(state.clone()))
+        .with_state(state.clone());
 
     // Ensure lock is dropped before axum::serve() is called otherwise
     // reloading config triggers a deadlock
-    let config = tracker.config.load().clone();
+    let config = state.config.load().clone();
 
     if let Some(path) = config.listening_unix_socket.to_owned() {
         // Create unix domain socket.
@@ -104,8 +104,8 @@ async fn main() -> Result<()> {
     let max_flushes = 1000;
     let mut flushes = 0;
 
-    while flushes < max_flushes && tracker.queues.are_not_empty() {
-        tracker.queues.flush(&tracker).await;
+    while flushes < max_flushes && state.queues.are_not_empty() {
+        state.queues.flush(&state).await;
         flushes += 1;
     }
 

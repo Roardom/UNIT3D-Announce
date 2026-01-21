@@ -6,9 +6,9 @@ use axum::{
     routing::{get, post, put},
 };
 
-use crate::{announce, config::Config, stats, store, tracker::Tracker};
+use crate::{announce, config::Config, state::AppState, stats, store};
 
-pub fn routes(state: Arc<Tracker>) -> Router<Arc<Tracker>> {
+pub fn routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
     Router::new()
         .nest(
             "/announce",

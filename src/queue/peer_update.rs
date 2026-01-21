@@ -1,6 +1,6 @@
 use std::{net::IpAddr, sync::Arc};
 
-use crate::{store::peer::PeerId, tracker::Tracker};
+use crate::{state::AppState, store::peer::PeerId};
 use chrono::{DateTime, Utc};
 use sqlx::{MySql, QueryBuilder};
 
@@ -51,7 +51,7 @@ impl Mergeable for PeerUpdate {
 }
 
 impl Flushable<PeerUpdate> for super::Batch<Index, PeerUpdate> {
-    async fn flush_to_db(&self, tracker: &Arc<Tracker>) -> Result<u64, sqlx::Error> {
+    async fn flush_to_db(&self, state: &Arc<AppState>) -> Result<u64, sqlx::Error> {
         if self.is_empty() {
             return Ok(0);
         }
@@ -124,7 +124,7 @@ impl Flushable<PeerUpdate> for super::Batch<Index, PeerUpdate> {
         query_builder
             .build()
             .persistent(false)
-            .execute(&tracker.pool)
+            .execute(&state.pool)
             .await
             .map(|result| result.rows_affected())
     }

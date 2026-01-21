@@ -3,7 +3,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use sqlx::{MySql, QueryBuilder};
 
-use crate::tracker::Tracker;
+use crate::state::AppState;
 
 use super::{Flushable, Mergeable};
 
@@ -49,7 +49,7 @@ impl Mergeable for HistoryUpdate {
 }
 
 impl Flushable<HistoryUpdate> for super::Batch<Index, HistoryUpdate> {
-    async fn flush_to_db(&self, tracker: &Arc<Tracker>) -> Result<u64, sqlx::Error> {
+    async fn flush_to_db(&self, state: &Arc<AppState>) -> Result<u64, sqlx::Error> {
         if self.is_empty() {
             return Ok(0);
         }
@@ -114,7 +114,7 @@ impl Flushable<HistoryUpdate> for super::Batch<Index, HistoryUpdate> {
                             WHEN updated_at + INTERVAL
             "#,
             )
-            .push_bind(tracker.config.load().active_peer_ttl + tracker.config.load().peer_expiry_interval)
+            .push_bind(state.config.load().active_peer_ttl + state.config.load().peer_expiry_interval)
             .push(
                 r#"
                                                          SECOND > VALUES(updated_at) AND seeder = TRUE AND active = TRUE AND VALUES(seeder) = TRUE
@@ -132,7 +132,7 @@ impl Flushable<HistoryUpdate> for super::Batch<Index, HistoryUpdate> {
         query_builder
             .build()
             .persistent(false)
-            .execute(&tracker.pool)
+            .execute(&state.pool)
             .await
             .map(|result| result.rows_affected())
     }

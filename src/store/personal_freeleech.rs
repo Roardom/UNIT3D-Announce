@@ -11,7 +11,7 @@ use sqlx::MySqlPool;
 use anyhow::{Context, Result};
 use tracing::info;
 
-use crate::tracker::Tracker;
+use crate::state::AppState;
 
 pub struct Set(IndexSet<PersonalFreeleech>);
 
@@ -46,7 +46,7 @@ impl Set {
     }
 
     pub async fn upsert(
-        State(tracker): State<Arc<Tracker>>,
+        State(state): State<Arc<AppState>>,
         Json(personal_freeleech): Json<PersonalFreeleech>,
     ) {
         info!(
@@ -54,7 +54,7 @@ impl Set {
             personal_freeleech.user_id
         );
 
-        tracker
+        state
             .stores
             .personal_freeleeches
             .write()
@@ -62,7 +62,7 @@ impl Set {
     }
 
     pub async fn destroy(
-        State(tracker): State<Arc<Tracker>>,
+        State(state): State<Arc<AppState>>,
         Json(personal_freeleech): Json<PersonalFreeleech>,
     ) {
         info!(
@@ -70,7 +70,7 @@ impl Set {
             personal_freeleech.user_id
         );
 
-        tracker
+        state
             .stores
             .personal_freeleeches
             .write()

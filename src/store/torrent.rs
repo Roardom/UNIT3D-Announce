@@ -22,8 +22,8 @@ pub mod infohash2id;
 pub mod status;
 pub use status::Status;
 
+use crate::state::AppState;
 use crate::store::peer::{self, Index, Peer};
-use crate::tracker::Tracker;
 use peer::peer_id::PeerId;
 
 pub struct Map(IndexMap<u32, Torrent>);
@@ -144,15 +144,15 @@ impl Map {
     }
 
     pub async fn upsert(
-        State(tracker): State<Arc<Tracker>>,
+        State(state): State<Arc<AppState>>,
         Json(torrent): Json<APIInsertTorrent>,
     ) -> StatusCode {
         if let Ok(info_hash) = InfoHash::from_str(&torrent.info_hash) {
             info!("Inserting torrent with id {}.", torrent.id);
-            let old_torrent = tracker.stores.torrents.lock().swap_remove(&torrent.id);
+            let old_torrent = state.stores.torrents.lock().swap_remove(&torrent.id);
             let peers = old_torrent.unwrap_or_default().peers;
 
-            tracker.stores.torrents.lock().insert(
+            state.stores.torrents.lock().insert(
                 torrent.id,
                 Torrent {
                     id: torrent.id,
@@ -167,7 +167,7 @@ impl Map {
                 },
             );
 
-            tracker
+            state
                 .stores
                 .infohash2id
                 .write()
@@ -180,10 +180,10 @@ impl Map {
     }
 
     pub async fn destroy(
-        State(tracker): State<Arc<Tracker>>,
+        State(state): State<Arc<AppState>>,
         Json(torrent): Json<APIRemoveTorrent>,
     ) -> StatusCode {
-        let mut torrent_guard = tracker.stores.torrents.lock();
+        let mut torrent_guard = state.stores.torrents.lock();
 
         if let Some(torrent) = torrent_guard.get_mut(&torrent.id) {
             info!("Removing torrent with id {}.", torrent.id);
@@ -196,10 +196,10 @@ impl Map {
     }
 
     pub async fn show(
-        State(tracker): State<Arc<Tracker>>,
+        State(state): State<Arc<AppState>>,
         Path(id): Path<u32>,
     ) -> Result<Json<Torrent>, StatusCode> {
-        tracker
+        state
             .stores
             .torrents
             .lock()

@@ -11,7 +11,7 @@ use sqlx::MySqlPool;
 use anyhow::{Context, Result};
 use tracing::info;
 
-use crate::tracker::Tracker;
+use crate::state::AppState;
 
 pub struct Set(IndexSet<FeaturedTorrent>);
 
@@ -45,22 +45,22 @@ impl Set {
         Ok(featured_torrent_set)
     }
 
-    pub async fn upsert(State(tracker): State<Arc<Tracker>>, Json(token): Json<FeaturedTorrent>) {
+    pub async fn upsert(State(state): State<Arc<AppState>>, Json(token): Json<FeaturedTorrent>) {
         info!(
             "Inserting featured torrent with torrent_id {}.",
             token.torrent_id
         );
 
-        tracker.stores.featured_torrents.write().insert(token);
+        state.stores.featured_torrents.write().insert(token);
     }
 
-    pub async fn destroy(State(tracker): State<Arc<Tracker>>, Json(token): Json<FeaturedTorrent>) {
+    pub async fn destroy(State(state): State<Arc<AppState>>, Json(token): Json<FeaturedTorrent>) {
         info!(
             "Removing featured torrent with torrent_id {}.",
             token.torrent_id
         );
 
-        tracker.stores.featured_torrents.write().swap_remove(&token);
+        state.stores.featured_torrents.write().swap_remove(&token);
     }
 }
 

@@ -7,7 +7,7 @@ pub mod torrent_update;
 pub mod unregistered_info_hash_update;
 pub mod user_update;
 
-use crate::tracker::Tracker;
+use crate::state::AppState;
 use futures_util::future::join_all;
 use history_update::HistoryUpdate;
 use parking_lot::Mutex;
@@ -72,24 +72,24 @@ impl Queues {
     }
 
     /// Send queued updates to mysql database
-    pub async fn flush(&self, tracker: &Arc<Tracker>) {
+    pub async fn flush(&self, state: &Arc<AppState>) {
         join!(
-            self.flush_announce_updates(tracker),
-            self.histories.flush(tracker, "histories"),
-            self.peers.flush(tracker, "peers"),
-            self.torrents.flush(tracker, "torrents"),
-            self.users.flush(tracker, "users"),
+            self.flush_announce_updates(state),
+            self.histories.flush(state, "histories"),
+            self.peers.flush(state, "peers"),
+            self.torrents.flush(state, "torrents"),
+            self.users.flush(state, "users"),
             self.unregistered_info_hashes
-                .flush(tracker, "unregistered info hashes"),
+                .flush(state, "unregistered info hashes"),
         );
     }
 
     /// Send announce updates to mysql database
-    async fn flush_announce_updates(&self, tracker: &Arc<Tracker>) {
+    async fn flush_announce_updates(&self, state: &Arc<AppState>) {
         let announce_update_batch = self.announces.lock().take_batch();
         let start = Instant::now();
         let len = announce_update_batch.len();
-        let result = announce_update_batch.flush_to_db(tracker).await;
+        let result = announce_update_batch.flush_to_db(state).await;
         let elapsed = start.elapsed().as_millis();
 
         match result {
@@ -98,7 +98,7 @@ impl Queues {
             }
             Err(e) => {
                 info!("Failed to update {len} announces after {elapsed} ms: {e}");
-                tracker
+                state
                     .queues
                     .announces
                     .lock()
@@ -129,11 +129,11 @@ pub struct QueueConfig {
 }
 
 impl QueueConfig {
-    fn max_batch_size(&mut self, tracker: &Arc<Tracker>) -> usize {
+    fn max_batch_size(&mut self, state: &Arc<AppState>) -> usize {
         let max_bindings = (self.max_bindings_per_flush - self.extra_bindings_per_flush)
             / self.bindings_per_record;
 
-        if let Some(max_records) = tracker.config.load().max_records_per_batch {
+        if let Some(max_records) = state.config.load().max_records_per_batch {
             return max_bindings.min(max_records);
         }
 
@@ -164,9 +164,9 @@ where
 
     /// Take a portion of the updates from the start of the queue with a max
     /// size defined by the buffer config
-    fn take_batches(&mut self, tracker: &Arc<Tracker>) -> VecDeque<Batch<K, V>> {
-        let max_batches = tracker.config.load().max_batches_per_flush;
-        let max_batch_size = self.config.max_batch_size(tracker);
+    fn take_batches(&mut self, state: &Arc<AppState>) -> VecDeque<Batch<K, V>> {
+        let max_batches = state.config.load().max_batches_per_flush;
+        let max_batch_size = self.config.max_batch_size(state);
 
         let mut records = self
             .records
@@ -201,7 +201,7 @@ pub trait Mergeable {
 }
 
 pub trait MutexQueueExt {
-    async fn flush<'a>(&self, tracker: &Arc<Tracker>, record_type: &'a str);
+    async fn flush<'a>(&self, state: &Arc<AppState>, record_type: &'a str);
 }
 
 impl<K, V> MutexQueueExt for Mutex<Queue<K, V>>
@@ -210,8 +210,8 @@ where
     V: Clone + Mergeable,
     Batch<K, V>: Flushable<V>,
 {
-    async fn flush<'a>(&self, tracker: &Arc<Tracker>, record_type: &'a str) {
-        let batches = self.lock().take_batches(tracker);
+    async fn flush<'a>(&self, state: &Arc<AppState>, record_type: &'a str) {
+        let batches = self.lock().take_batches(state);
 
         if batches.is_empty() {
             info!("Upserted 0 {record_type} in 0 ms.");
@@ -224,7 +224,7 @@ where
             .map(|batch| async move {
                 let start = Instant::now();
                 let len = batch.len();
-                let result = batch.flush_to_db(tracker).await;
+                let result = batch.flush_to_db(state).await;
                 let elapsed = start.elapsed().as_millis();
 
                 (len, elapsed, result, batch)
@@ -272,5 +272,5 @@ pub trait Flushable<T> {
     ///
     /// **Warning**: this function does not make sure that the query isn't too long
     /// or doesn't use too many bindings
-    async fn flush_to_db(&self, tracker: &Arc<Tracker>) -> Result<u64, sqlx::Error>;
+    async fn flush_to_db(&self, state: &Arc<AppState>) -> Result<u64, sqlx::Error>;
 }

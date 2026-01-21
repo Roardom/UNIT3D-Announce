@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use sqlx::{MySql, QueryBuilder};
 
-use crate::tracker::Tracker;
+use crate::state::AppState;
 
 use super::{Flushable, Mergeable};
 
@@ -29,7 +29,7 @@ impl Mergeable for UserUpdate {
 }
 
 impl Flushable<UserUpdate> for super::Batch<Index, UserUpdate> {
-    async fn flush_to_db(&self, tracker: &Arc<Tracker>) -> Result<u64, sqlx::Error> {
+    async fn flush_to_db(&self, state: &Arc<AppState>) -> Result<u64, sqlx::Error> {
         if self.is_empty() {
             return Ok(0);
         }
@@ -78,7 +78,7 @@ impl Flushable<UserUpdate> for super::Batch<Index, UserUpdate> {
         query_builder
             .build()
             .persistent(false)
-            .execute(&tracker.pool)
+            .execute(&state.pool)
             .await
             .map(|result| result.rows_affected())
     }

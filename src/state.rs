@@ -14,7 +14,7 @@ use sqlx::mysql::MySqlPoolOptions;
 use std::io::{self, Write};
 use std::{env, sync::Arc, time::Duration};
 
-pub struct Tracker {
+pub struct AppState {
     pub config: ArcSwap<config::Config>,
     pub pool: MySqlPool,
     pub queues: Queues,
@@ -22,11 +22,11 @@ pub struct Tracker {
     pub stores: Stores,
 }
 
-impl Tracker {
+impl AppState {
     /// Creates a database connection pool, and loads all relevant tracker
-    /// data into this shared tracker context. This is then passed to all
+    /// data into this shared state context. This is then passed to all
     /// handlers.
-    pub async fn default() -> Result<Arc<Tracker>> {
+    pub async fn default() -> Result<Arc<AppState>> {
         print!(".env file: verifying file exists                       ... ");
         io::stdout().flush().unwrap();
         let env_path = dotenv().context(".env file not found.")?;
@@ -46,7 +46,7 @@ impl Tracker {
 
         let stats = Stats::default();
 
-        Ok(Arc::new(Tracker {
+        Ok(Arc::new(AppState {
             config: ArcSwap::from_pointee(config),
             pool,
             queues: Queues::new(),

@@ -40,6 +40,7 @@ use crate::{
     warning::{AnnounceWarning, WarningCollection},
 };
 
+use crate::state::AppState;
 use crate::store::{
     self,
     connectable_port::ConnectablePort,
@@ -50,7 +51,6 @@ use crate::store::{
     torrent::InfoHash,
     user::Passkey,
 };
-use crate::tracker::Tracker;
 use crate::utils;
 
 #[derive(Clone, Copy, PartialEq, Default)]
@@ -106,11 +106,11 @@ pub struct Query<T>(pub T);
 impl<S> FromRequestParts<S> for Query<Announce>
 where
     S: Send + Sync,
-    Arc<Tracker>: FromRef<S>,
+    Arc<AppState>: FromRef<S>,
 {
     type Rejection = AnnounceError;
 
-    async fn from_request_parts(parts: &mut Parts, tracker: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let query_string = parts.uri.query().unwrap_or_default();
         let query_bytes = query_string.as_bytes();
         let query_length = query_bytes.len();
@@ -172,11 +172,11 @@ where
             }
         }
 
-        let State(tracker): State<Arc<Tracker>> = State::from_request_parts(parts, tracker)
+        let State(state): State<Arc<AppState>> = State::from_request_parts(parts, state)
             .await
             .or(Err(InternalTrackerError))?;
 
-        let config = tracker.config.load();
+        let config = state.config.load();
 
         Ok(Query(Announce {
             info_hash: info_hash.ok_or(MissingInfoHash)?,
@@ -203,12 +203,12 @@ where
 
 pub struct ClientIp(pub std::net::IpAddr);
 
-impl FromRequestParts<Arc<Tracker>> for ClientIp {
+impl FromRequestParts<Arc<AppState>> for ClientIp {
     type Rejection = AnnounceError;
 
     async fn from_request_parts(
         parts: &mut Parts,
-        state: &Arc<Tracker>,
+        state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
         let header_name_opt = &state
             .config
@@ -250,7 +250,7 @@ impl FromRequestParts<Arc<Tracker>> for ClientIp {
 }
 
 pub async fn announce(
-    State(tracker): State<Arc<Tracker>>,
+    State(state): State<Arc<AppState>>,
     Path(passkey): Path<String>,
     Query(queries): Query<Announce>,
     headers: HeaderMap,
@@ -282,7 +282,7 @@ pub async fn announce(
     }
 
     // Block user agent strings on the blacklist
-    for client in tracker.stores.agent_blacklist.read().iter() {
+    for client in state.stores.agent_blacklist.read().iter() {
         if queries.peer_id.starts_with(&client.peer_id_prefix) {
             return Err(BlacklistedClient);
         }
@@ -307,8 +307,7 @@ pub async fn announce(
 
     // Validate port
     // Some clients send port 0 on the stopped event
-    if tracker.stores.port_blacklist.read().contains(&queries.port)
-        && queries.event != Event::Stopped
+    if state.stores.port_blacklist.read().contains(&queries.port) && queries.event != Event::Stopped
     {
         return Err(BlacklistedPort(queries.port));
     }
@@ -316,7 +315,7 @@ pub async fn announce(
     let passkey: Passkey = Passkey::from_str(&passkey).or(Err(InvalidPasskey))?;
 
     // Validate passkey
-    let user_id = tracker
+    let user_id = state
         .stores
         .passkey2id
         .read()
@@ -325,7 +324,7 @@ pub async fn announce(
         .cloned();
 
     let user = if let Ok(user_id) = user_id {
-        tracker
+        state
             .stores
             .users
             .read()
@@ -337,7 +336,7 @@ pub async fn announce(
     };
 
     // Validate torrent
-    let torrent_id_res = tracker
+    let torrent_id_res = state
         .stores
         .infohash2id
         .read()
@@ -349,7 +348,7 @@ pub async fn announce(
 
     if let Ok(user) = &user {
         if let Err(InfoHashNotFound) = torrent_id_res {
-            tracker.queues.unregistered_info_hashes.lock().upsert(
+            state.queues.unregistered_info_hashes.lock().upsert(
                 unregistered_info_hash_update::Index {
                     user_id: user.id,
                     info_hash: queries.info_hash,
@@ -364,11 +363,11 @@ pub async fn announce(
 
     let torrent_id = torrent_id_res?;
 
-    let is_connectable = check_connectivity(&tracker, client_ip, queries.port).await;
+    let is_connectable = check_connectivity(&state, client_ip, queries.port).await;
 
     let mut warnings = WarningCollection::new();
 
-    let config = tracker.config.load();
+    let config = state.config.load();
 
     if !is_connectable && config.require_peer_connectivity {
         warnings.add(AnnounceWarning::ConnectivityIssueDetected);
@@ -391,12 +390,12 @@ pub async fn announce(
         has_requested_leech_list,
         response,
     ) = {
-        let mut torrent_guard = tracker.stores.torrents.lock();
+        let mut torrent_guard = state.stores.torrents.lock();
         let torrent = torrent_guard.get_mut(&torrent_id).ok_or(TorrentNotFound)?;
 
         if torrent.is_deleted {
             if let Ok(user) = &user {
-                tracker.queues.unregistered_info_hashes.lock().upsert(
+                state.queues.unregistered_info_hashes.lock().upsert(
                     unregistered_info_hash_update::Index {
                         user_id: user.id,
                         info_hash: queries.info_hash,
@@ -427,7 +426,7 @@ pub async fn announce(
             return Err(DownloadPrivilegesRevoked);
         }
 
-        let group = tracker
+        let group = state
             .stores
             .groups
             .read()
@@ -810,12 +809,12 @@ pub async fn announce(
         )
     };
 
-    let download_factor = if tracker
+    let download_factor = if state
         .stores
         .personal_freeleeches
         .read()
         .contains(&PersonalFreeleech { user_id })
-        || tracker
+        || state
             .stores
             .freeleech_tokens
             .read()
@@ -823,7 +822,7 @@ pub async fn announce(
                 user_id,
                 torrent_id,
             })
-        || tracker
+        || state
             .stores
             .featured_torrents
             .read()
@@ -834,7 +833,7 @@ pub async fn announce(
         download_factor
     };
 
-    let upload_factor = if tracker
+    let upload_factor = if state
         .stores
         .featured_torrents
         .read()
@@ -859,7 +858,7 @@ pub async fn announce(
         || has_requested_seed_list
         || has_requested_leech_list
     {
-        tracker
+        state
             .stores
             .users
             .write()
@@ -878,7 +877,7 @@ pub async fn announce(
             });
     }
 
-    tracker.queues.peers.lock().upsert(
+    state.queues.peers.lock().upsert(
         peer_update::Index {
             peer_id: queries.peer_id,
             torrent_id,
@@ -900,7 +899,7 @@ pub async fn announce(
         },
     );
 
-    tracker.queues.histories.lock().upsert(
+    state.queues.histories.lock().upsert(
         history_update::Index {
             user_id,
             torrent_id,
@@ -931,7 +930,7 @@ pub async fn announce(
     );
 
     if credited_uploaded_delta != 0 || credited_downloaded_delta != 0 {
-        tracker.queues.users.lock().upsert(
+        state.queues.users.lock().upsert(
             user_update::Index { user_id },
             UserUpdate {
                 uploaded_delta: credited_uploaded_delta,
@@ -946,7 +945,7 @@ pub async fn announce(
         || uploaded_delta != 0
         || downloaded_delta != 0
     {
-        tracker.queues.torrents.lock().upsert(
+        state.queues.torrents.lock().upsert(
             torrent_update::Index { torrent_id },
             TorrentUpdate {
                 seeder_delta,
@@ -959,7 +958,7 @@ pub async fn announce(
     }
 
     if config.is_announce_logging_enabled {
-        tracker.queues.announces.lock().upsert(AnnounceUpdate {
+        state.queues.announces.lock().upsert(AnnounceUpdate {
             user_id,
             torrent_id,
             uploaded: queries.uploaded,
@@ -975,24 +974,19 @@ pub async fn announce(
         });
     }
 
-    tracker.stats.increment_announce_response();
+    state.stats.increment_announce_response();
 
     Ok(response)
 }
 
-async fn check_connectivity(tracker: &Arc<Tracker>, ip: IpAddr, port: u16) -> bool {
-    if tracker.config.load().is_connectivity_check_enabled {
+async fn check_connectivity(state: &Arc<AppState>, ip: IpAddr, port: u16) -> bool {
+    if state.config.load().is_connectivity_check_enabled {
         let now = Utc::now();
         let socket = SocketAddr::from((ip, port));
-        let connectable_port_opt = tracker
-            .stores
-            .connectable_ports
-            .read()
-            .get(&socket)
-            .cloned();
+        let connectable_port_opt = state.stores.connectable_ports.read().get(&socket).cloned();
 
         if let Some(connectable_port) = connectable_port_opt {
-            let ttl = Duration::seconds(tracker.config.load().connectivity_check_interval);
+            let ttl = Duration::seconds(state.config.load().connectivity_check_interval);
 
             if let Some(cached_until) = connectable_port.updated_at.checked_add_signed(ttl) {
                 if cached_until > now {
@@ -1012,7 +1006,7 @@ async fn check_connectivity(tracker: &Arc<Tracker>, ip: IpAddr, port: u16) -> bo
         .await
         .unwrap_or(false);
 
-        tracker
+        state
             .stores
             .connectable_ports
             .write()
