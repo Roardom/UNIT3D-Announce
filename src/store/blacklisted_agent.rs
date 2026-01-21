@@ -1,17 +1,12 @@
+use std::ops::Deref;
 use std::ops::DerefMut;
-use std::{ops::Deref, sync::Arc};
 
-use axum::Json;
-use axum::extract::State;
 use futures_util::TryStreamExt;
 use indexmap::IndexSet;
 use serde::Deserialize;
 use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
-use tracing::info;
-
-use crate::state::AppState;
 
 pub struct BlacklistedAgentStore {
     inner: IndexSet<Agent>,
@@ -68,24 +63,4 @@ impl DerefMut for BlacklistedAgentStore {
 pub struct Agent {
     #[serde(with = "serde_bytes")]
     pub peer_id_prefix: Vec<u8>,
-}
-
-pub async fn upsert(State(state): State<Arc<AppState>>, Json(agent): Json<Agent>) {
-    info!(
-        "Inserting agent with peer_id_prefix {} ({:?}).",
-        String::from_utf8_lossy(&agent.peer_id_prefix),
-        agent.peer_id_prefix,
-    );
-
-    state.stores.agent_blacklist.write().insert(agent);
-}
-
-pub async fn destroy(State(state): State<Arc<AppState>>, Json(agent): Json<Agent>) {
-    info!(
-        "Removing agent with peer_id_prefix {} ({:?}).",
-        String::from_utf8_lossy(&agent.peer_id_prefix),
-        agent.peer_id_prefix,
-    );
-
-    state.stores.agent_blacklist.write().swap_remove(&agent);
 }

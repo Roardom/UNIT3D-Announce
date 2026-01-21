@@ -1,17 +1,12 @@
+use std::ops::Deref;
 use std::ops::DerefMut;
-use std::{ops::Deref, sync::Arc};
 
-use axum::Json;
-use axum::extract::State;
 use futures_util::TryStreamExt;
 use indexmap::IndexSet;
 use serde::Deserialize;
 use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
-use tracing::info;
-
-use crate::state::AppState;
 
 pub struct PersonalFreeleechStore {
     inner: IndexSet<PersonalFreeleech>,
@@ -67,36 +62,4 @@ impl DerefMut for PersonalFreeleechStore {
 #[derive(Eq, Deserialize, Hash, PartialEq)]
 pub struct PersonalFreeleech {
     pub user_id: u32,
-}
-
-pub async fn upsert(
-    State(state): State<Arc<AppState>>,
-    Json(personal_freeleech): Json<PersonalFreeleech>,
-) {
-    info!(
-        "Inserting personal freeleech with user_id {}.",
-        personal_freeleech.user_id
-    );
-
-    state
-        .stores
-        .personal_freeleeches
-        .write()
-        .insert(personal_freeleech);
-}
-
-pub async fn destroy(
-    State(state): State<Arc<AppState>>,
-    Json(personal_freeleech): Json<PersonalFreeleech>,
-) {
-    info!(
-        "Removing personal freeleech with user_id {}.",
-        personal_freeleech.user_id
-    );
-
-    state
-        .stores
-        .personal_freeleeches
-        .write()
-        .swap_remove(&personal_freeleech);
 }

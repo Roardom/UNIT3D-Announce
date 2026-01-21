@@ -1,17 +1,12 @@
+use std::ops::Deref;
 use std::ops::DerefMut;
-use std::{ops::Deref, sync::Arc};
 
-use axum::Json;
-use axum::extract::State;
 use futures_util::TryStreamExt;
 use indexmap::IndexSet;
 use serde::Deserialize;
 use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
-use tracing::info;
-
-use crate::state::AppState;
 
 pub struct FeaturedTorrentStore {
     inner: IndexSet<FeaturedTorrent>,
@@ -67,22 +62,4 @@ impl DerefMut for FeaturedTorrentStore {
 #[derive(Eq, Deserialize, Hash, PartialEq)]
 pub struct FeaturedTorrent {
     pub torrent_id: u32,
-}
-
-pub async fn upsert(State(state): State<Arc<AppState>>, Json(token): Json<FeaturedTorrent>) {
-    info!(
-        "Inserting featured torrent with torrent_id {}.",
-        token.torrent_id
-    );
-
-    state.stores.featured_torrents.write().insert(token);
-}
-
-pub async fn destroy(State(state): State<Arc<AppState>>, Json(token): Json<FeaturedTorrent>) {
-    info!(
-        "Removing featured torrent with torrent_id {}.",
-        token.torrent_id
-    );
-
-    state.stores.featured_torrents.write().swap_remove(&token);
 }

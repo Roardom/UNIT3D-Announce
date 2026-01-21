@@ -16,6 +16,7 @@ use tikv_jemallocator::Jemalloc;
 static GLOBAL: Jemalloc = Jemalloc;
 
 mod announce;
+mod api;
 mod config;
 mod error;
 mod model;

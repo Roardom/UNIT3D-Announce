@@ -1,17 +1,12 @@
+use std::ops::Deref;
 use std::ops::DerefMut;
-use std::{ops::Deref, sync::Arc};
 
-use axum::Json;
-use axum::extract::State;
 use futures_util::TryStreamExt;
 use indexmap::IndexSet;
 use serde::Deserialize;
 use sqlx::MySqlPool;
 
 use anyhow::{Context, Result};
-use tracing::info;
-
-use crate::state::AppState;
 
 pub struct FreeleechTokenStore {
     inner: IndexSet<FreeleechToken>,
@@ -69,22 +64,4 @@ impl DerefMut for FreeleechTokenStore {
 pub struct FreeleechToken {
     pub user_id: u32,
     pub torrent_id: u32,
-}
-
-pub async fn upsert(State(state): State<Arc<AppState>>, Json(token): Json<FreeleechToken>) {
-    info!(
-        "Inserting freeleech token with user_id {} and torrent_id {}.",
-        token.user_id, token.torrent_id
-    );
-
-    state.stores.freeleech_tokens.write().insert(token);
-}
-
-pub async fn destroy(State(state): State<Arc<AppState>>, Json(token): Json<FreeleechToken>) {
-    info!(
-        "Removing freeleech token with user_id {} and torrent_id {}.",
-        token.user_id, token.torrent_id
-    );
-
-    state.stores.freeleech_tokens.write().swap_remove(&token);
 }
