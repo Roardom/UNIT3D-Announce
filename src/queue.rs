@@ -159,7 +159,7 @@ where
         self.records
             .entry(key)
             .and_modify(|update| update.merge(&value))
-            .or_insert(value);
+            .or_push_back(value);
     }
 
     /// Take a portion of the updates from the start of the queue with a max
