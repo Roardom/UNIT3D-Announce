@@ -24,9 +24,10 @@ pub async fn handle(state: &Arc<AppState>) {
 
 /// Remove peers that have not announced for some time
 pub async fn reap(state: &Arc<AppState>) {
-    let ttl = Duration::seconds(state.config.load().active_peer_ttl.try_into().unwrap());
+    let config = state.config.load();
+    let ttl = Duration::seconds(config.active_peer_ttl.try_into().unwrap());
     let active_cutoff = Utc::now().checked_sub_signed(ttl).unwrap();
-    let ttl = Duration::seconds(state.config.load().inactive_peer_ttl.try_into().unwrap());
+    let ttl = Duration::seconds(config.inactive_peer_ttl.try_into().unwrap());
     let inactive_cutoff = Utc::now().checked_sub_signed(ttl).unwrap();
 
     for (_index, torrent) in state.stores.torrents.lock().iter_mut() {
@@ -44,9 +45,7 @@ pub async fn reap(state: &Arc<AppState>) {
             // active_peer_ttl seconds. User peer count and torrent peer
             // count are updated to reflect.
             if peer.updated_at < active_cutoff && peer.is_active {
-                peer.is_active = false;
-
-                if peer.is_visible {
+                if peer.is_included_in_peer_list(&config) {
                     state
                         .stores
                         .users
@@ -64,6 +63,8 @@ pub async fn reap(state: &Arc<AppState>) {
                         false => leecher_delta -= 1,
                     }
                 }
+
+                peer.is_active = false;
             }
         }
 
