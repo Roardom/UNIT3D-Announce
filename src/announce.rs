@@ -439,9 +439,16 @@ pub async fn announce(
             return Err(GroupNotEnabled(group.slug));
         }
 
-        // Make sure user isn't leeching more torrents than their group allows
+        // Make sure user isn't leeching more torrents than their group allows.
+        // Lifetime donors get unlimited slots unless overridden via config.
         let has_hit_download_slot_limit = if queries.left > 0 {
-            if let Some(slots) = group.download_slots {
+            let effective_slots = if user.is_lifetime {
+                config.lifetime_donor_download_slots_override
+            } else {
+                group.download_slots
+            };
+
+            if let Some(slots) = effective_slots {
                 user.num_leeching >= slots
             } else {
                 false

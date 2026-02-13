@@ -124,6 +124,9 @@ pub struct Config {
     /// If specified, this will override the download factor of the user's
     /// group. The factor is stored as a percentage.
     pub lifetime_donor_download_factor_override: Option<u8>,
+    /// If specified, this will override the download slot limit for lifetime
+    /// donors. If unspecified, lifetime donors have unlimited download slots.
+    pub lifetime_donor_download_slots_override: Option<u32>,
 }
 
 impl Config {
@@ -341,6 +344,16 @@ impl Config {
             "LIFETIME_DONOR_DOWNLOAD_FACTOR_OVERRIDE must be a number between 0 and 2^8 - 1, if provided",
         )?;
 
+        let lifetime_donor_download_slots_override = env::var(
+            "LIFETIME_DONOR_DOWNLOAD_SLOTS_OVERRIDE",
+        )
+        .ok()
+        .map(|s| s.parse())
+        .transpose()
+        .context(
+            "LIFETIME_DONOR_DOWNLOAD_SLOTS_OVERRIDE must be be a number between 0 and 2^32 - 1, if provided",
+        )?;
+
         let apikey = env::var("APIKEY").context("APIKEY not found in .env file.")?;
 
         if apikey.len() < 32 {
@@ -379,6 +392,7 @@ impl Config {
             lifetime_donor_immunity_override,
             lifetime_donor_upload_factor_override,
             lifetime_donor_download_factor_override,
+            lifetime_donor_download_slots_override,
         })
     }
 
