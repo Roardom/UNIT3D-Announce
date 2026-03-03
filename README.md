@@ -64,7 +64,7 @@ $ sudo nano .env
 $ cargo build --release
 ```
 
-Remember to [restart the tracker](#startingrestarting-unit3d-announce).
+Remember to [restart the tracker](#restarting-unit3d-announce).
 
 ## Reverse proxy
 
@@ -102,45 +102,74 @@ Uncomment and set `REVERSE_PROXY_CLIENT_IP_HEADER_NAME` in the .env file to `X-R
 $ service nginx reload
 ```
 
-## Supervisor
+## systemd
 
-Add a supervisor config to run UNIT3D-Announce in the background.
+Add a systemd service to run UNIT3D-Announce in the background.
 
-### Configuration
-
-```sh
-# Edit supervisor config
-sudo nano /etc/supervisor/conf.d/unit3d.conf
-```
-
-Paste the following block at the end of the file:
-
-```supervisor
-[program:unit3d-announce]
-process_name=%(program_name)s_%(process_num)02d
-command=/var/www/html/unit3d-announce/target/release/unit3d-announce
-directory=/var/www/html/unit3d-announce
-autostart=true
-autorestart=false
-user=ubuntu
-numprocs=1
-redirect_stderr=true
-stdout_logfile=/var/www/html/storage/logs/announce.log
-```
-
-**Set Up Runtime Directory (if using Unix sockets):**
-
-If using Unix sockets, create a `/run` directory for `ubuntu` user:
-1. `sudo nano /etc/tmpfiles.d/unit3d-announce.conf`
-2. Add: `d /run/unit3d-announce 0755 ubuntu www-data -`
-3. Run: `sudo systemd-tmpfiles --create`
-
-### Starting/Restarting UNIT3D-Announce
-
-Reload supervisor
+### Service
 
 ```sh
-$ sudo supervisorctl reread && sudo supervisorctl update && sudo supervisorctl reload
+# Create systemd service
+$ sudo nano /etc/systemd/system/unit3d-announce.service
+```
+
+Paste the following into the file:
+
+```ini
+# /etc/systemd/system/unit3d-announce.service
+#
+# Systemd service unit for UNIT3D-Announce
+
+[Unit]
+Description=UNIT3D-Announce service
+Documentation=https://github.com/HDInnovations/UNIT3D-Announce
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+
+WorkingDirectory=/var/www/html/unit3d-announce
+ExecStart=/var/www/html/unit3d-announce/target/release/unit3d-announce
+
+EnvironmentFile=/var/www/html/unit3d-announce/.env
+
+Restart=on-failure
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/www/html/unit3d-announce
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=unit3d-announce
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Reload systemd:
+
+```sh
+$ sudo systemctl daemon-reload
+```
+
+### Starting UNIT3D-Announce
+
+```sh
+$ sudo systemctl start unit3d-announce
+```
+
+### Restarting UNIT3D-Announce
+
+```sh
+$ sudo systemctl restart unit3d-announce
 ```
 
 ### Exiting UNIT3D-Announce
@@ -148,7 +177,20 @@ $ sudo supervisorctl reread && sudo supervisorctl update && sudo supervisorctl r
 To gracefully exit the tracker:
 
 ```sh
-sudo supervisorctl stop unit3d-announce:unit3d-announce_00
+$ sudo systemctl stop unit3d-announce
+```
+
+### Checking status & logs (journald)
+
+```sh
+$ sudo systemctl status unit3d-announce
+$ sudo journalctl -u unit3d-announce
+```
+
+### Enable on boot
+
+```sh
+$ sudo systemctl enable unit3d-announce
 ```
 
 ## Global Freeleech or Double Upload Events
@@ -156,7 +198,7 @@ sudo supervisorctl stop unit3d-announce:unit3d-announce_00
 > [!IMPORTANT]
 > When using the Rust-based UNIT3D-Announce tracker, the global freeleech and double upload events are handled by the external tracker itself. This means you must activate the events in the `config/other.php` file within UNIT3D as normal to show the timer and then also within the `.env` file of the UNIT3D-Announce tracker to update user stats correctly.
 
-To enable/disable global freeleech or double upload events, you need to adjust the following environment variables in the `.env` file and then either [reload the configuration](#reload) or [restart the tracker](#startingrestarting-unit3d-announce).
+To enable/disable global freeleech or double upload events, you need to adjust the following environment variables in the `.env` file and then either [reload the configuration](#reload) or [restart the tracker](#restarting-unit3d-announce).
 
 ```sh
 # The upload_factor is multiplied by 0.01 before being multiplied with
@@ -195,8 +237,10 @@ $ sudo nano /var/www/html/config/announce.php
 # Remove any potential `location /announce/` block from the nginx configuration
 $ sudo nano /etc/nginx/sites-enabled/default
 
-# Remove any potential `[program:unit3d-announce]` block from the supervisor configuration
-$ sudo nano /etc/supervisor/conf.d/unit3d.conf
+# Stop and remove systemd configuration
+$ sudo systemctl disable --now unit3d-announce
+$ sudo rm /etc/systemd/system/unit3d-announce.service
+$ sudo systemctl daemon-reload
 
 # Remove tracker files
 $ sudo rm -rf /var/www/html/unit3d-announce
