@@ -26,6 +26,8 @@ pub async fn handle(state: &Arc<AppState>) {
 
 /// Remove peers that have not announced for some time
 pub async fn reap(state: &Arc<AppState>) {
+    use rayon::prelude::*;
+
     let start = Instant::now();
     let config = state.config.load();
     let ttl = Duration::seconds(config.active_peer_ttl.try_into().unwrap());
@@ -33,7 +35,9 @@ pub async fn reap(state: &Arc<AppState>) {
     let ttl = Duration::seconds(config.inactive_peer_ttl.try_into().unwrap());
     let inactive_cutoff = Utc::now().checked_sub_signed(ttl).unwrap();
 
-    for torrent in state.stores.torrents.lock().values_mut() {
+    let mut torrent_store = state.stores.torrents.lock();
+
+    torrent_store.par_values_mut().for_each(|torrent| {
         let mut seeder_delta: i32 = 0;
         let mut leecher_delta: i32 = 0;
 
@@ -88,7 +92,7 @@ pub async fn reap(state: &Arc<AppState>) {
                 },
             );
         }
-    }
+    });
 
     let elapsed = start.elapsed().as_millis();
     info!("Expired stale peers in {elapsed} ms.")
