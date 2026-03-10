@@ -33,7 +33,7 @@ pub async fn reap(state: &Arc<AppState>) {
     let ttl = Duration::seconds(config.inactive_peer_ttl.try_into().unwrap());
     let inactive_cutoff = Utc::now().checked_sub_signed(ttl).unwrap();
 
-    for (_index, torrent) in state.stores.torrents.lock().iter_mut() {
+    for torrent in state.stores.torrents.lock().values_mut() {
         let mut seeder_delta: i32 = 0;
         let mut leecher_delta: i32 = 0;
 
@@ -41,7 +41,7 @@ pub async fn reap(state: &Arc<AppState>) {
         // more than inactive_peer_ttl, then it is permanently deleted.
         torrent
             .peers
-            .retain(|_index, peer| inactive_cutoff <= peer.updated_at || peer.is_active);
+            .retain(|_, peer| inactive_cutoff <= peer.updated_at || peer.is_active);
 
         for (index, peer) in torrent.peers.iter_mut() {
             // Peers get marked as inactive if not announced for more than

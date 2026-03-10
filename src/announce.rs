@@ -648,7 +648,7 @@ pub async fn announce(
                     peers.extend(
                         valid_peers
                             .clone()
-                            .filter(|(_index, peer)| peer.is_seeder)
+                            .filter(|(_, peer)| peer.is_seeder)
                             .choose_multiple(&mut rng(), queries.numwant),
                     );
                 } else {
@@ -663,7 +663,7 @@ pub async fn announce(
                 if user.receive_leech_list_rates.is_under_limit() {
                     peers.extend(
                         valid_peers
-                            .filter(|(_index, peer)| !peer.is_seeder)
+                            .filter(|(_, peer)| !peer.is_seeder)
                             .choose_multiple(
                                 &mut rng(),
                                 queries.numwant.saturating_sub(peers.len()),
@@ -676,7 +676,7 @@ pub async fn announce(
 
             // Split peers into ipv4 and ipv6 variants and serialize their socket
             // to bytes according to the bittorrent spec
-            for (_index, peer) in peers.iter() {
+            for (_, peer) in peers.iter() {
                 match peer.ip_address {
                     IpAddr::V4(ip) => {
                         peers_ipv4.extend(&ip.octets());
