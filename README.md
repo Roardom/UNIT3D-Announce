@@ -209,6 +209,14 @@ $ sudo rm -rf /var/www/html/unit3d-announce
 $ sudo nano /var/www/html/.env
 ```
 
+## Metrics
+
+Prometheus scrape endpoint:
+
+```
+http://<LISTENING_IP_ADDRESS>:<LISTENING_PORT>/announce/<APIKEY>/metrics
+```
+
 ## Performance
 
 UNIT3D's PHP announce can handle ~250 HTTP requests per second per core on modern hardware.

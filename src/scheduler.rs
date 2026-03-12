@@ -3,8 +3,8 @@ use std::sync::Arc;
 use crate::queue::torrent_update::{Index, TorrentUpdate};
 use crate::state::AppState;
 use chrono::{Duration, Utc};
+use metrics::gauge;
 use tokio::time::Instant;
-use tracing::info;
 
 pub async fn handle(state: &Arc<AppState>) {
     let mut interval = tokio::time::interval(std::time::Duration::from_millis(1));
@@ -94,6 +94,6 @@ pub async fn reap(state: &Arc<AppState>) {
         }
     });
 
-    let elapsed = start.elapsed().as_millis();
-    info!("Expired stale peers in {elapsed} ms.")
+    let elapsed = start.elapsed();
+    gauge!("scheduler.expire_state_peers_time").set(elapsed);
 }

@@ -1,14 +1,15 @@
-use std::sync::Arc;
+use std::{future::ready, sync::Arc};
 
 use axum::{
     Router,
-    middleware::from_fn_with_state,
+    middleware::{self, from_fn_with_state},
     routing::{get, post, put},
 };
+use metrics_exporter_prometheus::PrometheusHandle;
 
-use crate::{announce, api, config::Config, state::AppState, stats};
+use crate::{announce, api, config::Config, metrics, state::AppState, stats};
 
-pub fn routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
+pub fn routes(state: Arc<AppState>, recorder_handle: PrometheusHandle) -> Router<Arc<AppState>> {
     Router::new()
         .nest(
             "/announce",
@@ -21,6 +22,7 @@ pub fn routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
                 .nest(
                     &("/".to_string() + &state.config.load().apikey),
                     Router::new()
+                        .route("/metrics", get(move || ready(recorder_handle.render())))
                         .route(
                             "/torrents",
                             put(api::torrent::upsert).delete(api::torrent::destroy),
@@ -56,4 +58,5 @@ pub fn routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
                 ),
         )
         .layer(from_fn_with_state(state.clone(), stats::record_request))
+        .route_layer(middleware::from_fn(metrics::track_metrics))
 }

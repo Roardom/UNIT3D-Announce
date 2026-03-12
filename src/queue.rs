@@ -10,6 +10,7 @@ pub mod user_update;
 use crate::state::AppState;
 use futures_util::future::join_all;
 use history_update::HistoryUpdate;
+use metrics::{counter, gauge};
 use parking_lot::Mutex;
 use peer_update::PeerUpdate;
 use ringmap::RingMap;
@@ -90,14 +91,25 @@ impl Queues {
         let start = Instant::now();
         let len = announce_update_batch.len();
         let result = announce_update_batch.flush_to_db(state).await;
-        let elapsed = start.elapsed().as_millis();
+        let elapsed = start.elapsed();
 
         match result {
             Ok(_) => {
-                info!("Upserted {len} announces in {elapsed} ms.");
+                if len > 0 {
+                    gauge!("queues.batch.upsert_time", "type" => "announces").set(elapsed);
+                    counter!("queues.batch.upsert_count", "type" => "announces".to_string())
+                        .increment(1);
+                    counter!("queues.record.upsert_count", "type" => "announces".to_string())
+                        .increment(len as u64);
+                    gauge!("queues.record.upsert_time", "type" => "announces".to_string())
+                        .set(elapsed.as_secs_f64() / len as f64);
+                }
             }
             Err(e) => {
-                info!("Failed to update {len} announces after {elapsed} ms: {e}");
+                info!(
+                    "Failed to update {len} announces after {} ms: {e}",
+                    elapsed.as_millis()
+                );
                 state
                     .queues
                     .announces
@@ -214,10 +226,10 @@ where
         let batches = self.lock().take_batches(state);
 
         if batches.is_empty() {
-            info!("Upserted 0 {record_type} in 0 ms.");
-
             return;
         }
+
+        let start = Instant::now();
 
         let tasks = batches
             .into_iter()
@@ -225,7 +237,7 @@ where
                 let start = Instant::now();
                 let len = batch.len();
                 let result = batch.flush_to_db(state).await;
-                let elapsed = start.elapsed().as_millis();
+                let elapsed = start.elapsed();
 
                 (len, elapsed, result, batch)
             })
@@ -233,16 +245,36 @@ where
 
         let results = join_all(tasks).await;
 
+        let elapsed = start.elapsed();
+
+        let mut total_len = 0;
+
         for (len, elapsed, result, batch) in results {
             match result {
                 Ok(_) => {
-                    info!("Upserted {len} {record_type} in {elapsed} ms.");
+                    total_len += len;
+                    gauge!("queues.batch.upsert_time", "type" => record_type.to_string())
+                        .set(elapsed);
+                    counter!("queues.batch.upsert_count", "type" => record_type.to_string())
+                        .increment(1);
                 }
                 Err(e) => {
-                    info!("Failed to update {len} {record_type} after {elapsed} ms: {e}",);
+                    counter!("queues.batch.failed_upsert_count", "type" => record_type.to_string())
+                        .increment(1);
+                    info!(
+                        "Failed to update {len} {record_type} after {} ms: {e}",
+                        elapsed.as_millis()
+                    );
                     self.lock().upsert_batch(batch);
                 }
             }
+        }
+
+        if total_len > 0 {
+            counter!("queues.record.upsert_count", "type" => record_type.to_string())
+                .increment(total_len as u64);
+            gauge!("queues.record.upsert_time", "type" => record_type.to_string())
+                .set(elapsed.as_secs_f64() / total_len as f64);
         }
     }
 }
