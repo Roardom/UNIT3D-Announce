@@ -19,6 +19,7 @@ mod announce;
 mod api;
 mod config;
 mod error;
+mod metrics;
 mod model;
 mod queue;
 mod rate;
@@ -60,9 +61,11 @@ async fn main() -> Result<()> {
         }
     });
 
+    let recorder_handle = metrics::setup_metrics_recorder();
+
     // Create router.
     let app = Router::new()
-        .merge(routes::routes(state.clone()))
+        .merge(routes::routes(state.clone(), recorder_handle))
         .with_state(state.clone());
 
     // Ensure lock is dropped before axum::serve() is called otherwise
