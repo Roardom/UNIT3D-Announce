@@ -1,4 +1,11 @@
-use std::{env, net::IpAddr, num::NonZeroU64, path::PathBuf, sync::Arc};
+use std::{
+    env,
+    net::{AddrParseError, SocketAddr},
+    num::NonZeroU64,
+    path::PathBuf,
+    str::FromStr,
+    sync::Arc,
+};
 
 use anyhow::{Context, Result, bail, ensure};
 use axum::{
@@ -62,13 +69,9 @@ pub struct Config {
     /// Site password used by UNIT3D to send api requests to the tracker.
     /// Must be at least 32 characters long and should be properly randomized.
     pub apikey: String,
-    /// IP address for the tracker to listen from to receive announces.
-    pub listening_ip_address: Option<IpAddr>,
-    /// Port for the tracker to listen from to receive announces.
-    pub listening_port: Option<u16>,
-    /// Path to unix domain socket to listen from to receive announces from
-    /// reverse proxy.
-    pub listening_unix_socket: Option<PathBuf>,
+    /// IP address and port, or path to unix domain socket to listen from to
+    /// receive HTTP requests.
+    pub http_addr: Socket,
     /// Max amount of active peers a user is allowed to have on a torrent.
     /// Prevents abuse from malicious users causing the server to run out of ram,
     /// as well as keeps the peer lists from being filled with too many clients
@@ -211,38 +214,10 @@ impl Config {
             .parse()
             .context("INACTIVE_PEER_TTL must be a number between 0 and 2^64 - 1")?;
 
-        let listening_ip_address = env::var("LISTENING_IP_ADDRESS")
-            .ok()
-            .map(|s| s.parse())
-            .transpose()
-            .context("LISTENING_IP_ADDRESS in .env file could not be parsed.")?;
-
-        let listening_port = env::var("LISTENING_PORT")
-            .ok()
-            .map(|s| s.parse())
-            .transpose()
-            .context("LISTENING_PORT must be a number between 0 and 2^16 - 1")?;
-
-        let listening_unix_socket = env::var("LISTENING_UNIX_SOCKET")
-            .ok()
-            .map(|s| s.parse())
-            .transpose()
-            .context("LISTENING_UNIX_SOCKET could not be parsed into a unix domain socket path.")?;
-
-        ensure!(
-            listening_ip_address.is_some() == listening_port.is_some(),
-            "LISTENING_IP_ADDRESS and LISTENING PORT must be configured together."
-        );
-
-        ensure!(
-            (listening_ip_address.is_some()
-                && listening_port.is_some()
-                && listening_unix_socket.is_none())
-                || (listening_ip_address.is_none()
-                    && listening_port.is_none()
-                    && listening_unix_socket.is_some()),
-            "(LISTENING_IP_ADDRESS and LISTENING_PORT) AND LISTENING_UNIX_SOCKET are mutually exclusive"
-        );
+        let http_addr: Socket = env::var("HTTP_ADDR")
+            .context("HTTP_ADDR not found in .env file.")?
+            .parse()
+            .context("HTTP_ADDR is invalid")?;
 
         let max_peers_per_torrent_per_user = env::var("MAX_PEERS_PER_TORRENT_PER_USER")
             .context("MAX_PEERS_PER_TORRENT_PER_USER not found in .env file.")?
@@ -272,10 +247,10 @@ impl Config {
         let reverse_proxy_client_ip_header_name =
             env::var("REVERSE_PROXY_CLIENT_IP_HEADER_NAME").ok();
 
-        if listening_unix_socket.is_some() {
+        if let Socket::Unix(_) = &http_addr {
             ensure!(
                 reverse_proxy_client_ip_header_name.is_some(),
-                "LISTENING_UNIX_SOCKET requires REVERSE_PROXY_CLIENT_IP_HEADER_NAME to be configured."
+                "HTTP_ADDR as a unix socket requires REVERSE_PROXY_CLIENT_IP_HEADER_NAME to be configured."
             );
         }
 
@@ -362,9 +337,7 @@ impl Config {
             active_peer_ttl,
             inactive_peer_ttl,
             apikey,
-            listening_ip_address,
-            listening_port,
-            listening_unix_socket,
+            http_addr,
             max_peers_per_torrent_per_user,
             is_connectivity_check_enabled,
             connectivity_check_interval,
@@ -408,6 +381,24 @@ impl Config {
             error!(".env file not found.");
 
             (StatusCode::INTERNAL_SERVER_ERROR, ".env file not found.").into_response()
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum Socket {
+    Tcp(SocketAddr),
+    Unix(PathBuf),
+}
+
+impl FromStr for Socket {
+    type Err = AddrParseError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        if s.starts_with("/") {
+            Ok(Socket::Unix(PathBuf::from(s)))
+        } else {
+            Ok(Socket::Tcp(s.parse()?))
         }
     }
 }

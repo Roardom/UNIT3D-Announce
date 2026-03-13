@@ -1,4 +1,5 @@
-use anyhow::{Context, Result, bail};
+use crate::config::Socket;
+use anyhow::{Context, Result};
 use axum::Router;
 use dotenvy::dotenv;
 use std::net::SocketAddr;
@@ -69,37 +70,33 @@ async fn main() -> Result<()> {
     // reloading config triggers a deadlock
     let config = state.config.load().clone();
 
-    if let Some(path) = config.listening_unix_socket.to_owned() {
-        // Create unix domain socket.
-        let _ = tokio::fs::remove_file(&path).await;
-        tokio::fs::create_dir_all(path.parent().unwrap()).await?;
+    match &config.http_addr {
+        Socket::Unix(path) => {
+            // Create unix domain socket.
+            let _ = tokio::fs::remove_file(&path).await;
+            tokio::fs::create_dir_all(path.parent().unwrap()).await?;
 
-        let listener = UnixListener::bind(path.clone())?;
+            let listener = UnixListener::bind(path.clone())?;
 
-        // Start handling announces.
-        println!("UNIT3D Announce has started.");
+            // Start handling announces.
+            println!("UNIT3D Announce has started.");
 
-        axum::serve(listener, app)
-            .with_graceful_shutdown(shutdown_signal())
-            .await?;
-    } else if let Some(ip) = config.listening_ip_address
-        && let Some(port) = config.listening_port
-    {
-        // Create TCP socket.
-        let addr = SocketAddr::from((ip, port));
+            axum::serve(listener, app)
+                .with_graceful_shutdown(shutdown_signal())
+                .await?;
+        }
+        Socket::Tcp(addr) => {
+            let listener = TcpListener::bind(addr).await?;
 
-        let listener = TcpListener::bind(addr).await?;
+            // Start handling announces.
+            println!("UNIT3D Announce has started.");
 
-        // Start handling announces.
-        println!("UNIT3D Announce has started.");
+            let app = app.into_make_service_with_connect_info::<SocketAddr>();
 
-        let app = app.into_make_service_with_connect_info::<SocketAddr>();
-
-        axum::serve(listener, app)
-            .with_graceful_shutdown(shutdown_signal())
-            .await?;
-    } else {
-        bail!("Listener not configured.");
+            axum::serve(listener, app)
+                .with_graceful_shutdown(shutdown_signal())
+                .await?;
+        }
     }
 
     // Flush all remaining updates before shutting down.
