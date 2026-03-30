@@ -1006,18 +1006,20 @@ async fn check_connectivity(
         }
 
         let connectable = tokio::spawn(async move {
-            let timeout = std::time::Duration::from_millis(500);
-            let mut stream = tokio::time::timeout(timeout, TcpStream::connect(socket)).await??;
+            let conn_timeout = std::time::Duration::from_millis(500);
+            let data_timeout = std::time::Duration::from_millis(2000);
+            let mut stream =
+                tokio::time::timeout(conn_timeout, TcpStream::connect(socket)).await??;
 
             // Try encrypted peer handshake first
             // https://web.archive.org/web/20230315182724/http://wiki.vuze.com/w/Message_Stream_Encryption
             // https://tixati.com/specs/bittorrent/peer_connections/crypto
             let public_key: Vec<u8> = (0..96).map(|_| rng().random::<u8>()).collect();
 
-            tokio::time::timeout(timeout, stream.write_all(&public_key)).await??;
+            tokio::time::timeout(data_timeout, stream.write_all(&public_key)).await??;
 
             let mut buffer = vec![0u8; 1000];
-            let bytes_read = tokio::time::timeout(timeout, stream.read(&mut buffer))
+            let bytes_read = tokio::time::timeout(data_timeout, stream.read(&mut buffer))
                 .await
                 .map(|e| e.unwrap_or(0));
 
@@ -1026,7 +1028,8 @@ async fn check_connectivity(
             }
 
             // Fallback to non-encrypted peer handshake
-            let mut stream = tokio::time::timeout(timeout, TcpStream::connect(socket)).await??;
+            let mut stream =
+                tokio::time::timeout(conn_timeout, TcpStream::connect(socket)).await??;
 
             let mut handshake = Vec::with_capacity(68);
             handshake.extend(b"\x13BitTorrent protocol");
@@ -1035,10 +1038,10 @@ async fn check_connectivity(
             handshake.extend(b"-UN0310-");
             handshake.extend((0..12).map(|_| rng().random_range(0x21..0x7e)));
 
-            tokio::time::timeout(timeout, stream.write_all(&handshake)).await??;
+            tokio::time::timeout(data_timeout, stream.write_all(&handshake)).await??;
 
             let mut buffer = vec![0u8; 1000];
-            let bytes_read = tokio::time::timeout(timeout, stream.read(&mut buffer))
+            let bytes_read = tokio::time::timeout(data_timeout, stream.read(&mut buffer))
                 .await
                 .map(|e| e.unwrap_or(0));
 
