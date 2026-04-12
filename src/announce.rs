@@ -1018,13 +1018,22 @@ async fn check_connectivity(
 
             tokio::time::timeout(data_timeout, stream.write_all(&public_key)).await??;
 
-            let mut buffer = vec![0u8; 1000];
-            let bytes_read = tokio::time::timeout(data_timeout, stream.read(&mut buffer))
-                .await
-                .map(|e| e.unwrap_or(0));
+            let mut bytes_read = 0;
 
-            if bytes_read != Ok(0) {
-                return Ok(bytes_read.is_ok_and(|bytes_read| 96 <= bytes_read && bytes_read <= 608));
+            tokio::time::timeout(data_timeout, async {
+                let mut buffer = vec![0u8; 96];
+
+                while bytes_read < 96 {
+                    bytes_read += stream.read(&mut buffer).await?;
+                }
+
+                Ok::<(), std::io::Error>(())
+            })
+            .await
+            .ok();
+
+            if bytes_read >= 96 {
+                return Ok(true);
             }
 
             // Fallback to non-encrypted peer handshake
@@ -1040,16 +1049,21 @@ async fn check_connectivity(
 
             tokio::time::timeout(data_timeout, stream.write_all(&handshake)).await??;
 
-            let mut buffer = vec![0u8; 1000];
-            let bytes_read = tokio::time::timeout(data_timeout, stream.read(&mut buffer))
-                .await
-                .map(|e| e.unwrap_or(0));
+            let mut buffer = Vec::with_capacity(20);
+            tokio::time::timeout(data_timeout, async {
+                let mut temp_buffer = vec![0u8; 20];
 
-            if bytes_read != Ok(0) {
-                return Ok(bytes_read.is_ok() && buffer.starts_with(b"\x13BitTorrent protocol"));
-            }
+                while buffer.len() < 20 {
+                    let n = stream.read(&mut temp_buffer).await?;
+                    buffer.extend_from_slice(&temp_buffer[..n]);
+                }
 
-            return Err(std::io::ErrorKind::ConnectionAborted.into());
+                Ok::<(), std::io::Error>(())
+            })
+            .await
+            .ok();
+
+            return Ok(buffer.starts_with(b"\x13BitTorrent protocol"));
         })
         .await
         .is_ok_and(|res: tokio::io::Result<bool>| res.is_ok_and(|res| res));
