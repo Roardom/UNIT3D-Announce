@@ -102,6 +102,10 @@ Uncomment and set `REVERSE_PROXY_CLIENT_IP_HEADER_NAME` in the .env file to `X-R
 $ service nginx reload
 ```
 
+### Optimizations
+
+Building nginx with aws-lc as the TLS library improves throughput with non-persistent connections (common with libtorrent-rasterbar clients) by approximately 18%.
+
 ## Supervisor
 
 Add a supervisor config to run UNIT3D-Announce in the background.
