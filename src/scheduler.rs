@@ -38,6 +38,8 @@ pub async fn reap(state: &Arc<AppState>) {
     let mut torrent_store = state.stores.torrents.lock();
 
     torrent_store.par_values_mut().for_each(|torrent| {
+        // Copied out so it can be read while `torrent.peers` is borrowed mutably.
+        let torrent_id = torrent.id;
         let mut seeder_delta: i32 = 0;
         let mut leecher_delta: i32 = 0;
 
@@ -48,30 +50,59 @@ pub async fn reap(state: &Arc<AppState>) {
             .retain(|_, peer| inactive_cutoff <= peer.updated_at || peer.is_active);
 
         for (index, peer) in torrent.peers.iter_mut() {
-            // Peers get marked as inactive if not announced for more than
-            // active_peer_ttl seconds. User peer count and torrent peer
-            // count are updated to reflect.
-            if peer.updated_at < active_cutoff && peer.is_active {
-                if peer.is_included_in_peer_list(&config) {
-                    state
-                        .stores
-                        .users
-                        .write()
-                        .entry(index.user_id)
-                        .and_modify(|user| {
-                            if peer.is_seeder {
-                                user.num_seeding = user.num_seeding.saturating_sub(1);
-                            } else {
-                                user.num_leeching = user.num_leeching.saturating_sub(1);
-                            }
-                        });
-                    match peer.is_seeder {
-                        true => seeder_delta -= 1,
-                        false => leecher_delta -= 1,
-                    }
-                }
+            let was_included = peer.is_included_in_peer_list(&config);
+            let was_seeder = peer.is_seeder;
 
+            // Expire individual endpoints based on their own updated_at
+            if peer.ipv4.is_some_and(|ep| ep.updated_at < active_cutoff) {
+                peer.ipv4 = None;
+            }
+            if peer.ipv6.is_some_and(|ep| ep.updated_at < active_cutoff) {
+                peer.ipv6 = None;
+            }
+
+            // If all endpoints are gone, mark peer inactive
+            if peer.ipv4.is_none() && peer.ipv6.is_none() && peer.is_active {
                 peer.is_active = false;
+
+                // Propagate the deactivation to the database. The reaper only
+                // mutates the in-memory store; the peer_update flush sets
+                // `active` solely from a live announce and an explicit `stopped`
+                // is the only other path that clears it. Without this enqueue a
+                // client that abandons a peer_id without sending `stopped`
+                // (qBittorrent regenerating its peer_id on restart/re-add, a
+                // crash, a dropped connection) leaves a ghost `active = 1` row,
+                // which shows up as the torrent appearing once per stale peer_id
+                // in UNIT3D's peer lists.
+                state.queues.peer_deactivations.lock().upsert(
+                    crate::queue::peer_update::Index {
+                        user_id: index.user_id,
+                        torrent_id,
+                        peer_id: index.peer_id,
+                    },
+                    crate::queue::peer_deactivation::PeerDeactivation,
+                );
+            }
+
+            let is_included = peer.is_included_in_peer_list(&config);
+
+            if was_included && !is_included {
+                state
+                    .stores
+                    .users
+                    .write()
+                    .entry(index.user_id)
+                    .and_modify(|user| {
+                        if was_seeder {
+                            user.num_seeding = user.num_seeding.saturating_sub(1);
+                        } else {
+                            user.num_leeching = user.num_leeching.saturating_sub(1);
+                        }
+                    });
+                match was_seeder {
+                    true => seeder_delta -= 1,
+                    false => leecher_delta -= 1,
+                }
             }
         }
 

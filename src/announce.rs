@@ -257,6 +257,14 @@ pub async fn announce(
     headers: HeaderMap,
     ClientIp(client_ip): ClientIp,
 ) -> Result<Vec<u8>, AnnounceError> {
+    let client_ip = match client_ip {
+        IpAddr::V6(ip) => match ip.to_ipv4_mapped() {
+            Some(ipv4) => IpAddr::V4(ipv4),
+            None => client_ip,
+        },
+        _ => client_ip,
+    };
+
     // Validate headers
     if headers.contains_key(ACCEPT_LANGUAGE)
         || headers.contains_key(REFERER)
@@ -494,6 +502,19 @@ pub async fn announce(
         } else {
             // Insert the peer into the in-memory db
             let mut old_peer: Option<Peer> = None;
+
+            let endpoint = store::peer::Endpoint {
+                ip: client_ip,
+                port: queries.port,
+                is_connectable,
+                updated_at: now,
+            };
+
+            let (ipv4_ep, ipv6_ep) = match client_ip {
+                IpAddr::V4(_) => (Some(endpoint), None),
+                IpAddr::V6(_) => (None, Some(endpoint)),
+            };
+
             let new_peer = *torrent
                 .peers
                 .entry(store::peer::Index {
@@ -503,10 +524,11 @@ pub async fn announce(
                 .and_modify(|peer| {
                     old_peer = Some(*peer);
 
-                    peer.ip_address = client_ip;
-                    peer.port = queries.port;
+                    match client_ip {
+                        IpAddr::V4(_) => peer.ipv4 = Some(endpoint),
+                        IpAddr::V6(_) => peer.ipv6 = Some(endpoint),
+                    }
                     peer.is_seeder = queries.left == 0;
-                    peer.is_connectable = is_connectable;
                     peer.is_visible =
                         peer.is_included_in_leech_list(&config) || !has_hit_download_slot_limit;
                     peer.is_active = true;
@@ -517,12 +539,11 @@ pub async fn announce(
                     peer.downloaded = queries.downloaded;
                 })
                 .or_insert(store::peer::Peer {
-                    ip_address: client_ip,
-                    port: queries.port,
+                    ipv4: ipv4_ep,
+                    ipv6: ipv6_ep,
                     is_seeder: queries.left == 0,
                     is_active: true,
                     is_visible: !has_hit_download_slot_limit,
-                    is_connectable,
                     has_sent_completed: queries.event == Event::Completed,
                     updated_at: now,
                     uploaded: queries.uploaded,
@@ -674,17 +695,23 @@ pub async fn announce(
                 }
             }
 
-            // Split peers into ipv4 and ipv6 variants and serialize their socket
-            // to bytes according to the bittorrent spec
+            // Serialize both endpoints of each peer into the compact
+            // ipv4 and ipv6 peer lists according to the bittorrent spec
             for (_, peer) in peers.iter() {
-                match peer.ip_address {
-                    IpAddr::V4(ip) => {
-                        peers_ipv4.extend(&ip.octets());
-                        peers_ipv4.extend(&peer.port.to_be_bytes());
+                if let Some(ep) = &peer.ipv4 {
+                    if !config.require_peer_connectivity || ep.is_connectable {
+                        if let IpAddr::V4(ip) = ep.ip {
+                            peers_ipv4.extend(&ip.octets());
+                            peers_ipv4.extend(&ep.port.to_be_bytes());
+                        }
                     }
-                    IpAddr::V6(ip) => {
-                        peers_ipv6.extend(&ip.octets());
-                        peers_ipv6.extend(&peer.port.to_be_bytes());
+                }
+                if let Some(ep) = &peer.ipv6 {
+                    if !config.require_peer_connectivity || ep.is_connectable {
+                        if let IpAddr::V6(ip) = ep.ip {
+                            peers_ipv6.extend(&ip.octets());
+                            peers_ipv6.extend(&ep.port.to_be_bytes());
+                        }
                     }
                 }
             }
@@ -878,6 +905,15 @@ pub async fn announce(
             });
     }
 
+    let (peer_ipv4, peer_ipv4_port, peer_ipv4_connectable) = match client_ip {
+        IpAddr::V4(_) => (Some(client_ip), Some(queries.port), Some(is_connectable)),
+        _ => (None, None, None),
+    };
+    let (peer_ipv6, peer_ipv6_port, peer_ipv6_connectable) = match client_ip {
+        IpAddr::V6(_) => (Some(client_ip), Some(queries.port), Some(is_connectable)),
+        _ => (None, None, None),
+    };
+
     state.queues.peers.lock().upsert(
         peer_update::Index {
             peer_id: queries.peer_id,
@@ -897,6 +933,12 @@ pub async fn announce(
             created_at: now,
             updated_at: now,
             connectable: is_connectable,
+            ipv4: peer_ipv4,
+            ipv4_port: peer_ipv4_port,
+            ipv4_connectable: peer_ipv4_connectable,
+            ipv6: peer_ipv6,
+            ipv6_port: peer_ipv6_port,
+            ipv6_connectable: peer_ipv6_connectable,
         },
     );
 

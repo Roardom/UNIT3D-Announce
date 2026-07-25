@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use std::net::IpAddr;
 use std::ops::{Deref, DerefMut};
 
 use chrono::serde::ts_seconds;
@@ -23,13 +24,21 @@ pub struct Index {
 }
 
 #[derive(Clone, Copy, Debug, Serialize)]
-pub struct Peer {
-    pub ip_address: std::net::IpAddr,
+pub struct Endpoint {
+    pub ip: IpAddr,
     pub port: u16,
+    pub is_connectable: bool,
+    #[serde(with = "ts_seconds")]
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize)]
+pub struct Peer {
+    pub ipv4: Option<Endpoint>,
+    pub ipv6: Option<Endpoint>,
     pub is_seeder: bool,
     pub is_active: bool,
     pub is_visible: bool,
-    pub is_connectable: bool,
     pub has_sent_completed: bool,
     #[serde(with = "ts_seconds")]
     pub updated_at: DateTime<Utc>,
@@ -38,11 +47,16 @@ pub struct Peer {
 }
 
 impl Peer {
-    /// Determines if the peer should be included in the peer list
+    #[inline(always)]
+    pub fn is_connectable(&self) -> bool {
+        self.ipv4.is_some_and(|ep| ep.is_connectable)
+            || self.ipv6.is_some_and(|ep| ep.is_connectable)
+    }
+
     #[inline(always)]
     pub fn is_included_in_peer_list(&self, config: &Config) -> bool {
         if config.require_peer_connectivity {
-            self.is_active && self.is_visible && self.is_connectable
+            self.is_active && self.is_visible && self.is_connectable()
         } else {
             self.is_active && self.is_visible
         }

@@ -10,7 +10,7 @@ use sqlx::types::chrono::{DateTime, Utc};
 use anyhow::{Context, Result};
 
 use crate::model::{peer_id::PeerId, torrent_status::TorrentStatus};
-use crate::store::peer::{Index, Peer, PeerStore};
+use crate::store::peer::{Endpoint, Index, Peer, PeerStore};
 
 pub struct TorrentStore {
     inner: IndexMap<u32, Torrent>,
@@ -93,13 +93,64 @@ impl TorrentStore {
                     peers.updated_at as `updated_at: DateTime<Utc>`,
                     peers.uploaded as `uploaded: u64`,
                     peers.downloaded as `downloaded: u64`,
-                    peers.peer_id as `peer_id: PeerId`
+                    peers.peer_id as `peer_id: PeerId`,
+                    INET6_NTOA(peers.ipv4) as `ipv4_address: Option<IpAddr>`,
+                    peers.ipv4_port as `ipv4_port: Option<u16>`,
+                    peers.ipv4_connectable as `ipv4_connectable: Option<bool>`,
+                    INET6_NTOA(peers.ipv6) as `ipv6_address: Option<IpAddr>`,
+                    peers.ipv6_port as `ipv6_port: Option<u16>`,
+                    peers.ipv6_connectable as `ipv6_connectable: Option<bool>`
                 FROM
                     peers
             "#
         )
         .fetch(db)
         .try_fold(torrents, |mut store, peer| async move {
+            let updated_at = peer
+                .updated_at
+                .expect("Peer with a null updated_at found in database.");
+
+            let legacy_ip = peer
+                .ip_address
+                .expect("INET6_NTOA failed to decode peer ip.");
+
+            // Use new dual-stack columns if available, fall back to legacy ip column
+            let ipv4 = if let Some(ip) = peer.ipv4_address.flatten() {
+                Some(Endpoint {
+                    ip,
+                    port: peer.ipv4_port.flatten().unwrap_or(peer.port),
+                    is_connectable: peer.ipv4_connectable.flatten().unwrap_or(false),
+                    updated_at,
+                })
+            } else if matches!(legacy_ip, IpAddr::V4(_)) && peer.ipv6_address.flatten().is_none() {
+                Some(Endpoint {
+                    ip: legacy_ip,
+                    port: peer.port,
+                    is_connectable: peer.is_connectable,
+                    updated_at,
+                })
+            } else {
+                None
+            };
+
+            let ipv6 = if let Some(ip) = peer.ipv6_address.flatten() {
+                Some(Endpoint {
+                    ip,
+                    port: peer.ipv6_port.flatten().unwrap_or(peer.port),
+                    is_connectable: peer.ipv6_connectable.flatten().unwrap_or(false),
+                    updated_at,
+                })
+            } else if matches!(legacy_ip, IpAddr::V6(_)) && peer.ipv4_address.flatten().is_none() {
+                Some(Endpoint {
+                    ip: legacy_ip,
+                    port: peer.port,
+                    is_connectable: peer.is_connectable,
+                    updated_at,
+                })
+            } else {
+                None
+            };
+
             store.entry(peer.torrent_id).and_modify(|torrent| {
                 torrent.peers.insert(
                     Index {
@@ -107,18 +158,13 @@ impl TorrentStore {
                         peer_id: peer.peer_id,
                     },
                     Peer {
-                        ip_address: peer
-                            .ip_address
-                            .expect("INET6_NTOA failed to decode peer ip."),
-                        port: peer.port,
+                        ipv4,
+                        ipv6,
                         is_seeder: peer.is_seeder,
                         is_active: peer.is_active,
                         is_visible: peer.is_visible,
-                        is_connectable: peer.is_connectable,
                         has_sent_completed: false,
-                        updated_at: peer
-                            .updated_at
-                            .expect("Peer with a null updated_at found in database."),
+                        updated_at,
                         uploaded: peer.uploaded,
                         downloaded: peer.downloaded,
                     },

@@ -2,6 +2,7 @@ use std::{cmp::min, collections::VecDeque, hash::Hash, slice::Iter, sync::Arc, v
 
 pub mod announce_update;
 pub mod history_update;
+pub mod peer_deactivation;
 pub mod peer_update;
 pub mod torrent_update;
 pub mod unregistered_info_hash_update;
@@ -11,6 +12,7 @@ use crate::state::AppState;
 use futures_util::future::join_all;
 use history_update::HistoryUpdate;
 use parking_lot::Mutex;
+use peer_deactivation::PeerDeactivation;
 use peer_update::PeerUpdate;
 use ringmap::RingMap;
 use tokio::{join, time::Instant};
@@ -24,6 +26,10 @@ pub struct Queues {
     pub announces: Mutex<announce_update::Queue>,
     pub histories: Mutex<Queue<history_update::Index, HistoryUpdate>>,
     pub peers: Mutex<Queue<peer_update::Index, PeerUpdate>>,
+    /// Marks reaped peers inactive in the database. Keyed by the same primary
+    /// key as [`peers`](Self::peers) (`peer_update::Index`), it exists as a
+    /// separate queue because the reaper cannot reconstruct a full `PeerUpdate`.
+    pub peer_deactivations: Mutex<Queue<peer_update::Index, PeerDeactivation>>,
     pub torrents: Mutex<Queue<torrent_update::Index, TorrentUpdate>>,
     pub unregistered_info_hashes:
         Mutex<Queue<unregistered_info_hash_update::Index, UnregisteredInfoHashUpdate>>,
@@ -45,9 +51,17 @@ impl Queues {
             )),
             peers: Mutex::new(Queue::<peer_update::Index, PeerUpdate>::new(QueueConfig {
                 max_bindings_per_flush: 65_535,
-                bindings_per_record: 15,
+                bindings_per_record: 21,
                 extra_bindings_per_flush: 0,
             })),
+            peer_deactivations: Mutex::new(
+                Queue::<peer_update::Index, PeerDeactivation>::new(QueueConfig {
+                    max_bindings_per_flush: 65_535,
+                    // peer_id, torrent_id, user_id
+                    bindings_per_record: 3,
+                    extra_bindings_per_flush: 0,
+                }),
+            ),
             torrents: Mutex::new(Queue::<torrent_update::Index, TorrentUpdate>::new(
                 QueueConfig {
                     max_bindings_per_flush: 65_535,
@@ -77,6 +91,7 @@ impl Queues {
             self.flush_announce_updates(state),
             self.histories.flush(state, "histories"),
             self.peers.flush(state, "peers"),
+            self.peer_deactivations.flush(state, "peer deactivations"),
             self.torrents.flush(state, "torrents"),
             self.users.flush(state, "users"),
             self.unregistered_info_hashes
@@ -111,6 +126,7 @@ impl Queues {
         !self.announces.lock().is_empty()
             || self.histories.lock().is_not_empty()
             || self.peers.lock().is_not_empty()
+            || self.peer_deactivations.lock().is_not_empty()
             || self.torrents.lock().is_not_empty()
             || self.users.lock().is_not_empty()
             || self.unregistered_info_hashes.lock().is_not_empty()

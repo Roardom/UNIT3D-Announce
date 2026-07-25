@@ -82,8 +82,8 @@ async fn main() -> Result<()> {
         axum::serve(listener, app)
             .with_graceful_shutdown(shutdown_signal())
             .await?;
-    } else if let Some(ip) = config.listening_ip_address
-        && let Some(port) = config.listening_port
+    } else if let (Some(ip), Some(port)) =
+        (config.listening_ip_address, config.listening_port)
     {
         // Create TCP socket.
         let addr = SocketAddr::from((ip, port));

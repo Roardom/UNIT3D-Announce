@@ -1,6 +1,6 @@
 {
   "db_name": "MySQL",
-  "query": "\n                SELECT\n                    INET6_NTOA(peers.ip) as `ip_address: IpAddr`,\n                    peers.user_id as `user_id: u32`,\n                    peers.torrent_id as `torrent_id: u32`,\n                    peers.port as `port: u16`,\n                    peers.seeder as `is_seeder: bool`,\n                    peers.active as `is_active: bool`,\n                    peers.visible as `is_visible: bool`,\n                    peers.connectable as `is_connectable: bool`,\n                    peers.updated_at as `updated_at: DateTime<Utc>`,\n                    peers.uploaded as `uploaded: u64`,\n                    peers.downloaded as `downloaded: u64`,\n                    peers.peer_id as `peer_id: PeerId`\n                FROM\n                    peers\n            ",
+  "query": "\n                SELECT\n                    INET6_NTOA(peers.ip) as `ip_address: IpAddr`,\n                    peers.user_id as `user_id: u32`,\n                    peers.torrent_id as `torrent_id: u32`,\n                    peers.port as `port: u16`,\n                    peers.seeder as `is_seeder: bool`,\n                    peers.active as `is_active: bool`,\n                    peers.visible as `is_visible: bool`,\n                    peers.connectable as `is_connectable: bool`,\n                    peers.updated_at as `updated_at: DateTime<Utc>`,\n                    peers.uploaded as `uploaded: u64`,\n                    peers.downloaded as `downloaded: u64`,\n                    peers.peer_id as `peer_id: PeerId`,\n                    INET6_NTOA(peers.ipv4) as `ipv4_address: Option<IpAddr>`,\n                    peers.ipv4_port as `ipv4_port: Option<u16>`,\n                    peers.ipv4_connectable as `ipv4_connectable: Option<bool>`,\n                    INET6_NTOA(peers.ipv6) as `ipv6_address: Option<IpAddr>`,\n                    peers.ipv6_port as `ipv6_port: Option<u16>`,\n                    peers.ipv6_connectable as `ipv6_connectable: Option<bool>`\n                FROM\n                    peers\n            ",
   "describe": {
     "columns": [
       {
@@ -110,6 +110,60 @@
           "flags": "NOT_NULL | PRIMARY_KEY | BINARY | NO_DEFAULT_VALUE",
           "max_size": 20
         }
+      },
+      {
+        "ordinal": 12,
+        "name": "ipv4_address: Option<IpAddr>",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "max_size": 156
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "ipv4_port: Option<u16>",
+        "type_info": {
+          "type": "Short",
+          "flags": "UNSIGNED",
+          "max_size": 5
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "ipv4_connectable: Option<bool>",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "",
+          "max_size": 1
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "ipv6_address: Option<IpAddr>",
+        "type_info": {
+          "type": "VarString",
+          "flags": "",
+          "max_size": 156
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "ipv6_port: Option<u16>",
+        "type_info": {
+          "type": "Short",
+          "flags": "UNSIGNED",
+          "max_size": 5
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "ipv6_connectable: Option<bool>",
+        "type_info": {
+          "type": "Tiny",
+          "flags": "",
+          "max_size": 1
+        }
       }
     ],
     "parameters": {
@@ -127,8 +181,14 @@
       true,
       false,
       false,
-      false
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
     ]
   },
-  "hash": "3e1bd0d09ba49be5266185bd8411c8ba83b05ce292ab287676be905169bf1d38"
+  "hash": "b1ec8a6b388f2084b1170573c7eebbfefd6505507a95810ba82665953a20bd82"
 }
