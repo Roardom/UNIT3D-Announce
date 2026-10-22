@@ -7,7 +7,7 @@ use axum::{
     },
 };
 use chrono::Duration;
-use rand::{Rng, rng, seq::IteratorRandom};
+use rand::{RngExt, rng, seq::IteratorRandom};
 use sqlx::types::chrono::Utc;
 use std::{
     fmt::Display,
@@ -653,7 +653,7 @@ pub async fn announce(
                         valid_peers
                             .clone()
                             .filter(|(_, peer)| peer.is_seeder)
-                            .choose_multiple(&mut rng(), queries.numwant),
+                            .sample(&mut rng(), queries.numwant),
                     );
                 } else {
                     is_over_seed_list_rate_limit = true;
@@ -668,10 +668,7 @@ pub async fn announce(
                     peers.extend(
                         valid_peers
                             .filter(|(_, peer)| !peer.is_seeder)
-                            .choose_multiple(
-                                &mut rng(),
-                                queries.numwant.saturating_sub(peers.len()),
-                            ),
+                            .sample(&mut rng(), queries.numwant.saturating_sub(peers.len())),
                     );
                 } else {
                     is_over_leech_list_rate_limit = true;
