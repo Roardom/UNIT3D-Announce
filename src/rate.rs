@@ -48,7 +48,7 @@ impl Rate {
             .as_secs_f64();
         let elapsed = now - self.updated_at;
 
-        self.count = self.count * f64::exp(-1f64 * elapsed / self.window) + 1f64;
+        self.count = self.count * f64::exp(-elapsed / self.window) + 1f64;
 
         self.updated_at = now;
     }

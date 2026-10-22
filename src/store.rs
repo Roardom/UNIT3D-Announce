@@ -48,7 +48,7 @@ impl Stores {
     pub async fn new(pool: &MySqlPool, config: &Config) -> Result<Stores> {
         print!("Synchronizing peer counts                              ... ");
         io::stdout().flush().unwrap();
-        sync_peer_count_aggregates(&pool, &config).await?;
+        sync_peer_count_aggregates(pool, config).await?;
         println!("[Finished]");
 
         println!("Loading entities from database into memory...");
@@ -59,52 +59,52 @@ impl Stores {
 
         print!("Starting to load  2/11: blacklisted user agents        ... ");
         io::stdout().flush().unwrap();
-        let agent_blacklist = BlacklistedAgentStore::from_db(&pool).await?;
+        let agent_blacklist = BlacklistedAgentStore::from_db(pool).await?;
         println!("[Finished] Records: {:?}", agent_blacklist.len());
 
         print!("Starting to load  3/11: torrents                       ... ");
         io::stdout().flush().unwrap();
-        let torrents = TorrentStore::from_db(&pool).await?;
+        let torrents = TorrentStore::from_db(pool).await?;
         println!("[Finished] Records: {:?}", torrents.len());
 
         print!("Starting to load  4/11: infohash to torrent id mappings... ");
         io::stdout().flush().unwrap();
-        let infohash2id = InfoHash2IdStore::from_db(&pool).await?;
+        let infohash2id = InfoHash2IdStore::from_db(pool).await?;
         println!("[Finished] Records: {:?}", infohash2id.len());
 
         print!("Starting to load  5/11: users                          ... ");
         io::stdout().flush().unwrap();
-        let users = UserStore::from_db(&pool, &config).await?;
+        let users = UserStore::from_db(pool, config).await?;
         println!("[Finished] Records: {:?}", users.len());
 
         print!("Starting to load  6/11: passkey to user id mappings    ... ");
         io::stdout().flush().unwrap();
-        let passkey2id = Passkey2IdStore::from_db(&pool).await?;
+        let passkey2id = Passkey2IdStore::from_db(pool).await?;
         println!("[Finished] Records: {:?}", passkey2id.len());
 
         print!("Starting to load  7/11: connectable ports              ... ");
         io::stdout().flush().unwrap();
-        let connectable_ports = ConnectablePortStore::from_db(&pool).await?;
+        let connectable_ports = ConnectablePortStore::from_db(pool).await?;
         println!("[Finished] Records: {:?}", connectable_ports.len());
 
         print!("Starting to load  8/11: freeleech tokens               ... ");
         io::stdout().flush().unwrap();
-        let freeleech_tokens = FreeleechTokenStore::from_db(&pool).await?;
+        let freeleech_tokens = FreeleechTokenStore::from_db(pool).await?;
         println!("[Finished] Records: {:?}", freeleech_tokens.len());
 
         print!("Starting to load  9/11: personal freeleeches           ... ");
         io::stdout().flush().unwrap();
-        let personal_freeleeches = PersonalFreeleechStore::from_db(&pool).await?;
+        let personal_freeleeches = PersonalFreeleechStore::from_db(pool).await?;
         println!("[Finished] Records: {:?}", personal_freeleeches.len());
 
         print!("Starting to load 10/11: featured torrents              ... ");
         io::stdout().flush().unwrap();
-        let featured_torrents = FeaturedTorrentStore::from_db(&pool).await?;
+        let featured_torrents = FeaturedTorrentStore::from_db(pool).await?;
         println!("[Finished] Records: {:?}", featured_torrents.len());
 
         print!("Starting to load 11/11: groups                         ... ");
         io::stdout().flush().unwrap();
-        let groups = GroupStore::from_db(&pool).await?;
+        let groups = GroupStore::from_db(pool).await?;
         println!("[Finished] Records: {:?}", groups.len());
 
         println!("All entities loaded into memory.");

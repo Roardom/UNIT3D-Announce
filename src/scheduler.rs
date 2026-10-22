@@ -14,11 +14,11 @@ pub async fn handle(state: &Arc<AppState>) {
         interval.tick().await;
         counter += 1;
 
-        if counter % state.config.load().flush_interval_milliseconds == 0 {
+        if counter.is_multiple_of(state.config.load().flush_interval_milliseconds) {
             state.queues.flush(state).await;
         }
 
-        if counter % (state.config.load().peer_expiry_interval * 1000) == 0 {
+        if counter.is_multiple_of(state.config.load().peer_expiry_interval * 1000) {
             reap(state).await;
         }
     }

@@ -189,7 +189,7 @@ where
 
         let mut batches = VecDeque::new();
 
-        while records.len() > 0 {
+        while !records.is_empty() {
             let batch = records.split_off(records.len() - min(records.len(), max_batch_size));
             batches.push_front(Batch(batch));
         }
@@ -213,7 +213,7 @@ pub trait Mergeable {
 }
 
 pub trait MutexQueueExt {
-    async fn flush<'a>(&self, state: &Arc<AppState>, record_type: &'a str);
+    async fn flush(&self, state: &Arc<AppState>, record_type: &str);
 }
 
 impl<K, V> MutexQueueExt for Mutex<Queue<K, V>>
@@ -222,7 +222,7 @@ where
     V: Clone + Mergeable,
     Batch<K, V>: Flushable<V>,
 {
-    async fn flush<'a>(&self, state: &Arc<AppState>, record_type: &'a str) {
+    async fn flush(&self, state: &Arc<AppState>, record_type: &str) {
         let batches = self.lock().take_batches(state);
 
         if batches.is_empty() {
