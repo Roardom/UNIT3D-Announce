@@ -4,28 +4,28 @@ version = "0.3.1"
 edition = "2024"
 
 [dependencies]
-anyhow = "1.0.100"
-arc-swap = "1.8.0"
-axum = { version = "0.8.8", features = ["macros"] }
-chrono = { version = "0.4.43", features = ["serde"] }
+anyhow = "1.0.104"
+arc-swap = "1.9.3"
+axum = { version = "0.8.9", features = ["macros"] }
+chrono = { version = "0.4.45", features = ["serde"] }
 dotenvy = "0.15.7"
-futures-util = "0.3.31"
-indexmap = { version = "2.13.0", features = ["serde", "rayon"] }
-memchr = "2.7.6"
-metrics = "0.24.3"
-metrics-exporter-prometheus = { version = "0.18.1", default-features = false, features = ["http-listener"] }
+futures-util = "0.3.34"
+indexmap = { version = "2.14.2", features = ["serde", "rayon"] }
+memchr = "2.8.3"
+metrics = "0.24.6"
+metrics-exporter-prometheus = { version = "0.18.3", default-features = false, features = ["http-listener"] }
 parking_lot = "0.12.5"
 rand = { version = "0.10.3", features = ["thread_rng"] }
-rayon = "1.11.0"
-ringmap = "0.2.3"
-serde = { version = "1.0.228", features = ["derive"] }
+rayon = "1.12.0"
+ringmap = "0.2.8"
+serde = { version = "1.0.229", features = ["derive"] }
 serde_bytes = "0.11.19"
-serde_repr = "0.1.20"
+serde_repr = "0.1.21"
 sqlx = { version = "0.8.6", features = ["runtime-tokio-rustls", "macros", "mysql", "chrono"] }
-thiserror = "2.0.18"
-tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros", "signal", "sync"] }
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "signal", "sync"] }
 tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.6"
