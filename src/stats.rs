@@ -64,23 +64,23 @@ impl Stats {
         if let Ok(now) = now {
             let elapsed = now.as_secs_f64() - self.last_request_at.load(Ordering::Relaxed);
             self.requests_per_1s
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |rate| {
+                .try_update(Ordering::Relaxed, Ordering::Relaxed, |rate| {
                     rate * f64::exp(-1f64 * elapsed / 1f64) + 1f64
                 });
             self.requests_per_10s
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |rate| {
+                .try_update(Ordering::Relaxed, Ordering::Relaxed, |rate| {
                     rate * f64::exp(-1f64 * elapsed / 10f64) + 1f64
                 });
             self.requests_per_60s
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |rate| {
+                .try_update(Ordering::Relaxed, Ordering::Relaxed, |rate| {
                     rate * f64::exp(-1f64 * elapsed / 60f64) + 1f64
                 });
             self.requests_per_900s
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |rate| {
+                .try_update(Ordering::Relaxed, Ordering::Relaxed, |rate| {
                     rate * f64::exp(-1f64 * elapsed / 900f64) + 1f64
                 });
             self.requests_per_7200s
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |rate| {
+                .try_update(Ordering::Relaxed, Ordering::Relaxed, |rate| {
                     rate * f64::exp(-1f64 * elapsed / 7200f64) + 1f64
                 });
             self.last_request_at
@@ -94,27 +94,27 @@ impl Stats {
         if let Ok(now) = now {
             let elapsed =
                 now.as_secs_f64() - self.last_announce_response_at.load(Ordering::Relaxed);
-            self.announce_responses_per_1s.fetch_update(
+            self.announce_responses_per_1s.try_update(
                 Ordering::Relaxed,
                 Ordering::Relaxed,
                 |rate| rate * f64::exp(-1f64 * elapsed / 1f64) + 1f64,
             );
-            self.announce_responses_per_10s.fetch_update(
+            self.announce_responses_per_10s.try_update(
                 Ordering::Relaxed,
                 Ordering::Relaxed,
                 |rate| rate * f64::exp(-1f64 * elapsed / 10f64) + 1f64,
             );
-            self.announce_responses_per_60s.fetch_update(
+            self.announce_responses_per_60s.try_update(
                 Ordering::Relaxed,
                 Ordering::Relaxed,
                 |rate| rate * f64::exp(-1f64 * elapsed / 60f64) + 1f64,
             );
-            self.announce_responses_per_900s.fetch_update(
+            self.announce_responses_per_900s.try_update(
                 Ordering::Relaxed,
                 Ordering::Relaxed,
                 |rate| rate * f64::exp(-1f64 * elapsed / 900f64) + 1f64,
             );
-            self.announce_responses_per_7200s.fetch_update(
+            self.announce_responses_per_7200s.try_update(
                 Ordering::Relaxed,
                 Ordering::Relaxed,
                 |rate| rate * f64::exp(-1f64 * elapsed / 7200f64) + 1f64,
@@ -219,11 +219,11 @@ impl AtomicF64 {
         self.content.store(value.to_bits(), order)
     }
 
-    fn fetch_update<F>(&self, set_order: Ordering, fetch_order: Ordering, mut f: F)
+    fn try_update<F>(&self, set_order: Ordering, fetch_order: Ordering, mut f: F)
     where
         F: FnMut(f64) -> f64,
     {
-        let _ = self.content.fetch_update(set_order, fetch_order, |num| {
+        let _ = self.content.try_update(set_order, fetch_order, |num| {
             Some(f(f64::from_bits(num)).to_bits())
         });
     }
