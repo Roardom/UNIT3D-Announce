@@ -116,6 +116,8 @@ impl TorrentStore {
                         is_visible: peer.is_visible,
                         is_connectable: peer.is_connectable,
                         has_sent_completed: false,
+                        // Peers loaded from the database are already tracked.
+                        has_received_peer_list: true,
                         updated_at: peer
                             .updated_at
                             .expect("Peer with a null updated_at found in database."),

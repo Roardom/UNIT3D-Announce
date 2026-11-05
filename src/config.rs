@@ -94,17 +94,23 @@ pub struct Config {
     /// if not using a reverse proxy. A reverse proxy is required if listening
     /// on unix sockets.
     pub reverse_proxy_client_ip_header_name: Option<String>,
-    /// The max amount of peer lists containing seeds a user is allowed to
+    /// The max amount of new peer lists containing seeds a user is allowed to
     /// receive per time window (in seconds). The rate is calculated using an
-    /// exponential decay model. If a user requests peer lists faster than
-    /// this, then their peer lists will be empty. Mitigates peer scraping
-    /// attacks.
+    /// exponential decay model. Only the announce that first serves a peer its
+    /// list (or an explicit started event) counts towards the limit;
+    /// reannounces of peers that already received a list are always served.
+    /// Requests that are already
+    /// being limited are not counted, so the limit recovers on its own.
+    /// Mitigates peer scraping attacks. An empty string disables the limit.
     pub user_receive_seed_list_rate_limits: RateCollection,
-    /// The max amount of peer lists containing leeches a user is allowed to
-    /// receive per time window (in seconds). The rate is calculated using an
-    /// exponential decay model. If a user requests peer lists faster than
-    /// this, then their peer lists will be empty. Mitigates peer scraping
-    /// attacks.
+    /// The max amount of new peer lists containing leeches a user is allowed
+    /// to receive per time window (in seconds). The rate is calculated using
+    /// an exponential decay model. Only the announce that first serves a peer its
+    /// list (or an explicit started event) counts towards the limit;
+    /// reannounces of peers that already received a list are always served.
+    /// Requests that are already
+    /// being limited are not counted, so the limit recovers on its own.
+    /// Mitigates peer scraping attacks. An empty string disables the limit.
     pub user_receive_leech_list_rate_limits: RateCollection,
     /// If specified, this will override the immune status on the user's group
     /// to the specified value.

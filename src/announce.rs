@@ -391,8 +391,9 @@ pub async fn announce(
         user,
         user_id,
         group,
-        has_requested_seed_list,
-        has_requested_leech_list,
+        should_count_peer_list_requests,
+        has_received_seed_list,
+        has_received_leech_list,
         response,
     ) = {
         let mut torrent_guard = state.stores.torrents.lock();
@@ -462,6 +463,12 @@ pub async fn announce(
         let times_completed_delta;
         let is_visible;
         let mut is_active_after_stop = false;
+        // Only the first announce of a peer (or an explicit started event)
+        // counts towards the peer list rate limits. Reannounces of peers that
+        // are already being tracked must never be throttled: they are not new
+        // peer list acquisitions and throttling them would drop peers from
+        // active downloads.
+        let should_count_peer_list_requests;
 
         if queries.event == Event::Stopped {
             // Try and remove the peer
@@ -495,6 +502,7 @@ pub async fn announce(
 
             times_completed_delta = 0;
             is_visible = false;
+            should_count_peer_list_requests = false;
         } else {
             // Insert the peer into the in-memory db
             let mut old_peer: Option<Peer> = None;
@@ -528,6 +536,7 @@ pub async fn announce(
                     is_visible: !has_hit_download_slot_limit,
                     is_connectable,
                     has_sent_completed: queries.event == Event::Completed,
+                    has_received_peer_list: false,
                     updated_at: now,
                     uploaded: queries.uploaded,
                     downloaded: queries.downloaded,
@@ -542,6 +551,9 @@ pub async fn announce(
 
             // Update the user and torrent seeding/leeching counts in the
             // in-memory db
+            should_count_peer_list_requests = queries.event == Event::Started
+                || old_peer.is_none_or(|old_peer| !old_peer.has_received_peer_list);
+
             match old_peer {
                 Some(old_peer) => {
                     leecher_delta = new_peer.is_included_in_leech_list(&config) as i32
@@ -624,10 +636,9 @@ pub async fn announce(
         let mut peers_ipv4: Vec<u8> = Vec::new();
         let mut peers_ipv6: Vec<u8> = Vec::new();
 
-        let mut has_requested_seed_list = false;
-        let mut has_requested_leech_list = false;
-        let mut is_over_seed_list_rate_limit = false;
-        let mut is_over_leech_list_rate_limit = false;
+        let mut has_received_seed_list = false;
+        let mut has_received_leech_list = false;
+        let mut was_rate_limited = false;
 
         // Only provide peer list if
         // - it is not a stopped event,
@@ -646,32 +657,66 @@ pub async fn announce(
 
             // Make sure leech peer lists are filled with seeds
             if queries.left > 0 && torrent.seeders > 0 && queries.numwant > peers.len() {
-                has_requested_seed_list = true;
+                let is_allowed = if should_count_peer_list_requests {
+                    if user.receive_seed_list_rates.is_under_limit() {
+                        true
+                    } else {
+                        if let Some(rate) =
+                            user.receive_seed_list_rates.most_restrictive_over_limit()
+                        {
+                            was_rate_limited = true;
+                            warnings.add(AnnounceWarning::SeedListRateLimitExceeded {
+                                window: rate.window_secs(),
+                                retry_after: rate.retry_after(),
+                            });
+                        }
 
-                if user.receive_seed_list_rates.is_under_limit() {
+                        false
+                    }
+                } else {
+                    true
+                };
+
+                if is_allowed {
                     peers.extend(
                         valid_peers
                             .clone()
                             .filter(|(_, peer)| peer.is_seeder)
                             .sample(&mut rng(), queries.numwant),
                     );
-                } else {
-                    is_over_seed_list_rate_limit = true;
+                    has_received_seed_list = true;
                 }
             }
 
             // Otherwise only send leeches until the numwant is reached
             if torrent.leechers > 0 && queries.numwant > peers.len() {
-                has_requested_leech_list = true;
+                let is_allowed = if should_count_peer_list_requests {
+                    if user.receive_leech_list_rates.is_under_limit() {
+                        true
+                    } else {
+                        if let Some(rate) =
+                            user.receive_leech_list_rates.most_restrictive_over_limit()
+                        {
+                            was_rate_limited = true;
+                            warnings.add(AnnounceWarning::LeechListRateLimitExceeded {
+                                window: rate.window_secs(),
+                                retry_after: rate.retry_after(),
+                            });
+                        }
 
-                if user.receive_leech_list_rates.is_under_limit() {
+                        false
+                    }
+                } else {
+                    true
+                };
+
+                if is_allowed {
                     peers.extend(
                         valid_peers
                             .filter(|(_, peer)| !peer.is_seeder)
                             .sample(&mut rng(), queries.numwant.saturating_sub(peers.len())),
                     );
-                } else {
-                    is_over_leech_list_rate_limit = true;
+                    has_received_leech_list = true;
                 }
             }
 
@@ -691,6 +736,18 @@ pub async fn announce(
             }
         }
 
+        // The peer is only considered served once it received a list without
+        // being rate limited. Otherwise its next announce is limited again.
+        if (has_received_seed_list || has_received_leech_list)
+            && !was_rate_limited
+            && let Some(peer) = torrent.peers.get_mut(&store::peer::Index {
+                user_id,
+                peer_id: queries.peer_id,
+            })
+        {
+            peer.has_received_peer_list = true;
+        }
+
         // Generate bencoded response to return to client
 
         let interval = rng().random_range(config.announce_min..=config.announce_max);
@@ -705,23 +762,11 @@ pub async fn announce(
         );
 
         response.extend(b"d8:completei");
-
-        if is_over_seed_list_rate_limit || !warnings.is_empty() {
-            response.extend(b"0")
-        } else {
-            response.extend(torrent.seeders.to_string().as_bytes());
-        }
-
+        response.extend(torrent.seeders.to_string().as_bytes());
         response.extend(b"e10:downloadedi");
         response.extend(torrent.times_completed.to_string().as_bytes());
         response.extend(b"e10:incompletei");
-
-        if is_over_leech_list_rate_limit || !warnings.is_empty() {
-            response.extend(b"0");
-        } else {
-            response.extend(torrent.leechers.to_string().as_bytes());
-        }
-
+        response.extend(torrent.leechers.to_string().as_bytes());
         response.extend(b"e8:intervali");
         response.extend(interval.to_string().as_bytes());
         response.extend(b"e12:min intervali");
@@ -805,8 +850,9 @@ pub async fn announce(
             user,
             user_id,
             group,
-            has_requested_seed_list,
-            has_requested_leech_list,
+            should_count_peer_list_requests,
+            has_received_seed_list,
+            has_received_leech_list,
             response,
         )
     };
@@ -855,10 +901,7 @@ pub async fn announce(
         None
     };
 
-    if seeder_delta != 0
-        || leecher_delta != 0
-        || has_requested_seed_list
-        || has_requested_leech_list
+    if seeder_delta != 0 || leecher_delta != 0 || has_received_seed_list || has_received_leech_list
     {
         state
             .stores
@@ -869,12 +912,17 @@ pub async fn announce(
                 user.num_seeding = user.num_seeding.saturating_add_signed(seeder_delta);
                 user.num_leeching = user.num_leeching.saturating_add_signed(leecher_delta);
 
-                if has_requested_seed_list {
-                    user.receive_seed_list_rates.tick();
-                }
+                // Reannounces of already tracked peers are served without
+                // counting towards the rate limits. Only new peer list
+                // acquisitions are counted.
+                if should_count_peer_list_requests {
+                    if has_received_seed_list {
+                        user.receive_seed_list_rates.tick();
+                    }
 
-                if has_requested_leech_list {
-                    user.receive_leech_list_rates.tick();
+                    if has_received_leech_list {
+                        user.receive_leech_list_rates.tick();
+                    }
                 }
             });
     }

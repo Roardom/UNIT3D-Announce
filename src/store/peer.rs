@@ -31,6 +31,11 @@ pub struct Peer {
     pub is_visible: bool,
     pub is_connectable: bool,
     pub has_sent_completed: bool,
+    /// Whether the peer has been served a peer list since it was first
+    /// tracked. Peers that were denied a list because of a rate limit stay
+    /// pending, so their next announce is limited again instead of getting
+    /// the list for free.
+    pub has_received_peer_list: bool,
     #[serde(with = "ts_seconds")]
     pub updated_at: DateTime<Utc>,
     pub uploaded: u64,

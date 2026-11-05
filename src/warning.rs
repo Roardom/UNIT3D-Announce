@@ -1,15 +1,14 @@
-use thiserror::Error;
+use std::fmt::{Display, Formatter};
 
 /// Announce warnings that don't stop the announce processing but still return
-/// an empty peer list..
-#[derive(Error, Debug, Clone, Copy, PartialEq)]
+/// an empty peer list.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AnnounceWarning {
-    #[error("Rate limit exceeded. Please wait.")]
     RateLimitExceeded,
-    #[error("Download slot limit reached")]
     HitDownloadSlotLimit,
-    #[error("Connectivity issue detected. Enable port-forwarding to resolve.")]
     ConnectivityIssueDetected,
+    SeedListRateLimitExceeded { window: f64, retry_after: f64 },
+    LeechListRateLimitExceeded { window: f64, retry_after: f64 },
 }
 
 impl AnnounceWarning {
@@ -21,6 +20,56 @@ impl AnnounceWarning {
             // duplicate announce bug.
             Self::RateLimitExceeded => true,
             _ => false,
+        }
+    }
+}
+
+fn format_duration(seconds: f64) -> String {
+    if !seconds.is_finite() {
+        return "later".to_string();
+    }
+
+    let seconds = seconds.max(0f64).ceil() as u64;
+
+    match seconds {
+        0 => "now".to_string(),
+        1..=59 => format!("{seconds}s"),
+        60..=3599 => format!("{}m", seconds / 60),
+        3600..=86399 => format!("{}h", seconds / 3600),
+        86400..=604799 => format!("{}d", seconds / 86400),
+        _ => format!("{}w", seconds / 604800),
+    }
+}
+
+impl Display for AnnounceWarning {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::RateLimitExceeded => write!(f, "Rate limit exceeded. Please wait."),
+            Self::HitDownloadSlotLimit => write!(f, "Download slot limit reached"),
+            Self::ConnectivityIssueDetected => {
+                write!(
+                    f,
+                    "Connectivity issue detected. Enable port-forwarding to resolve."
+                )
+            }
+            Self::SeedListRateLimitExceeded {
+                window,
+                retry_after,
+            } => write!(
+                f,
+                "Seed peer list limit hit ({} window). Retry in {}.",
+                format_duration(*window),
+                format_duration(*retry_after)
+            ),
+            Self::LeechListRateLimitExceeded {
+                window,
+                retry_after,
+            } => write!(
+                f,
+                "Leech peer list limit hit ({} window). Retry in {}.",
+                format_duration(*window),
+                format_duration(*retry_after)
+            ),
         }
     }
 }
@@ -85,5 +134,31 @@ impl WarningCollection {
         message.truncate(message.len() - SEPARATOR.len());
 
         Some(message)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rate_limit_warning_names_the_window_and_retry() {
+        let warning = AnnounceWarning::SeedListRateLimitExceeded {
+            window: 900f64,
+            retry_after: 600f64,
+        };
+
+        assert_eq!(
+            warning.to_string(),
+            "Seed peer list limit hit (15m window). Retry in 10m."
+        );
+    }
+
+    #[test]
+    fn silent_warning_is_not_serialized() {
+        let mut warnings = WarningCollection::new();
+        warnings.add(AnnounceWarning::RateLimitExceeded);
+
+        assert!(warnings.into_message().is_none());
     }
 }
